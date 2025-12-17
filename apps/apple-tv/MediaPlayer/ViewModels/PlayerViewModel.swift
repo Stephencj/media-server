@@ -53,10 +53,12 @@ class PlayerViewModel: ObservableObject {
         setupObservers()
     }
 
-    deinit {
+    func cleanup() {
         if let observer = timeObserver {
             player.removeTimeObserver(observer)
+            timeObserver = nil
         }
+        player.pause()
     }
 
     private func setupObservers() {
@@ -134,25 +136,28 @@ class PlayerViewModel: ObservableObject {
     func selectAudioTrack(_ index: Int) {
         guard let playerItem = player.currentItem else { return }
 
-        let group = playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .audible)
-        if let group = group, index < group.options.count {
-            playerItem.select(group.options[index], in: group)
+        Task {
+            if let group = try? await playerItem.asset.loadMediaSelectionGroup(for: .audible),
+               index < group.options.count {
+                playerItem.select(group.options[index], in: group)
+            }
         }
     }
 
     func selectSubtitle(_ language: String?) {
         guard let playerItem = player.currentItem else { return }
 
-        let group = playerItem.asset.mediaSelectionGroup(forMediaCharacteristic: .legible)
-        if let group = group {
-            if let language = language {
-                if let option = group.options.first(where: {
-                    $0.locale?.languageCode == language
-                }) {
-                    playerItem.select(option, in: group)
+        Task {
+            if let group = try? await playerItem.asset.loadMediaSelectionGroup(for: .legible) {
+                if let language = language {
+                    if let option = group.options.first(where: {
+                        $0.locale?.language.languageCode?.identifier == language
+                    }) {
+                        playerItem.select(option, in: group)
+                    }
+                } else {
+                    playerItem.select(nil, in: group)
                 }
-            } else {
-                playerItem.select(nil, in: group)
             }
         }
     }

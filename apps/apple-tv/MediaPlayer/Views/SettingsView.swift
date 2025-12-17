@@ -154,9 +154,7 @@ struct SettingsView: View {
             Task {
                 do {
                     try await APIClient.shared.deleteSource(id: source.id)
-                    await MainActor.run {
-                        sources.remove(at: index)
-                    }
+                    sources.remove(at: index)
                 } catch {
                     // Handle error
                 }
