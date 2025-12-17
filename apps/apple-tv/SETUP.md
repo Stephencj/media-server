@@ -1,51 +1,11 @@
-# Apple TV App Setup
+# Apple TV App
 
-## Creating the Xcode Project
+## Opening the Project
 
-Since I can't create Xcode projects directly, follow these steps:
-
-### 1. Create New Project in Xcode
-
-1. Open Xcode
-2. File > New > Project
-3. Select **tvOS** tab
-4. Choose **App**
-5. Configure:
-   - Product Name: `MediaPlayer`
-   - Team: Your development team
-   - Organization Identifier: `com.yourname` (or your bundle ID prefix)
-   - Interface: **SwiftUI**
-   - Language: **Swift**
-6. Save in: `apps/apple-tv/` (replace the MediaPlayer folder)
-
-### 2. Add Source Files
-
-After creating the project:
-
-1. Delete the default `ContentView.swift` file
-2. In Xcode's Project Navigator, right-click on the `MediaPlayer` folder
-3. Select **Add Files to "MediaPlayer"...**
-4. Navigate to the `MediaPlayer` folder with all the Swift files
-5. Select all folders: `App`, `Views`, `ViewModels`, `Models`, `Services`, `Components`, `Extensions`
-6. Check **"Copy items if needed"** and **"Create groups"**
-7. Click Add
-
-### 3. Project Settings
-
-1. Select the project in the navigator
-2. Select the `MediaPlayer` target
-3. Go to **Signing & Capabilities**:
-   - Add your Team
-   - Check "Automatically manage signing"
-
-4. Go to **Info** tab and add:
-   - `App Transport Security Settings` > `Allow Arbitrary Loads` = `YES`
-   (Required for local network HTTP during development)
-
-### 4. Build and Run
-
-1. Select an Apple TV simulator or your device
-2. Press Cmd+R to build and run
+1. Open `MediaPlayer.xcodeproj` in Xcode
+2. Select your Development Team in Signing & Capabilities
+3. Select an Apple TV simulator or device
+4. Press Cmd+R to build and run
 
 ## Project Structure
 
@@ -75,14 +35,14 @@ MediaPlayer/
 ├── Services/
 │   ├── APIClient.swift         # HTTP client
 │   └── AuthService.swift       # Authentication
-└── Components/
-    └── MediaCardView.swift     # Reusable media card
+├── Components/
+│   └── MediaCardView.swift     # Reusable media card
+└── Assets.xcassets/            # App icons and colors
 ```
 
 ## Configuration
 
-The app connects to your media server. On first launch:
-
+On first launch:
 1. Enter your server URL (e.g., `http://192.168.1.100:8080`)
 2. Create an account or log in
 3. The app will load your media library

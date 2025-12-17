@@ -44,8 +44,9 @@ coverage.html
 tmp/
 temp/
 
-# Apps - Xcode/Android Studio generated
-apps/apple-tv/MediaPlayer.xcodeproj/
+# Apps - Xcode/Android Studio user data
+apps/apple-tv/MediaPlayer.xcodeproj/xcuserdata/
+apps/apple-tv/MediaPlayer.xcodeproj/project.xcworkspace/xcuserdata/
 apps/apple-tv/MediaPlayer.xcworkspace/
 apps/apple-tv/MediaPlayer/build/
 apps/apple-tv/DerivedData/
