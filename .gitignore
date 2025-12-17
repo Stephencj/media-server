@@ -13,6 +13,7 @@ data/
 
 # Go binaries
 media-server
+server
 *.exe
 
 # IDE
