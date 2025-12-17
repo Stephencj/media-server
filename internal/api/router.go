@@ -23,6 +23,11 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	progressHandler := handlers.NewProgressHandler(database)
 	sourceHandler := handlers.NewSourceHandler(database)
 
+	// Serve web admin interface
+	router.StaticFile("/", "./web/index.html")
+	router.StaticFile("/index.html", "./web/index.html")
+	router.Static("/assets", "./web/assets")
+
 	// Health check
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})

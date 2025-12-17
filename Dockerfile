@@ -36,8 +36,13 @@ RUN mkdir -p /data /media && \
 # Copy binary from builder
 COPY --from=builder /app/media-server /usr/local/bin/media-server
 
+# Copy web interface
+COPY --from=builder /app/web /app/web
+
 # Copy default config
 COPY config.yaml /etc/media-server/config.yaml
+
+WORKDIR /app
 
 # Switch to non-root user
 USER mediaserver

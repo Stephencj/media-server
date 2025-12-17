@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Server Admin</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        .container { max-width: 900px; margin: 0 auto; padding: 20px; }
+        h1 { color: #1e88e5; margin-bottom: 30px; }
+        h2 { color: #90caf9; margin: 20px 0 15px; font-size: 1.2rem; }
+
+        /* Auth */
+        #auth-section { max-width: 400px; margin: 100px auto; }
+        #auth-section h1 { text-align: center; }
+        .tabs { display: flex; margin-bottom: 20px; }
+        .tab { flex: 1; padding: 12px; background: #16213e; border: none; color: #888; cursor: pointer; }
+        .tab.active { background: #1e88e5; color: white; }
+        .tab:first-child { border-radius: 8px 0 0 8px; }
+        .tab:last-child { border-radius: 0 8px 8px 0; }
+
+        /* Forms */
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #90caf9; font-size: 0.9rem; }
+        input, select {
+            width: 100%; padding: 12px; border: 1px solid #333;
+            border-radius: 8px; background: #16213e; color: #eee; font-size: 1rem;
+        }
+        input:focus, select:focus { outline: none; border-color: #1e88e5; }
+        button {
+            padding: 12px 24px; border: none; border-radius: 8px;
+            background: #1e88e5; color: white; font-size: 1rem; cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #1565c0; }
+        button:disabled { background: #444; cursor: not-allowed; }
+        .btn-secondary { background: #37474f; }
+        .btn-secondary:hover { background: #455a64; }
+        .btn-danger { background: #c62828; }
+        .btn-danger:hover { background: #b71c1c; }
+        .btn-sm { padding: 8px 16px; font-size: 0.9rem; }
+
+        /* Cards */
+        .card {
+            background: #16213e; border-radius: 12px; padding: 20px; margin-bottom: 20px;
+        }
+        .card-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 15px;
+        }
+        .card-header h2 { margin: 0; }
+
+        /* Sources list */
+        .source-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px; background: #1a1a2e; border-radius: 8px; margin-bottom: 10px;
+        }
+        .source-info { flex: 1; }
+        .source-name { font-weight: 600; margin-bottom: 4px; }
+        .source-path { font-size: 0.85rem; color: #888; font-family: monospace; }
+        .source-meta { font-size: 0.8rem; color: #666; margin-top: 4px; }
+
+        /* Stats */
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+        .stat {
+            background: #1a1a2e; padding: 20px; border-radius: 8px; text-align: center;
+        }
+        .stat-value { font-size: 2rem; font-weight: 700; color: #1e88e5; }
+        .stat-label { font-size: 0.85rem; color: #888; margin-top: 5px; }
+
+        /* Messages */
+        .error { color: #ef5350; font-size: 0.9rem; margin-top: 10px; }
+        .success { color: #66bb6a; font-size: 0.9rem; margin-top: 10px; }
+        .empty { color: #666; text-align: center; padding: 30px; }
+
+        /* Header */
+        header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #333;
+        }
+        header h1 { margin: 0; }
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .username { color: #90caf9; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #16213e; border-radius: 12px; padding: 25px;
+            width: 90%; max-width: 500px;
+        }
+        .modal h2 { margin-bottom: 20px; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+        /* Inline form */
+        .inline-form { display: flex; gap: 10px; }
+        .inline-form input { flex: 1; }
+
+        /* Scanning status */
+        .scanning { display: flex; align-items: center; gap: 10px; color: #ffa726; }
+        .spinner {
+            width: 20px; height: 20px; border: 2px solid #333;
+            border-top-color: #ffa726; border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Hide sections */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <!-- Auth Section -->
+    <div id="auth-section">
+        <h1>Media Server</h1>
+        <div class="tabs">
+            <button class="tab active" onclick="showAuthTab('login')">Login</button>
+            <button class="tab" onclick="showAuthTab('register')">Register</button>
+        </div>
+
+        <div id="login-form">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="login-username" placeholder="Enter username">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="login-password" placeholder="Enter password">
+            </div>
+            <button onclick="login()" style="width: 100%">Login</button>
+            <div id="login-error" class="error"></div>
+        </div>
+
+        <div id="register-form" class="hidden">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" id="register-username" placeholder="Choose username">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="register-email" placeholder="Enter email">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="register-password" placeholder="Choose password (min 6 chars)">
+            </div>
+            <button onclick="register()" style="width: 100%">Create Account</button>
+            <div id="register-error" class="error"></div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="main-section" class="hidden">
+        <div class="container">
+            <header>
+                <h1>Media Server</h1>
+                <div class="user-info">
+                    <span class="username" id="current-user"></span>
+                    <button class="btn-secondary btn-sm" onclick="logout()">Logout</button>
+                </div>
+            </header>
+
+            <!-- Stats -->
+            <div class="card">
+                <h2>Library</h2>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value" id="stat-movies">-</div>
+                        <div class="stat-label">Movies</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="stat-shows">-</div>
+                        <div class="stat-label">TV Shows</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="stat-sources">-</div>
+                        <div class="stat-label">Sources</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Media Sources -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Media Sources</h2>
+                    <div>
+                        <button class="btn-secondary btn-sm" onclick="scanLibrary()" id="scan-btn">Scan Library</button>
+                        <button class="btn-sm" onclick="showAddSource()">Add Source</button>
+                    </div>
+                </div>
+                <div id="scan-status" class="scanning hidden">
+                    <div class="spinner"></div>
+                    <span>Scanning library...</span>
+                </div>
+                <div id="sources-list"></div>
+            </div>
+
+            <!-- Recent Media -->
+            <div class="card">
+                <h2>Recently Added</h2>
+                <div id="recent-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Source Modal -->
+    <div class="modal-overlay" id="add-source-modal">
+        <div class="modal">
+            <h2>Add Media Source</h2>
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="source-name" placeholder="e.g., Movies, TV Shows">
+            </div>
+            <div class="form-group">
+                <label>Path</label>
+                <input type="text" id="source-path" placeholder="e.g., /mnt/media/movies">
+            </div>
+            <div class="form-group">
+                <label>Type</label>
+                <select id="source-type">
+                    <option value="movies">Movies</option>
+                    <option value="shows">TV Shows</option>
+                </select>
+            </div>
+            <div id="add-source-error" class="error"></div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="hideAddSource()">Cancel</button>
+                <button onclick="addSource()">Add Source</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = localStorage.getItem('token');
+        let currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+
+        // Check auth on load
+        if (token && currentUser) {
+            showDashboard();
+        }
+
+        function showAuthTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+            document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+        }
+
+        async function login() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
+            errorEl.textContent = '';
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Login failed');
+                }
+
+                const data = await res.json();
+                token = data.token;
+                currentUser = data.user;
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(currentUser));
+                showDashboard();
+            } catch (err) {
+                errorEl.textContent = err.message;
+            }
+        }
+
+        async function register() {
+            const username = document.getElementById('register-username').value;
+            const email = document.getElementById('register-email').value;
+            const password = document.getElementById('register-password').value;
+            const errorEl = document.getElementById('register-error');
+            errorEl.textContent = '';
+
+            try {
+                const res = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Registration failed');
+                }
+
+                const data = await res.json();
+                token = data.token;
+                currentUser = data.user;
+                localStorage.setItem('token', token);
+                localStorage.setItem('user', JSON.stringify(currentUser));
+                showDashboard();
+            } catch (err) {
+                errorEl.textContent = err.message;
+            }
+        }
+
+        function logout() {
+            token = null;
+            currentUser = null;
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('main-section').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('main-section').classList.remove('hidden');
+            document.getElementById('current-user').textContent = currentUser.username;
+            loadData();
+        }
+
+        async function api(endpoint, options = {}) {
+            const res = await fetch(endpoint, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    ...options.headers
+                }
+            });
+            if (res.status === 401) {
+                logout();
+                throw new Error('Session expired');
+            }
+            return res;
+        }
+
+        async function loadData() {
+            await Promise.all([loadSources(), loadStats(), loadRecent()]);
+        }
+
+        async function loadSources() {
+            try {
+                const res = await api('/api/sources');
+                const data = await res.json();
+                const sources = data.sources || [];
+                document.getElementById('stat-sources').textContent = sources.length;
+
+                const list = document.getElementById('sources-list');
+                if (sources.length === 0) {
+                    list.innerHTML = '<div class="empty">No media sources configured. Add one to get started.</div>';
+                    return;
+                }
+
+                list.innerHTML = sources.map(s => `
+                    <div class="source-item">
+                        <div class="source-info">
+                            <div class="source-name">${escapeHtml(s.name)}</div>
+                            <div class="source-path">${escapeHtml(s.path)}</div>
+                            <div class="source-meta">Type: ${s.type} ${s.last_scan ? '• Last scan: ' + new Date(s.last_scan).toLocaleString() : ''}</div>
+                        </div>
+                        <button class="btn-danger btn-sm" onclick="deleteSource(${s.id})">Remove</button>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Failed to load sources:', err);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const [moviesRes, showsRes] = await Promise.all([
+                    api('/api/library/movies?limit=1'),
+                    api('/api/library/shows?limit=1')
+                ]);
+                const movies = await moviesRes.json();
+                const shows = await showsRes.json();
+                document.getElementById('stat-movies').textContent = movies.total || 0;
+                document.getElementById('stat-shows').textContent = shows.total || 0;
+            } catch (err) {
+                console.error('Failed to load stats:', err);
+            }
+        }
+
+        async function loadRecent() {
+            try {
+                const res = await api('/api/library/recent?limit=5');
+                const data = await res.json();
+                const items = data.items || [];
+
+                const list = document.getElementById('recent-list');
+                if (items.length === 0) {
+                    list.innerHTML = '<div class="empty">No media found. Add a source and scan your library.</div>';
+                    return;
+                }
+
+                list.innerHTML = items.map(m => `
+                    <div class="source-item">
+                        <div class="source-info">
+                            <div class="source-name">${escapeHtml(m.title)}</div>
+                            <div class="source-path">${m.year || ''} ${m.type === 'show' ? '• TV Show' : '• Movie'}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Failed to load recent:', err);
+            }
+        }
+
+        function showAddSource() {
+            document.getElementById('add-source-modal').classList.add('active');
+            document.getElementById('source-name').value = '';
+            document.getElementById('source-path').value = '';
+            document.getElementById('add-source-error').textContent = '';
+        }
+
+        function hideAddSource() {
+            document.getElementById('add-source-modal').classList.remove('active');
+        }
+
+        async function addSource() {
+            const name = document.getElementById('source-name').value;
+            const path = document.getElementById('source-path').value;
+            const type = document.getElementById('source-type').value;
+            const errorEl = document.getElementById('add-source-error');
+            errorEl.textContent = '';
+
+            if (!name || !path) {
+                errorEl.textContent = 'Name and path are required';
+                return;
+            }
+
+            try {
+                const res = await api('/api/sources', {
+                    method: 'POST',
+                    body: JSON.stringify({ name, path, type })
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Failed to add source');
+                }
+
+                hideAddSource();
+                loadSources();
+            } catch (err) {
+                errorEl.textContent = err.message;
+            }
+        }
+
+        async function deleteSource(id) {
+            if (!confirm('Remove this media source?')) return;
+
+            try {
+                await api(`/api/sources/${id}`, { method: 'DELETE' });
+                loadSources();
+            } catch (err) {
+                alert('Failed to delete source: ' + err.message);
+            }
+        }
+
+        async function scanLibrary() {
+            const btn = document.getElementById('scan-btn');
+            const status = document.getElementById('scan-status');
+
+            btn.disabled = true;
+            status.classList.remove('hidden');
+
+            try {
+                await api('/api/library/scan', { method: 'POST' });
+                // Poll for completion or just wait
+                setTimeout(async () => {
+                    status.classList.add('hidden');
+                    btn.disabled = false;
+                    await loadData();
+                }, 3000);
+            } catch (err) {
+                alert('Scan failed: ' + err.message);
+                status.classList.add('hidden');
+                btn.disabled = false;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
