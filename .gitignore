@@ -1,0 +1,54 @@
+# Environment and secrets
+.env
+*.env.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Transcode cache
+transcode/
+data/
+
+# Go binaries
+media-server
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test media
+test-media/
+
+# Build artifacts
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage.out
+coverage.html
+
+# Temporary files
+tmp/
+temp/
+
+# Apps - Xcode/Android Studio generated
+apps/apple-tv/MediaPlayer.xcodeproj/
+apps/apple-tv/MediaPlayer.xcworkspace/
+apps/apple-tv/MediaPlayer/build/
+apps/apple-tv/DerivedData/
+apps/fire-tv/.gradle/
+apps/fire-tv/app/build/
+apps/fire-tv/local.properties

@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  media-server:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+      - ${MEDIA_PATH:-./test-media}:/media:ro
+    environment:
+      - MEDIA_SERVER_DB_PATH=/data/media-server.db
+      - MEDIA_SERVER_JWT_SECRET=${JWT_SECRET:-development-secret-change-me}
+      - MEDIA_SERVER_ENV=development
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+    restart: unless-stopped
+
+volumes:
+  data:

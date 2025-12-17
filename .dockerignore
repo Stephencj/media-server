@@ -1,0 +1,35 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+LICENSE
+
+# IDE
+.idea/
+.vscode/
+
+# Environment
+.env
+.env.*
+
+# Apps (not needed in Docker image)
+apps/
+
+# Data and cache
+data/
+transcode/
+*.db
+
+# Test files
+*_test.go
+test-media/
+
+# Scripts (not needed in runtime image)
+scripts/
+
+# Docker files (prevent recursive copy)
+Dockerfile
+docker-compose*.yml
+.dockerignore

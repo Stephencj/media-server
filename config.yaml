@@ -1,0 +1,43 @@
+# Media Server Configuration
+
+# Server settings
+host: "0.0.0.0"
+port: "8080"
+environment: "development"  # development or production
+
+# Database
+database_path: "~/.media-server/media-server.db"
+
+# JWT Authentication
+# IMPORTANT: Change this to a secure random string in production!
+jwt_secret: "your-secret-key-change-me-in-production"
+jwt_expiration_hours: 168  # 7 days
+
+# Media Sources
+# Add your media directories here
+media_sources:
+  # Example local source:
+  # - id: "movies"
+  #   name: "Movies"
+  #   path: "/path/to/movies"
+  #   type: "local"
+
+  # Example NAS source:
+  # - id: "nas-movies"
+  #   name: "NAS Movies"
+  #   path: "/mnt/nas/movies"
+  #   type: "smb"
+  #   username: "user"
+  #   password: "pass"
+
+# Transcoding settings
+ffmpeg_path: "ffmpeg"
+transcode_dir: "~/.media-server/transcode"
+enable_hw_accel: true
+hw_accel_type: "videotoolbox"  # videotoolbox (macOS), nvenc (Nvidia), qsv (Intel)
+default_quality: "1080p"
+thumbnail_seconds: 30
+
+# TMDb API for metadata (optional)
+# Get your API key from: https://www.themoviedb.org/settings/api
+tmdb_api_key: ""

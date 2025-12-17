@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  media-server:
+    image: ghcr.io/stephencjuliano/media-server:latest
+    container_name: media-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+      - /mnt/media:/media:ro
+    environment:
+      - MEDIA_SERVER_DB_PATH=/data/media-server.db
+      - MEDIA_SERVER_JWT_SECRET=${JWT_SECRET}
+      - MEDIA_SERVER_ENV=production
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Caddy for HTTPS reverse proxy
+  # Uncomment if you want HTTPS support
+  # caddy:
+  #   image: caddy:2-alpine
+  #   container_name: caddy
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   depends_on:
+  #     - media-server
+  #   restart: unless-stopped
+
+volumes:
+  data:
+  # caddy_data:
+  # caddy_config:
