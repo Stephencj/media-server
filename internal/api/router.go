@@ -67,6 +67,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 				stream.GET("/:id/segment/:num.ts", streamHandler.GetSegment)
 				stream.GET("/:id/subtitles/:lang.vtt", streamHandler.GetSubtitle)
 				stream.GET("/:id/direct", streamHandler.DirectPlay)
+				stream.DELETE("/:id/transcode", streamHandler.StopTranscode)
 			}
 
 			// Progress

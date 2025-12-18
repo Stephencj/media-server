@@ -7,19 +7,33 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stephencjuliano/media-server/internal/config"
 	"github.com/stephencjuliano/media-server/internal/db"
+	"github.com/stephencjuliano/media-server/pkg/ffmpeg"
 )
 
 type StreamHandler struct {
-	db  *db.DB
-	cfg *config.Config
+	db             *db.DB
+	cfg            *config.Config
+	sessionManager *ffmpeg.SessionManager
 }
 
 func NewStreamHandler(database *db.DB, cfg *config.Config) *StreamHandler {
-	return &StreamHandler{db: database, cfg: cfg}
+	sm := ffmpeg.NewSessionManager(
+		cfg.FFmpegPath,
+		cfg.TranscodeDir,
+		cfg.EnableHWAccel,
+		cfg.HWAccelType,
+	)
+
+	return &StreamHandler{
+		db:             database,
+		cfg:            cfg,
+		sessionManager: sm,
+	}
 }
 
 // GetManifest returns the HLS manifest for a media item
@@ -41,21 +55,62 @@ func (h *StreamHandler) GetManifest(c *gin.Context) {
 		return
 	}
 
-	// Check if transcode exists or if direct play is possible
-	transcodeDir := filepath.Join(h.cfg.TranscodeDir, fmt.Sprintf("%d", id))
-	manifestPath := filepath.Join(transcodeDir, "manifest.m3u8")
+	// Check if file exists
+	if _, err := os.Stat(media.FilePath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Media file not found"})
+		return
+	}
 
-	// Check if manifest exists
-	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
-		// TODO: Trigger transcoding if needed
-		// For now, generate a simple manifest pointing to direct stream
+	// Check if direct play is possible (H.264/HEVC in MP4/MKV)
+	if h.canDirectPlay(media.FilePath) {
 		manifest := h.generateDirectPlayManifest(media, id)
 		c.Header("Content-Type", "application/vnd.apple.mpegurl")
 		c.String(http.StatusOK, manifest)
 		return
 	}
 
+	// Need to transcode - check for existing manifest
+	transcodeDir := filepath.Join(h.cfg.TranscodeDir, fmt.Sprintf("%d", id))
+	manifestPath := filepath.Join(transcodeDir, "manifest.m3u8")
+
+	// Check if transcode is complete
+	if data, err := os.ReadFile(manifestPath); err == nil {
+		if strings.Contains(string(data), "#EXT-X-ENDLIST") {
+			// Transcode complete, serve the file
+			c.Header("Content-Type", "application/vnd.apple.mpegurl")
+			c.File(manifestPath)
+			return
+		}
+	}
+
+	// Start or get existing transcode session
+	profile := ffmpeg.Profiles["1080p"]
+	// Use resolution string to determine profile (e.g., "1920x1080")
+	if media.Resolution != "" && strings.Contains(media.Resolution, "x") {
+		parts := strings.Split(media.Resolution, "x")
+		if len(parts) == 2 {
+			if height, err := strconv.Atoi(parts[1]); err == nil && height <= 720 {
+				profile = ffmpeg.Profiles["720p"]
+			}
+		}
+	}
+
+	_, err = h.sessionManager.GetOrStartSession(id, media.FilePath, profile)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transcoding: " + err.Error()})
+		return
+	}
+
+	// Wait for initial segments (at least 2 for smooth playback)
+	err = h.sessionManager.WaitForSegments(id, 2, 30*time.Second)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transcoding timeout - " + err.Error()})
+		return
+	}
+
+	// Serve the manifest (now has at least some segments)
 	c.Header("Content-Type", "application/vnd.apple.mpegurl")
+	c.Header("Cache-Control", "no-cache")
 	c.File(manifestPath)
 }
 
@@ -79,12 +134,24 @@ func (h *StreamHandler) GetSegment(c *gin.Context) {
 	transcodeDir := filepath.Join(h.cfg.TranscodeDir, fmt.Sprintf("%d", id))
 	segmentPath := filepath.Join(transcodeDir, fmt.Sprintf("segment%s.ts", numStr))
 
+	// Wait for segment if transcoding is in progress
+	if h.sessionManager.IsTranscoding(id) {
+		deadline := time.Now().Add(30 * time.Second)
+		for time.Now().Before(deadline) {
+			if _, err := os.Stat(segmentPath); err == nil {
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+	}
+
 	if _, err := os.Stat(segmentPath); os.IsNotExist(err) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Segment not found"})
 		return
 	}
 
 	c.Header("Content-Type", "video/MP2T")
+	c.Header("Cache-Control", "max-age=86400")
 	c.File(segmentPath)
 }
 
@@ -153,8 +220,34 @@ func (h *StreamHandler) DirectPlay(c *gin.Context) {
 	c.File(media.FilePath)
 }
 
+// StopTranscode stops an active transcode session
+func (h *StreamHandler) StopTranscode(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid media ID"})
+		return
+	}
+
+	h.sessionManager.StopSession(id)
+	c.JSON(http.StatusOK, gin.H{"message": "Transcode stopped"})
+}
+
+// canDirectPlay checks if the file can be played directly on Apple TV
+func (h *StreamHandler) canDirectPlay(filePath string) bool {
+	ext := strings.ToLower(filepath.Ext(filePath))
+
+	// MP4 and M4V are typically directly playable
+	if ext == ".mp4" || ext == ".m4v" {
+		return true
+	}
+
+	// For MKV, we'd need to probe the codec
+	// For now, assume MKV needs transcoding (common case)
+	return false
+}
+
 func (h *StreamHandler) generateDirectPlayManifest(media *db.Media, id int64) string {
-	// Generate a simple HLS manifest for direct play
 	duration := media.Duration
 	if duration == 0 {
 		duration = 3600 // Default 1 hour
@@ -164,7 +257,8 @@ func (h *StreamHandler) generateDirectPlayManifest(media *db.Media, id int64) st
 #EXT-X-VERSION:3
 #EXT-X-TARGETDURATION:%d
 #EXT-X-MEDIA-SEQUENCE:0
-#EXTINF:%d,
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXTINF:%d.0,
 /api/stream/%d/direct
 #EXT-X-ENDLIST
 `, duration, duration, id)
