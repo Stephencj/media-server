@@ -16,92 +16,15 @@ struct PlayerView: View {
 
     var body: some View {
         ZStack {
-            // Video Player
-            VideoPlayer(player: viewModel.player)
+            // Video Player - use AVPlayerViewController for proper tvOS controls
+            AVPlayerView(player: viewModel.player)
                 .ignoresSafeArea()
                 .onAppear {
                     viewModel.play()
                 }
                 .onDisappear {
-                    viewModel.pause()
+                    viewModel.cleanup()
                 }
-
-            // Custom overlay for additional controls
-            if viewModel.showControls {
-                VStack {
-                    // Top bar
-                    HStack {
-                        Button(action: { dismiss() }) {
-                            Image(systemName: "xmark")
-                                .font(.title2)
-                                .padding()
-                                .background(.ultraThinMaterial)
-                                .clipShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-
-                        Spacer()
-
-                        Text(media.title)
-                            .font(.headline)
-
-                        Spacer()
-
-                        // Audio/Subtitle selector
-                        Menu {
-                            if !media.decodedAudioTracks.isEmpty {
-                                Section("Audio") {
-                                    ForEach(media.decodedAudioTracks) { track in
-                                        Button(track.displayName) {
-                                            viewModel.selectAudioTrack(track.index)
-                                        }
-                                    }
-                                }
-                            }
-
-                            if !media.decodedSubtitleTracks.isEmpty {
-                                Section("Subtitles") {
-                                    Button("Off") {
-                                        viewModel.selectSubtitle(nil)
-                                    }
-                                    ForEach(media.decodedSubtitleTracks) { track in
-                                        Button(track.displayName) {
-                                            viewModel.selectSubtitle(track.language)
-                                        }
-                                    }
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .font(.title2)
-                                .padding()
-                                .background(.ultraThinMaterial)
-                                .clipShape(Circle())
-                        }
-                    }
-                    .padding()
-
-                    Spacer()
-
-                    // Bottom progress bar
-                    VStack(spacing: 10) {
-                        // Time labels
-                        HStack {
-                            Text(formatTime(viewModel.currentTime))
-                            Spacer()
-                            Text("-\(formatTime(viewModel.duration - viewModel.currentTime))")
-                        }
-                        .font(.caption)
-                        .foregroundColor(.white)
-
-                        // Progress
-                        ProgressView(value: viewModel.progress)
-                            .tint(.white)
-                    }
-                    .padding()
-                    .background(.ultraThinMaterial)
-                }
-            }
 
             // Loading indicator
             if viewModel.isBuffering {
@@ -113,25 +36,27 @@ struct PlayerView: View {
             viewModel.markAsCompleted()
             dismiss()
         }
-        .gesture(
-            TapGesture()
-                .onEnded { _ in
-                    withAnimation {
-                        viewModel.showControls.toggle()
-                    }
-                }
-        )
+        // Menu button dismisses
+        .onExitCommand {
+            viewModel.pause()
+            dismiss()
+        }
+    }
+}
+
+// Wrap AVPlayerViewController for proper tvOS playback controls
+struct AVPlayerView: UIViewControllerRepresentable {
+    let player: AVPlayer
+
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.showsPlaybackControls = true
+        return controller
     }
 
-    private func formatTime(_ seconds: Double) -> String {
-        let hours = Int(seconds) / 3600
-        let minutes = (Int(seconds) % 3600) / 60
-        let secs = Int(seconds) % 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, secs)
-        }
-        return String(format: "%d:%02d", minutes, secs)
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
+        uiViewController.player = player
     }
 }
 
