@@ -4,7 +4,7 @@ struct WatchProgress: Codable, Identifiable {
     let id: Int64?
     let userId: Int64?
     let mediaId: Int64
-    let mediaType: String
+    let mediaType: String?
     let position: Int
     let duration: Int
     let completed: Bool

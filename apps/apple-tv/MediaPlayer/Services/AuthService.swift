@@ -139,7 +139,7 @@ class AuthService: ObservableObject {
     // MARK: - Keychain Methods
 
     private func saveToKeychain(token: String) {
-        let data = token.data(using: .utf8)!
+        guard let data = token.data(using: .utf8) else { return }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

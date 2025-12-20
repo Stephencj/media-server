@@ -14,7 +14,7 @@ class AppState: ObservableObject {
     @Published var errorMessage: String?
 
     private init() {
-        self.serverURL = UserDefaults.standard.string(forKey: "serverURL") ?? "http://192.168.1.100:8080"
+        self.serverURL = UserDefaults.standard.string(forKey: "serverURL") ?? ""
     }
 
     func showError(_ message: String) {
