@@ -179,6 +179,27 @@ func (db *DB) Migrate() error {
 			UNIQUE(user_id, media_id, media_type)
 		)`,
 
+		`CREATE TABLE IF NOT EXISTS playlists (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS playlist_items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			playlist_id INTEGER NOT NULL,
+			media_id INTEGER NOT NULL,
+			media_type TEXT NOT NULL,
+			position INTEGER NOT NULL,
+			added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
+			UNIQUE(playlist_id, media_id, media_type)
+		)`,
+
 		// Indexes for common queries
 		`CREATE INDEX IF NOT EXISTS idx_media_type ON media(type)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_title ON media(title)`,
@@ -187,6 +208,8 @@ func (db *DB) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_episodes_season ON episodes(season_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_watch_progress_user ON watch_progress(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_playlists_user ON playlists(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_playlist_items_playlist ON playlist_items(playlist_id)`,
 	}
 
 	for _, migration := range migrations {

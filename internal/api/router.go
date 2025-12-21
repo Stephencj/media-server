@@ -23,6 +23,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	progressHandler := handlers.NewProgressHandler(database)
 	sourceHandler := handlers.NewSourceHandler(database)
 	watchlistHandler := handlers.NewWatchlistHandler(database)
+	playlistHandler := handlers.NewPlaylistHandler(database)
 
 	// Serve web admin interface
 	router.StaticFile("/", "./web/index.html")
@@ -100,6 +101,19 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 
 			// Mark as watched
 			protected.POST("/media/:mediaId/watched", watchlistHandler.MarkAsWatched)
+
+			// Playlists
+			playlists := protected.Group("/playlists")
+			{
+				playlists.GET("", playlistHandler.GetPlaylists)
+				playlists.POST("", playlistHandler.CreatePlaylist)
+				playlists.GET("/:playlistId", playlistHandler.GetPlaylist)
+				playlists.PUT("/:playlistId", playlistHandler.UpdatePlaylist)
+				playlists.DELETE("/:playlistId", playlistHandler.DeletePlaylist)
+				playlists.POST("/:playlistId/items/:mediaId", playlistHandler.AddToPlaylist)
+				playlists.DELETE("/:playlistId/items/:mediaId", playlistHandler.RemoveFromPlaylist)
+				playlists.PUT("/:playlistId/reorder", playlistHandler.ReorderPlaylist)
+			}
 		}
 	}
 

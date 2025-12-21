@@ -7,15 +7,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stephencjuliano/media-server/internal/config"
 	"github.com/stephencjuliano/media-server/internal/db"
+	"github.com/stephencjuliano/media-server/internal/library"
 )
 
 type LibraryHandler struct {
-	db  *db.DB
-	cfg *config.Config
+	db      *db.DB
+	cfg     *config.Config
+	scanner *library.Scanner
 }
 
 func NewLibraryHandler(database *db.DB, cfg *config.Config) *LibraryHandler {
-	return &LibraryHandler{db: database, cfg: cfg}
+	return &LibraryHandler{
+		db:      database,
+		cfg:     cfg,
+		scanner: library.NewScanner(database, cfg),
+	}
 }
 
 type PaginatedResponse struct {
@@ -110,8 +116,22 @@ func (h *LibraryHandler) GetMedia(c *gin.Context) {
 
 // TriggerScan initiates a library scan
 func (h *LibraryHandler) TriggerScan(c *gin.Context) {
-	// TODO: Implement async library scan
-	// This will be implemented in the library scanner module
+	if h.scanner.IsRunning() {
+		c.JSON(http.StatusConflict, gin.H{
+			"message": "Scan already in progress",
+			"status":  "scanning",
+		})
+		return
+	}
+
+	// Run scan asynchronously
+	go func() {
+		if err := h.scanner.ScanAll(); err != nil {
+			// Log error but don't fail - scan is async
+			println("Scan error:", err.Error())
+		}
+	}()
+
 	c.JSON(http.StatusAccepted, gin.H{
 		"message": "Library scan started",
 		"status":  "scanning",

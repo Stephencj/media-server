@@ -389,23 +389,27 @@ func parseFilename(filePath string) (title string, year int, mediaType db.MediaT
 	filename := filepath.Base(filePath)
 	filename = strings.TrimSuffix(filename, filepath.Ext(filename))
 
+	// Remove quality indicators FIRST (before separators become spaces)
+	// This prevents "1080p" from being parsed as year "1080"
+	qualityRegex := regexp.MustCompile(`(?i)[\.\s_-]?(1080p|720p|480p|2160p|4k|uhd|hdr|bluray|bdrip|webrip|web-dl|hdtv|dvdrip|x264|x265|hevc|h264|h265|aac|ac3|dts|HD)[\.\s_-]?`)
+	filename = qualityRegex.ReplaceAllString(filename, " ")
+
 	// Replace common separators with spaces
 	filename = strings.ReplaceAll(filename, ".", " ")
 	filename = strings.ReplaceAll(filename, "_", " ")
 	filename = strings.ReplaceAll(filename, "-", " ")
 
-	// Look for year pattern (4 digits in parentheses or standalone)
-	yearRegex := regexp.MustCompile(`\((\d{4})\)|(\d{4})`)
+	// Remove parenthetical quality/format info like "(1080p HD)" or "(HD)"
+	parenQualityRegex := regexp.MustCompile(`\([^)]*(?:1080|720|480|2160|HD|p)[^)]*\)`)
+	filename = parenQualityRegex.ReplaceAllString(filename, "")
+
+	// Look for year pattern - only match realistic movie years (1900-2099)
+	yearRegex := regexp.MustCompile(`\(?(19\d{2}|20\d{2})\)?`)
 	yearMatch := yearRegex.FindStringSubmatch(filename)
 	if len(yearMatch) > 0 {
-		for _, m := range yearMatch[1:] {
-			if m != "" {
-				year, _ = strconv.Atoi(m)
-				// Remove year from title
-				filename = yearRegex.ReplaceAllString(filename, "")
-				break
-			}
-		}
+		year, _ = strconv.Atoi(yearMatch[1])
+		// Remove year from title
+		filename = yearRegex.ReplaceAllString(filename, "")
 	}
 
 	// Check for TV show patterns (S01E01, 1x01, etc.)
@@ -416,17 +420,14 @@ func parseFilename(filePath string) (title string, year int, mediaType db.MediaT
 		mediaType = db.MediaTypeMovie
 	}
 
-	// Clean up title
-	title = strings.TrimSpace(filename)
-
-	// Remove quality indicators
-	qualityRegex := regexp.MustCompile(`(?i)\b(1080p|720p|480p|2160p|4k|uhd|hdr|bluray|bdrip|webrip|web-dl|hdtv|dvdrip|x264|x265|hevc|h264|h265|aac|ac3|dts)\b`)
-	title = qualityRegex.ReplaceAllString(title, "")
-
-	// Clean up multiple spaces
+	// Clean up multiple spaces and trim
 	spaceRegex := regexp.MustCompile(`\s+`)
-	title = spaceRegex.ReplaceAllString(title, " ")
+	title = spaceRegex.ReplaceAllString(filename, " ")
 	title = strings.TrimSpace(title)
+
+	// Remove leading numbers if they look like file ordering (01, 02, etc.)
+	leadingNumRegex := regexp.MustCompile(`^0\d\s+`)
+	title = leadingNumRegex.ReplaceAllString(title, "")
 
 	if title == "" {
 		title = filepath.Base(filePath)

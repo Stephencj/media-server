@@ -6,7 +6,7 @@ port: "8080"
 environment: "development"  # development or production
 
 # Database
-database_path: "~/.media-server/media-server.db"
+database_path: "/data/media-server.db"
 
 # JWT Authentication
 # IMPORTANT: Change this to a secure random string in production!
@@ -32,7 +32,7 @@ media_sources:
 
 # Transcoding settings
 ffmpeg_path: "ffmpeg"
-transcode_dir: "~/.media-server/transcode"
+transcode_dir: "/data/transcode"
 enable_hw_accel: true
 hw_accel_type: "videotoolbox"  # videotoolbox (macOS), nvenc (Nvidia), qsv (Intel)
 default_quality: "1080p"

@@ -406,3 +406,194 @@ func (db *DB) MarkAsWatched(userID, mediaID int64, mediaType MediaType) error {
 	)
 	return err
 }
+
+// Playlist Repository Methods
+
+// CreatePlaylist creates a new playlist
+func (db *DB) CreatePlaylist(userID int64, name, description string) (*Playlist, error) {
+	result, err := db.conn.Exec(
+		`INSERT INTO playlists (user_id, name, description) VALUES (?, ?, ?)`,
+		userID, name, description,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return db.GetPlaylistByID(id)
+}
+
+// GetPlaylistByID retrieves a playlist by ID with item count
+func (db *DB) GetPlaylistByID(id int64) (*Playlist, error) {
+	playlist := &Playlist{}
+	err := db.conn.QueryRow(
+		`SELECT p.id, p.user_id, p.name, p.description, p.created_at, p.updated_at,
+			(SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
+		 FROM playlists p WHERE p.id = ?`,
+		id,
+	).Scan(&playlist.ID, &playlist.UserID, &playlist.Name, &playlist.Description,
+		&playlist.CreatedAt, &playlist.UpdatedAt, &playlist.ItemCount)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return playlist, err
+}
+
+// GetUserPlaylists retrieves all playlists for a user
+func (db *DB) GetUserPlaylists(userID int64) ([]*Playlist, error) {
+	rows, err := db.conn.Query(
+		`SELECT p.id, p.user_id, p.name, p.description, p.created_at, p.updated_at,
+			(SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
+		 FROM playlists p WHERE p.user_id = ? ORDER BY p.updated_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	playlists := make([]*Playlist, 0)
+	for rows.Next() {
+		p := &Playlist{}
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Description,
+			&p.CreatedAt, &p.UpdatedAt, &p.ItemCount); err != nil {
+			return nil, err
+		}
+		playlists = append(playlists, p)
+	}
+	return playlists, nil
+}
+
+// UpdatePlaylist updates a playlist's name and description
+func (db *DB) UpdatePlaylist(id int64, name, description string) error {
+	result, err := db.conn.Exec(
+		`UPDATE playlists SET name = ?, description = ?, updated_at = ? WHERE id = ?`,
+		name, description, time.Now(), id,
+	)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// DeletePlaylist deletes a playlist and all its items
+func (db *DB) DeletePlaylist(id int64) error {
+	result, err := db.conn.Exec(`DELETE FROM playlists WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// AddToPlaylist adds a media item to a playlist
+func (db *DB) AddToPlaylist(playlistID, mediaID int64, mediaType MediaType) error {
+	// Get the next position
+	var maxPos int
+	db.conn.QueryRow(
+		`SELECT COALESCE(MAX(position), 0) FROM playlist_items WHERE playlist_id = ?`,
+		playlistID,
+	).Scan(&maxPos)
+
+	_, err := db.conn.Exec(
+		`INSERT INTO playlist_items (playlist_id, media_id, media_type, position)
+		 VALUES (?, ?, ?, ?)`,
+		playlistID, mediaID, mediaType, maxPos+1,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Update playlist's updated_at timestamp
+	db.conn.Exec(`UPDATE playlists SET updated_at = ? WHERE id = ?`, time.Now(), playlistID)
+	return nil
+}
+
+// RemoveFromPlaylist removes a media item from a playlist
+func (db *DB) RemoveFromPlaylist(playlistID, mediaID int64, mediaType MediaType) error {
+	result, err := db.conn.Exec(
+		`DELETE FROM playlist_items WHERE playlist_id = ? AND media_id = ? AND media_type = ?`,
+		playlistID, mediaID, mediaType,
+	)
+	if err != nil {
+		return err
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return ErrNotFound
+	}
+
+	// Reorder remaining items
+	db.conn.Exec(
+		`UPDATE playlist_items SET position = (
+			SELECT COUNT(*) FROM playlist_items pi2
+			WHERE pi2.playlist_id = playlist_items.playlist_id
+			AND pi2.id <= playlist_items.id
+		) WHERE playlist_id = ?`,
+		playlistID,
+	)
+
+	// Update playlist's updated_at timestamp
+	db.conn.Exec(`UPDATE playlists SET updated_at = ? WHERE id = ?`, time.Now(), playlistID)
+	return nil
+}
+
+// GetPlaylistItems retrieves all items in a playlist with media details
+func (db *DB) GetPlaylistItems(playlistID int64) ([]*PlaylistItemWithMedia, error) {
+	rows, err := db.conn.Query(
+		`SELECT pi.id, pi.playlist_id, pi.media_id, pi.media_type, pi.position, pi.added_at,
+			m.title, m.year, m.poster_path, m.duration, m.overview, m.rating, m.resolution
+		 FROM playlist_items pi
+		 JOIN media m ON pi.media_id = m.id
+		 WHERE pi.playlist_id = ?
+		 ORDER BY pi.position ASC`,
+		playlistID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]*PlaylistItemWithMedia, 0)
+	for rows.Next() {
+		item := &PlaylistItemWithMedia{}
+		if err := rows.Scan(&item.ID, &item.PlaylistID, &item.MediaID, &item.MediaType,
+			&item.Position, &item.AddedAt, &item.Title, &item.Year, &item.PosterPath,
+			&item.Duration, &item.Overview, &item.Rating, &item.Resolution); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+// ReorderPlaylistItems reorders items in a playlist based on the provided order
+func (db *DB) ReorderPlaylistItems(playlistID int64, itemIDs []int64) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for i, itemID := range itemIDs {
+		_, err := tx.Exec(
+			`UPDATE playlist_items SET position = ? WHERE id = ? AND playlist_id = ?`,
+			i+1, itemID, playlistID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Update playlist's updated_at timestamp
+	tx.Exec(`UPDATE playlists SET updated_at = ? WHERE id = ?`, time.Now(), playlistID)
+
+	return tx.Commit()
+}

@@ -117,6 +117,106 @@
 
         /* Hide sections */
         .hidden { display: none !important; }
+
+        /* Playlists */
+        .playlist-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px; background: #1a1a2e; border-radius: 8px; margin-bottom: 10px;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .playlist-item:hover { background: #252542; }
+        .playlist-name { font-weight: 600; margin-bottom: 4px; }
+        .playlist-meta { font-size: 0.85rem; color: #888; }
+        .playlist-actions { display: flex; gap: 8px; }
+
+        /* Playlist Items (draggable) */
+        .playlist-item-row {
+            display: flex; align-items: center; gap: 12px;
+            padding: 12px; background: #1a1a2e; border-radius: 8px; margin-bottom: 8px;
+            cursor: grab;
+        }
+        .playlist-item-row:active { cursor: grabbing; }
+        .playlist-item-row.dragging { opacity: 0.5; background: #2a2a4e; }
+        .playlist-item-row.drag-over { border-top: 2px solid #1e88e5; }
+        .drag-handle { color: #555; font-size: 1.2rem; cursor: grab; }
+        .playlist-item-poster {
+            width: 60px; height: 90px; background: #333; border-radius: 4px;
+            object-fit: cover;
+        }
+        .playlist-item-info { flex: 1; }
+        .playlist-item-title { font-weight: 600; margin-bottom: 4px; }
+        .playlist-item-meta { font-size: 0.85rem; color: #888; }
+        .playlist-item-duration { color: #666; font-size: 0.8rem; }
+
+        /* Add to Playlist Dropdown */
+        .dropdown-container { position: relative; display: inline-block; }
+        .dropdown-menu {
+            display: none; position: absolute; top: 100%; right: 0;
+            background: #16213e; border-radius: 8px; min-width: 200px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 100;
+            padding: 8px 0; margin-top: 4px;
+        }
+        .dropdown-menu.active { display: block; }
+        .dropdown-item {
+            padding: 10px 16px; cursor: pointer; transition: background 0.2s;
+        }
+        .dropdown-item:hover { background: #252542; }
+        .dropdown-divider { height: 1px; background: #333; margin: 8px 0; }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; padding: 12px 20px;
+            background: #1e88e5; color: white; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 2000;
+            animation: slideIn 0.3s ease;
+        }
+        .toast.success { background: #43a047; }
+        .toast.error { background: #e53935; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* Media Grid */
+        .media-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px;
+        }
+        .media-card {
+            position: relative; cursor: pointer; border-radius: 8px; overflow: hidden;
+            transition: transform 0.2s;
+        }
+        .media-card:hover { transform: scale(1.05); }
+        .media-poster {
+            width: 100%; aspect-ratio: 2/3; background: #333; object-fit: cover;
+        }
+        .media-card-info {
+            padding: 8px; background: #16213e;
+        }
+        .media-card-title { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .media-card-year { font-size: 0.8rem; color: #888; }
+        .media-card-actions {
+            position: absolute; top: 8px; right: 8px;
+        }
+
+        /* Player Modal */
+        .player-modal {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: #000; z-index: 3000; display: none;
+        }
+        .player-modal.active { display: flex; flex-direction: column; }
+        .player-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 15px 20px; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent);
+            position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+        }
+        .player-title { font-size: 1.2rem; font-weight: 600; }
+        .player-close { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
+        .player-video { flex: 1; width: 100%; background: #000; }
+        .up-next {
+            position: absolute; bottom: 80px; right: 20px;
+            background: rgba(0,0,0,0.9); border-radius: 8px; padding: 15px;
+            max-width: 300px; z-index: 10;
+        }
+        .up-next-label { font-size: 0.8rem; color: #888; margin-bottom: 8px; }
+        .up-next-title { font-weight: 600; margin-bottom: 10px; }
+        .up-next-actions { display: flex; gap: 10px; }
     </style>
 </head>
 <body>
@@ -205,6 +305,15 @@
                 <div id="sources-list"></div>
             </div>
 
+            <!-- Playlists -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>Playlists</h2>
+                    <button class="btn-sm" onclick="showCreatePlaylist()">New Playlist</button>
+                </div>
+                <div id="playlists-list"></div>
+            </div>
+
             <!-- Recent Media -->
             <div class="card">
                 <h2>Recently Added</h2>
@@ -236,6 +345,74 @@
             <div class="modal-actions">
                 <button class="btn-secondary" onclick="hideAddSource()">Cancel</button>
                 <button onclick="addSource()">Add Source</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Playlist Modal -->
+    <div class="modal-overlay" id="playlist-modal">
+        <div class="modal">
+            <h2 id="playlist-modal-title">New Playlist</h2>
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="playlist-name" placeholder="Enter playlist name">
+            </div>
+            <div class="form-group">
+                <label>Description (optional)</label>
+                <input type="text" id="playlist-description" placeholder="Enter description">
+            </div>
+            <div id="playlist-modal-error" class="error"></div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="hidePlaylistModal()">Cancel</button>
+                <button onclick="savePlaylist()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Playlist Detail Modal -->
+    <div class="modal-overlay" id="playlist-detail-modal">
+        <div class="modal" style="max-width: 700px;">
+            <div class="card-header">
+                <div>
+                    <h2 id="playlist-detail-name"></h2>
+                    <div id="playlist-detail-desc" class="playlist-meta"></div>
+                </div>
+                <div class="playlist-actions">
+                    <button class="btn-sm" onclick="playPlaylist()">Play All</button>
+                    <button class="btn-sm btn-secondary" onclick="shufflePlaylist()">Shuffle</button>
+                    <button class="btn-sm btn-secondary" onclick="editCurrentPlaylist()">Edit</button>
+                    <button class="btn-secondary" onclick="hidePlaylistDetail()">Close</button>
+                </div>
+            </div>
+            <div id="playlist-items-list" style="max-height: 400px; overflow-y: auto; margin-top: 15px;"></div>
+        </div>
+    </div>
+
+    <!-- Add to Playlist Modal -->
+    <div class="modal-overlay" id="add-to-playlist-modal">
+        <div class="modal" style="max-width: 400px;">
+            <h2>Add to Playlist</h2>
+            <div id="add-to-playlist-list" style="max-height: 300px; overflow-y: auto;"></div>
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button class="btn-secondary" onclick="hideAddToPlaylist()">Cancel</button>
+                <button onclick="showCreatePlaylistFromAdd()">New Playlist</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Player Modal -->
+    <div class="player-modal" id="player-modal">
+        <div class="player-header">
+            <div class="player-title" id="player-title"></div>
+            <button class="player-close" onclick="closePlayer()">&times;</button>
+        </div>
+        <video id="player-video" class="player-video" controls></video>
+        <div class="up-next hidden" id="up-next">
+            <div class="up-next-label">Up Next</div>
+            <div class="up-next-title" id="up-next-title"></div>
+            <div class="up-next-actions">
+                <button class="btn-sm" onclick="playNextItem()">Play Now</button>
+                <button class="btn-sm btn-secondary" onclick="cancelAutoPlay()">Cancel</button>
             </div>
         </div>
     </div>
@@ -410,8 +587,9 @@
                     <div class="source-item">
                         <div class="source-info">
                             <div class="source-name">${escapeHtml(m.title)}</div>
-                            <div class="source-path">${m.year || ''} ${m.type === 'show' ? '• TV Show' : '• Movie'}</div>
+                            <div class="source-path">${m.year || ''} ${m.type === 'tvshow' ? '• TV Show' : '• Movie'}</div>
                         </div>
+                        <button class="btn-sm btn-secondary" onclick="showAddToPlaylist(${m.id}, '${m.type}')">+ Playlist</button>
                     </div>
                 `).join('');
             } catch (err) {
@@ -498,6 +676,408 @@
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // ============ PLAYLIST FUNCTIONS ============
+        let playlists = [];
+        let currentPlaylist = null;
+        let currentPlaylistItems = [];
+        let editingPlaylistId = null;
+        let addToPlaylistMediaId = null;
+        let addToPlaylistMediaType = null;
+        let draggedItem = null;
+
+        // Playlist playback state
+        let playlistQueue = [];
+        let currentPlaylistIndex = -1;
+        let autoPlayTimer = null;
+
+        async function loadPlaylists() {
+            try {
+                const res = await api('/api/playlists');
+                const data = await res.json();
+                playlists = data.items || [];
+                renderPlaylists();
+            } catch (err) {
+                console.error('Failed to load playlists:', err);
+            }
+        }
+
+        function renderPlaylists() {
+            const list = document.getElementById('playlists-list');
+            if (playlists.length === 0) {
+                list.innerHTML = '<div class="empty">No playlists yet. Create one to get started.</div>';
+                return;
+            }
+
+            list.innerHTML = playlists.map(p => `
+                <div class="playlist-item" onclick="showPlaylistDetail(${p.id})">
+                    <div>
+                        <div class="playlist-name">${escapeHtml(p.name)}</div>
+                        <div class="playlist-meta">${p.item_count} item${p.item_count !== 1 ? 's' : ''}</div>
+                    </div>
+                    <div class="playlist-actions" onclick="event.stopPropagation()">
+                        <button class="btn-danger btn-sm" onclick="deletePlaylist(${p.id})">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showCreatePlaylist() {
+            editingPlaylistId = null;
+            document.getElementById('playlist-modal-title').textContent = 'New Playlist';
+            document.getElementById('playlist-name').value = '';
+            document.getElementById('playlist-description').value = '';
+            document.getElementById('playlist-modal-error').textContent = '';
+            document.getElementById('playlist-modal').classList.add('active');
+        }
+
+        function hidePlaylistModal() {
+            document.getElementById('playlist-modal').classList.remove('active');
+        }
+
+        async function savePlaylist() {
+            const name = document.getElementById('playlist-name').value.trim();
+            const description = document.getElementById('playlist-description').value.trim();
+            const errorEl = document.getElementById('playlist-modal-error');
+            errorEl.textContent = '';
+
+            if (!name) {
+                errorEl.textContent = 'Name is required';
+                return;
+            }
+
+            try {
+                if (editingPlaylistId) {
+                    await api(`/api/playlists/${editingPlaylistId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ name, description })
+                    });
+                    showToast('Playlist updated', 'success');
+                } else {
+                    await api('/api/playlists', {
+                        method: 'POST',
+                        body: JSON.stringify({ name, description })
+                    });
+                    showToast('Playlist created', 'success');
+                }
+                hidePlaylistModal();
+                await loadPlaylists();
+                if (currentPlaylist && currentPlaylist.id === editingPlaylistId) {
+                    showPlaylistDetail(editingPlaylistId);
+                }
+            } catch (err) {
+                errorEl.textContent = err.message;
+            }
+        }
+
+        async function deletePlaylist(id) {
+            if (!confirm('Delete this playlist?')) return;
+
+            try {
+                await api(`/api/playlists/${id}`, { method: 'DELETE' });
+                showToast('Playlist deleted', 'success');
+                loadPlaylists();
+                if (currentPlaylist && currentPlaylist.id === id) {
+                    hidePlaylistDetail();
+                }
+            } catch (err) {
+                showToast('Failed to delete playlist', 'error');
+            }
+        }
+
+        async function showPlaylistDetail(id) {
+            try {
+                const res = await api(`/api/playlists/${id}`);
+                const data = await res.json();
+                currentPlaylist = data.playlist;
+                currentPlaylistItems = data.items || [];
+
+                document.getElementById('playlist-detail-name').textContent = currentPlaylist.name;
+                document.getElementById('playlist-detail-desc').textContent = currentPlaylist.description || '';
+                renderPlaylistItems();
+                document.getElementById('playlist-detail-modal').classList.add('active');
+            } catch (err) {
+                showToast('Failed to load playlist', 'error');
+            }
+        }
+
+        function hidePlaylistDetail() {
+            document.getElementById('playlist-detail-modal').classList.remove('active');
+            currentPlaylist = null;
+            currentPlaylistItems = [];
+        }
+
+        function renderPlaylistItems() {
+            const list = document.getElementById('playlist-items-list');
+            if (currentPlaylistItems.length === 0) {
+                list.innerHTML = '<div class="empty">This playlist is empty. Add items from your media library.</div>';
+                return;
+            }
+
+            list.innerHTML = currentPlaylistItems.map((item, index) => `
+                <div class="playlist-item-row" draggable="true" data-index="${index}" data-id="${item.id}"
+                     ondragstart="handleDragStart(event)" ondragover="handleDragOver(event)"
+                     ondragenter="handleDragEnter(event)" ondragleave="handleDragLeave(event)"
+                     ondrop="handleDrop(event)" ondragend="handleDragEnd(event)">
+                    <span class="drag-handle">&#9776;</span>
+                    ${item.poster_path ? `<img src="https://image.tmdb.org/t/p/w92${item.poster_path}" class="playlist-item-poster" alt="">` : '<div class="playlist-item-poster"></div>'}
+                    <div class="playlist-item-info" onclick="playPlaylistItem(${index})">
+                        <div class="playlist-item-title">${escapeHtml(item.title)}</div>
+                        <div class="playlist-item-meta">${item.year || ''} ${item.resolution || ''}</div>
+                        <div class="playlist-item-duration">${formatDuration(item.duration)}</div>
+                    </div>
+                    <button class="btn-danger btn-sm" onclick="removeFromPlaylist(${item.id}, ${item.media_id}, '${item.media_type}')">Remove</button>
+                </div>
+            `).join('');
+        }
+
+        function editCurrentPlaylist() {
+            if (!currentPlaylist) return;
+            editingPlaylistId = currentPlaylist.id;
+            document.getElementById('playlist-modal-title').textContent = 'Edit Playlist';
+            document.getElementById('playlist-name').value = currentPlaylist.name;
+            document.getElementById('playlist-description').value = currentPlaylist.description || '';
+            document.getElementById('playlist-modal-error').textContent = '';
+            document.getElementById('playlist-modal').classList.add('active');
+        }
+
+        async function removeFromPlaylist(itemId, mediaId, mediaType) {
+            if (!currentPlaylist) return;
+            try {
+                await api(`/api/playlists/${currentPlaylist.id}/items/${mediaId}?type=${mediaType}`, { method: 'DELETE' });
+                showToast('Removed from playlist', 'success');
+                showPlaylistDetail(currentPlaylist.id);
+                loadPlaylists();
+            } catch (err) {
+                showToast('Failed to remove item', 'error');
+            }
+        }
+
+        // Drag and Drop
+        function handleDragStart(e) {
+            draggedItem = e.target;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDragEnter(e) {
+            e.preventDefault();
+            const row = e.target.closest('.playlist-item-row');
+            if (row && row !== draggedItem) {
+                row.classList.add('drag-over');
+            }
+        }
+
+        function handleDragLeave(e) {
+            const row = e.target.closest('.playlist-item-row');
+            if (row) {
+                row.classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const row = e.target.closest('.playlist-item-row');
+            if (row && draggedItem && row !== draggedItem) {
+                const fromIndex = parseInt(draggedItem.dataset.index);
+                const toIndex = parseInt(row.dataset.index);
+                reorderPlaylistItems(fromIndex, toIndex);
+            }
+            if (row) row.classList.remove('drag-over');
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.playlist-item-row').forEach(r => r.classList.remove('drag-over'));
+            draggedItem = null;
+        }
+
+        async function reorderPlaylistItems(fromIndex, toIndex) {
+            if (!currentPlaylist) return;
+
+            // Reorder locally
+            const items = [...currentPlaylistItems];
+            const [moved] = items.splice(fromIndex, 1);
+            items.splice(toIndex, 0, moved);
+            currentPlaylistItems = items;
+            renderPlaylistItems();
+
+            // Send to server
+            const itemIds = items.map(i => i.id);
+            try {
+                await api(`/api/playlists/${currentPlaylist.id}/reorder`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ item_ids: itemIds })
+                });
+            } catch (err) {
+                showToast('Failed to reorder', 'error');
+                showPlaylistDetail(currentPlaylist.id);
+            }
+        }
+
+        // Add to Playlist
+        function showAddToPlaylist(mediaId, mediaType) {
+            addToPlaylistMediaId = mediaId;
+            addToPlaylistMediaType = mediaType;
+
+            const list = document.getElementById('add-to-playlist-list');
+            if (playlists.length === 0) {
+                list.innerHTML = '<div class="empty">No playlists. Create one first.</div>';
+            } else {
+                list.innerHTML = playlists.map(p => `
+                    <div class="dropdown-item" onclick="addToPlaylist(${p.id})">${escapeHtml(p.name)}</div>
+                `).join('');
+            }
+            document.getElementById('add-to-playlist-modal').classList.add('active');
+        }
+
+        function hideAddToPlaylist() {
+            document.getElementById('add-to-playlist-modal').classList.remove('active');
+            addToPlaylistMediaId = null;
+            addToPlaylistMediaType = null;
+        }
+
+        async function addToPlaylist(playlistId) {
+            if (!addToPlaylistMediaId) return;
+
+            try {
+                await api(`/api/playlists/${playlistId}/items/${addToPlaylistMediaId}?type=${addToPlaylistMediaType}`, { method: 'POST' });
+                showToast('Added to playlist', 'success');
+                hideAddToPlaylist();
+                loadPlaylists();
+            } catch (err) {
+                showToast('Failed to add to playlist', 'error');
+            }
+        }
+
+        function showCreatePlaylistFromAdd() {
+            hideAddToPlaylist();
+            showCreatePlaylist();
+        }
+
+        // Sequential Playback
+        function playPlaylist() {
+            if (currentPlaylistItems.length === 0) return;
+            playlistQueue = [...currentPlaylistItems];
+            currentPlaylistIndex = 0;
+            hidePlaylistDetail();
+            playCurrentQueueItem();
+        }
+
+        function shufflePlaylist() {
+            if (currentPlaylistItems.length === 0) return;
+            playlistQueue = [...currentPlaylistItems].sort(() => Math.random() - 0.5);
+            currentPlaylistIndex = 0;
+            hidePlaylistDetail();
+            playCurrentQueueItem();
+        }
+
+        function playPlaylistItem(index) {
+            playlistQueue = [...currentPlaylistItems];
+            currentPlaylistIndex = index;
+            hidePlaylistDetail();
+            playCurrentQueueItem();
+        }
+
+        function playCurrentQueueItem() {
+            if (currentPlaylistIndex < 0 || currentPlaylistIndex >= playlistQueue.length) {
+                closePlayer();
+                return;
+            }
+
+            const item = playlistQueue[currentPlaylistIndex];
+            document.getElementById('player-title').textContent = item.title;
+            document.getElementById('player-modal').classList.add('active');
+
+            const video = document.getElementById('player-video');
+            const streamUrl = `/api/stream/${item.media_id}/direct?token=${token}&type=${item.media_type}`;
+            video.src = streamUrl;
+            video.play();
+
+            video.onended = onMediaComplete;
+            video.onerror = () => {
+                // Try HLS fallback
+                const hlsUrl = `/api/stream/${item.media_id}/manifest.m3u8?token=${token}&type=${item.media_type}`;
+                if (Hls && Hls.isSupported()) {
+                    const hls = new Hls();
+                    hls.loadSource(hlsUrl);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    video.src = hlsUrl;
+                    video.play();
+                }
+            };
+        }
+
+        function onMediaComplete() {
+            const nextIndex = currentPlaylistIndex + 1;
+            if (nextIndex < playlistQueue.length) {
+                const nextItem = playlistQueue[nextIndex];
+                document.getElementById('up-next-title').textContent = nextItem.title;
+                document.getElementById('up-next').classList.remove('hidden');
+
+                autoPlayTimer = setTimeout(() => {
+                    playNextItem();
+                }, 10000);
+            } else {
+                closePlayer();
+            }
+        }
+
+        function playNextItem() {
+            cancelAutoPlay();
+            currentPlaylistIndex++;
+            playCurrentQueueItem();
+        }
+
+        function cancelAutoPlay() {
+            if (autoPlayTimer) {
+                clearTimeout(autoPlayTimer);
+                autoPlayTimer = null;
+            }
+            document.getElementById('up-next').classList.add('hidden');
+        }
+
+        function closePlayer() {
+            cancelAutoPlay();
+            const video = document.getElementById('player-video');
+            video.pause();
+            video.src = '';
+            document.getElementById('player-modal').classList.remove('active');
+            playlistQueue = [];
+            currentPlaylistIndex = -1;
+        }
+
+        // Helper functions
+        function formatDuration(seconds) {
+            if (!seconds) return '';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m`;
+        }
+
+        function showToast(message, type = '') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Update loadData to include playlists
+        const originalLoadData = loadData;
+        loadData = async function() {
+            await originalLoadData();
+            await loadPlaylists();
+        };
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </body>
 </html>

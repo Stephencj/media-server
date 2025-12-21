@@ -156,3 +156,41 @@ type Watchlist struct {
 	MediaType MediaType `json:"media_type"`
 	AddedAt   time.Time `json:"added_at"`
 }
+
+// Playlist represents a user-created playlist
+type Playlist struct {
+	ID          int64     `json:"id"`
+	UserID      int64     `json:"user_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	ItemCount   int       `json:"item_count"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// PlaylistItem represents an item in a playlist
+type PlaylistItem struct {
+	ID         int64     `json:"id"`
+	PlaylistID int64     `json:"playlist_id"`
+	MediaID    int64     `json:"media_id"`
+	MediaType  MediaType `json:"media_type"`
+	Position   int       `json:"position"`
+	AddedAt    time.Time `json:"added_at"`
+}
+
+// PlaylistItemWithMedia combines PlaylistItem with Media details for display
+type PlaylistItemWithMedia struct {
+	ID           int64     `json:"id"`
+	PlaylistID   int64     `json:"playlist_id"`
+	MediaID      int64     `json:"media_id"`
+	MediaType    MediaType `json:"media_type"`
+	Position     int       `json:"position"`
+	AddedAt      time.Time `json:"added_at"`
+	Title        string    `json:"title"`
+	Year         int       `json:"year,omitempty"`
+	PosterPath   string    `json:"poster_path,omitempty"`
+	Duration     int       `json:"duration,omitempty"`
+	Overview     string    `json:"overview,omitempty"`
+	Rating       float64   `json:"rating,omitempty"`
+	Resolution   string    `json:"resolution,omitempty"`
+}

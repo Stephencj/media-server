@@ -214,6 +214,43 @@ class APIClient: ObservableObject {
         let body = ["media_type": mediaType]
         let _: MessageResponse = try await post("/api/media/\(mediaId)/watched", body: body)
     }
+
+    // MARK: - Playlist Endpoints
+
+    func getPlaylists() async throws -> PlaylistsResponse {
+        try await get("/api/playlists")
+    }
+
+    func getPlaylist(id: Int64) async throws -> PlaylistWithItems {
+        try await get("/api/playlists/\(id)")
+    }
+
+    func createPlaylist(name: String, description: String?) async throws -> Playlist {
+        let request = CreatePlaylistRequest(name: name, description: description)
+        return try await post("/api/playlists", body: request)
+    }
+
+    func updatePlaylist(id: Int64, name: String, description: String?) async throws {
+        let body = CreatePlaylistRequest(name: name, description: description)
+        let _: MessageResponse = try await self.request("/api/playlists/\(id)", method: "PUT", body: body, authenticated: true)
+    }
+
+    func deletePlaylist(id: Int64) async throws {
+        try await delete("/api/playlists/\(id)")
+    }
+
+    func addToPlaylist(playlistId: Int64, mediaId: Int64, mediaType: String) async throws {
+        let _: MessageResponse = try await post("/api/playlists/\(playlistId)/items/\(mediaId)?type=\(mediaType)", body: EmptyBody())
+    }
+
+    func removeFromPlaylist(playlistId: Int64, mediaId: Int64, mediaType: String) async throws {
+        try await delete("/api/playlists/\(playlistId)/items/\(mediaId)?type=\(mediaType)")
+    }
+
+    func reorderPlaylist(playlistId: Int64, itemIds: [Int64]) async throws {
+        let body = ReorderPlaylistRequest(itemIds: itemIds)
+        let _: MessageResponse = try await self.request("/api/playlists/\(playlistId)/reorder", method: "PUT", body: body, authenticated: true)
+    }
 }
 
 struct MessageResponse: Codable {
