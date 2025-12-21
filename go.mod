@@ -1,6 +1,6 @@
 module github.com/stephencjuliano/media-server
 
-go 1.25.5
+go 1.24.0
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0
