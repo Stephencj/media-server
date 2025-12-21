@@ -146,15 +146,18 @@ class APIClient: ObservableObject {
     // MARK: - Streaming Endpoints
 
     func getStreamURL(mediaId: Int64) -> URL? {
-        URL(string: "\(baseURL)/api/stream/\(mediaId)/manifest.m3u8")
+        guard let token = authToken else { return nil }
+        return URL(string: "\(baseURL)/api/stream/\(mediaId)/manifest.m3u8?token=\(token)")
     }
 
     func getDirectPlayURL(mediaId: Int64) -> URL? {
-        URL(string: "\(baseURL)/api/stream/\(mediaId)/direct")
+        guard let token = authToken else { return nil }
+        return URL(string: "\(baseURL)/api/stream/\(mediaId)/direct?token=\(token)")
     }
 
     func getSubtitleURL(mediaId: Int64, language: String) -> URL? {
-        URL(string: "\(baseURL)/api/stream/\(mediaId)/subtitles/\(language).vtt")
+        guard let token = authToken else { return nil }
+        return URL(string: "\(baseURL)/api/stream/\(mediaId)/subtitles/\(language).vtt?token=\(token)")
     }
 
     // MARK: - Progress Endpoints

@@ -33,18 +33,8 @@ class PlayerViewModel: ObservableObject {
         }
 
         if let url = streamURL {
-            // Add auth token to URL request
-            var request = URLRequest(url: url)
-            if let token = AuthService.shared.token {
-                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            }
-
-            let asset = AVURLAsset(url: url, options: [
-                "AVURLAssetHTTPHeaderFieldsKey": [
-                    "Authorization": "Bearer \(AuthService.shared.token ?? "")"
-                ]
-            ])
-            let playerItem = AVPlayerItem(asset: asset)
+            // Token is included in URL query parameter for AVPlayer compatibility
+            let playerItem = AVPlayerItem(url: url)
             self.player = AVPlayer(playerItem: playerItem)
         } else {
             self.player = AVPlayer()
