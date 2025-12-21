@@ -376,6 +376,21 @@ func (db *DB) GetWatchlist(userID int64, limit int) ([]*Media, error) {
 	return scanMediaRows(rows)
 }
 
+// UpdateMedia updates an existing media item
+func (db *DB) UpdateMedia(media *Media) error {
+	_, err := db.conn.Exec(
+		`UPDATE media SET
+			title = ?, original_title = ?, overview = ?, poster_path = ?, backdrop_path = ?,
+			rating = ?, runtime = ?, genres = ?, tmdb_id = ?, imdb_id = ?,
+			season_count = ?, episode_count = ?, year = ?, updated_at = ?
+		 WHERE id = ?`,
+		media.Title, media.OriginalTitle, media.Overview, media.PosterPath, media.BackdropPath,
+		media.Rating, media.Runtime, media.Genres, media.TMDbID, media.IMDbID,
+		media.SeasonCount, media.EpisodeCount, media.Year, time.Now(), media.ID,
+	)
+	return err
+}
+
 // MarkAsWatched marks a media item as completed (100% watched)
 func (db *DB) MarkAsWatched(userID, mediaID int64, mediaType MediaType) error {
 	// Get media duration if available

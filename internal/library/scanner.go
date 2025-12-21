@@ -156,8 +156,13 @@ func (s *Scanner) ScanSource(source *db.MediaSource) error {
 
 func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 	// Check if already in database
-	if _, err := s.db.GetMediaByFilePath(filePath); err == nil {
-		return nil // Already exists
+	if existing, err := s.db.GetMediaByFilePath(filePath); err == nil {
+		// Already exists - check if we should refresh metadata
+		if s.tmdb.IsConfigured() && existing.TMDbID == 0 {
+			// Has no TMDB data yet, refresh it
+			s.refreshMetadata(existing)
+		}
+		return nil
 	}
 
 	// Get file info
@@ -202,6 +207,95 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 
 	log.Printf("Added: %s (%d)", media.Title, media.Year)
 	return nil
+}
+
+// refreshMetadata updates an existing media item with TMDB data
+func (s *Scanner) refreshMetadata(media *db.Media) {
+	if !s.tmdb.IsConfigured() {
+		return
+	}
+
+	// Parse title to get clean search term
+	title, year, _ := parseFilename(media.FilePath)
+	if media.Title != "" {
+		title = media.Title // Use existing title if available
+	}
+	if media.Year > 0 {
+		year = media.Year
+	}
+
+	log.Printf("Refreshing metadata for: %s", title)
+
+	// Create a copy to update
+	updated := *media
+
+	if media.Type == db.MediaTypeMovie {
+		result, err := s.tmdb.SearchMovie(title, year)
+		if err != nil || result == nil {
+			return
+		}
+
+		details, err := s.tmdb.GetMovieDetails(result.ID)
+		if err != nil {
+			return
+		}
+
+		updated.Title = details.Title
+		updated.OriginalTitle = details.OriginalTitle
+		updated.Overview = details.Overview
+		updated.PosterPath = details.PosterPath
+		updated.BackdropPath = details.BackdropPath
+		updated.Rating = details.VoteAverage
+		updated.Runtime = details.Runtime
+		updated.TMDbID = details.ID
+		updated.IMDbID = details.IMDbID
+		updated.Genres = tmdb.GenresToString(details.Genres)
+
+		if len(details.ReleaseDate) >= 4 {
+			if y, err := strconv.Atoi(details.ReleaseDate[:4]); err == nil {
+				updated.Year = y
+			}
+		}
+
+	} else if media.Type == db.MediaTypeTVShow {
+		result, err := s.tmdb.SearchTV(title, year)
+		if err != nil || result == nil {
+			return
+		}
+
+		details, err := s.tmdb.GetTVDetails(result.ID)
+		if err != nil {
+			return
+		}
+
+		updated.Title = details.Name
+		updated.OriginalTitle = details.OriginalName
+		updated.Overview = details.Overview
+		updated.PosterPath = details.PosterPath
+		updated.BackdropPath = details.BackdropPath
+		updated.Rating = details.VoteAverage
+		updated.SeasonCount = details.NumberOfSeasons
+		updated.EpisodeCount = details.NumberOfEpisodes
+		updated.TMDbID = details.ID
+		updated.Genres = tmdb.GenresToString(details.Genres)
+
+		if details.ExternalIDs != nil {
+			updated.IMDbID = details.ExternalIDs.IMDbID
+		}
+
+		if len(details.FirstAirDate) >= 4 {
+			if y, err := strconv.Atoi(details.FirstAirDate[:4]); err == nil {
+				updated.Year = y
+			}
+		}
+	}
+
+	// Update in database
+	if err := s.db.UpdateMedia(&updated); err != nil {
+		log.Printf("Failed to update metadata for %s: %v", title, err)
+	} else {
+		log.Printf("Updated metadata for: %s (%d)", updated.Title, updated.Year)
+	}
 }
 
 // enrichWithTMDB fetches and applies metadata from TMDB
