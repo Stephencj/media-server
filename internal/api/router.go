@@ -22,6 +22,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	streamHandler := handlers.NewStreamHandler(database, cfg)
 	progressHandler := handlers.NewProgressHandler(database)
 	sourceHandler := handlers.NewSourceHandler(database)
+	watchlistHandler := handlers.NewWatchlistHandler(database)
 
 	// Serve web admin interface
 	router.StaticFile("/", "./web/index.html")
@@ -87,6 +88,18 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 				sources.POST("", sourceHandler.CreateSource)
 				sources.DELETE("/:id", sourceHandler.DeleteSource)
 			}
+
+			// Watchlist
+			watchlist := protected.Group("/watchlist")
+			{
+				watchlist.GET("", watchlistHandler.GetWatchlist)
+				watchlist.POST("/:mediaId", watchlistHandler.AddToWatchlist)
+				watchlist.DELETE("/:mediaId", watchlistHandler.RemoveFromWatchlist)
+				watchlist.GET("/:mediaId/check", watchlistHandler.CheckWatchlist)
+			}
+
+			// Mark as watched
+			protected.POST("/media/:mediaId/watched", watchlistHandler.MarkAsWatched)
 		}
 	}
 

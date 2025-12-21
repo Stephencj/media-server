@@ -3,6 +3,8 @@ import SwiftUI
 struct MediaCardView: View {
     let media: Media
     var progress: WatchProgress? = nil
+    var onSave: ((Media) -> Void)? = nil
+    var onMarkWatched: ((Media) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -77,6 +79,19 @@ struct MediaCardView: View {
             }
         }
         .frame(width: 250)
+        .contextMenu {
+            Button {
+                onSave?(media)
+            } label: {
+                Label("Save", systemImage: "bookmark")
+            }
+
+            Button {
+                onMarkWatched?(media)
+            } label: {
+                Label("Mark as Watched", systemImage: "checkmark.circle")
+            }
+        }
     }
 }
 

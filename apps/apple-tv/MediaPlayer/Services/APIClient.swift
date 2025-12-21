@@ -191,6 +191,30 @@ class APIClient: ObservableObject {
     func deleteSource(id: Int64) async throws {
         try await delete("/api/sources/\(id)")
     }
+
+    // MARK: - Watchlist Endpoints
+
+    func getWatchlist(limit: Int = 50) async throws -> ItemsResponse<Media> {
+        try await get("/api/watchlist?limit=\(limit)")
+    }
+
+    func addToWatchlist(mediaId: Int64, mediaType: String) async throws {
+        let body = ["media_type": mediaType]
+        let _: MessageResponse = try await post("/api/watchlist/\(mediaId)", body: body)
+    }
+
+    func removeFromWatchlist(mediaId: Int64, mediaType: String) async throws {
+        try await delete("/api/watchlist/\(mediaId)?type=\(mediaType)")
+    }
+
+    func markAsWatched(mediaId: Int64, mediaType: String) async throws {
+        let body = ["media_type": mediaType]
+        let _: MessageResponse = try await post("/api/media/\(mediaId)/watched", body: body)
+    }
+}
+
+struct MessageResponse: Codable {
+    let message: String
 }
 
 // MARK: - Response Types

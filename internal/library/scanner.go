@@ -12,6 +12,7 @@ import (
 	"github.com/stephencjuliano/media-server/internal/config"
 	"github.com/stephencjuliano/media-server/internal/db"
 	"github.com/stephencjuliano/media-server/pkg/ffmpeg"
+	"github.com/stephencjuliano/media-server/pkg/tmdb"
 )
 
 // Scanner handles media library scanning
@@ -19,6 +20,7 @@ type Scanner struct {
 	db      *db.DB
 	cfg     *config.Config
 	ffprobe *ffmpeg.FFprobe
+	tmdb    *tmdb.Client
 	mu      sync.Mutex
 	running bool
 }
@@ -49,10 +51,18 @@ var videoExtensions = map[string]bool{
 
 // NewScanner creates a new library scanner
 func NewScanner(database *db.DB, cfg *config.Config) *Scanner {
+	tmdbClient := tmdb.NewClient(cfg.TMDbAPIKey)
+	if tmdbClient.IsConfigured() {
+		log.Println("TMDB metadata enrichment enabled")
+	} else {
+		log.Println("TMDB API key not configured - metadata enrichment disabled")
+	}
+
 	return &Scanner{
 		db:      database,
 		cfg:     cfg,
 		ffprobe: ffmpeg.NewFFprobe(cfg.FFmpegPath),
+		tmdb:    tmdbClient,
 	}
 }
 
@@ -166,7 +176,7 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 		metadata = &ffmpeg.Metadata{}
 	}
 
-	// Create media entry
+	// Create media entry with basic info
 	media := &db.Media{
 		Title:          title,
 		Type:           mediaType,
@@ -182,13 +192,102 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 		SubtitleTracks: metadata.SubtitleTracksJSON,
 	}
 
+	// Enrich with TMDB metadata if available
+	s.enrichWithTMDB(media, title, year, mediaType)
+
 	_, err = s.db.CreateMedia(media)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("Added: %s (%d)", title, year)
+	log.Printf("Added: %s (%d)", media.Title, media.Year)
 	return nil
+}
+
+// enrichWithTMDB fetches and applies metadata from TMDB
+func (s *Scanner) enrichWithTMDB(media *db.Media, title string, year int, mediaType db.MediaType) {
+	if !s.tmdb.IsConfigured() {
+		return
+	}
+
+	if mediaType == db.MediaTypeMovie {
+		// Search for movie
+		result, err := s.tmdb.SearchMovie(title, year)
+		if err != nil {
+			log.Printf("TMDB search failed for %s: %v", title, err)
+			return
+		}
+		if result == nil {
+			return
+		}
+
+		// Get detailed info
+		details, err := s.tmdb.GetMovieDetails(result.ID)
+		if err != nil {
+			log.Printf("TMDB details failed for %s: %v", title, err)
+			return
+		}
+
+		// Apply metadata
+		media.Title = details.Title
+		media.OriginalTitle = details.OriginalTitle
+		media.Overview = details.Overview
+		media.PosterPath = details.PosterPath
+		media.BackdropPath = details.BackdropPath
+		media.Rating = details.VoteAverage
+		media.Runtime = details.Runtime
+		media.TMDbID = details.ID
+		media.IMDbID = details.IMDbID
+		media.Genres = tmdb.GenresToString(details.Genres)
+
+		// Extract year from release date
+		if len(details.ReleaseDate) >= 4 {
+			if y, err := strconv.Atoi(details.ReleaseDate[:4]); err == nil {
+				media.Year = y
+			}
+		}
+
+	} else if mediaType == db.MediaTypeTVShow {
+		// Search for TV show
+		result, err := s.tmdb.SearchTV(title, year)
+		if err != nil {
+			log.Printf("TMDB search failed for %s: %v", title, err)
+			return
+		}
+		if result == nil {
+			return
+		}
+
+		// Get detailed info
+		details, err := s.tmdb.GetTVDetails(result.ID)
+		if err != nil {
+			log.Printf("TMDB details failed for %s: %v", title, err)
+			return
+		}
+
+		// Apply metadata
+		media.Title = details.Name
+		media.OriginalTitle = details.OriginalName
+		media.Overview = details.Overview
+		media.PosterPath = details.PosterPath
+		media.BackdropPath = details.BackdropPath
+		media.Rating = details.VoteAverage
+		media.SeasonCount = details.NumberOfSeasons
+		media.EpisodeCount = details.NumberOfEpisodes
+		media.TMDbID = details.ID
+		media.Genres = tmdb.GenresToString(details.Genres)
+
+		if details.ExternalIDs != nil {
+			media.IMDbID = details.ExternalIDs.IMDbID
+		}
+
+		// Extract year from first air date
+		if len(details.FirstAirDate) >= 4 {
+			if y, err := strconv.Atoi(details.FirstAirDate[:4]); err == nil {
+				media.Year = y
+			}
+		}
+	}
 }
 
 // parseFilename extracts title, year, and type from filename

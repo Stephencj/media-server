@@ -68,6 +68,12 @@ struct MediaRowView: View {
     let items: [Media]
     var progress: [Int64: WatchProgress]? = nil
 
+    @State private var showingSaveConfirmation = false
+    @State private var showingWatchedConfirmation = false
+    @State private var selectedMedia: Media?
+
+    private let api = APIClient.shared
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text(title)
@@ -81,7 +87,21 @@ struct MediaRowView: View {
                         NavigationLink(value: media) {
                             MediaCardView(
                                 media: media,
-                                progress: progress?[media.id]
+                                progress: progress?[media.id],
+                                onSave: { media in
+                                    selectedMedia = media
+                                    Task {
+                                        try? await api.addToWatchlist(mediaId: media.id, mediaType: media.type.rawValue)
+                                        showingSaveConfirmation = true
+                                    }
+                                },
+                                onMarkWatched: { media in
+                                    selectedMedia = media
+                                    Task {
+                                        try? await api.markAsWatched(mediaId: media.id, mediaType: media.type.rawValue)
+                                        showingWatchedConfirmation = true
+                                    }
+                                }
                             )
                         }
                         .buttonStyle(.card)
@@ -92,6 +112,16 @@ struct MediaRowView: View {
         }
         .navigationDestination(for: Media.self) { media in
             MediaDetailView(media: media)
+        }
+        .alert("Saved", isPresented: $showingSaveConfirmation) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("\(selectedMedia?.title ?? "Item") added to your list")
+        }
+        .alert("Marked as Watched", isPresented: $showingWatchedConfirmation) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("\(selectedMedia?.title ?? "Item") marked as watched")
         }
     }
 }

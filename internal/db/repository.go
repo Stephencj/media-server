@@ -252,7 +252,7 @@ func (db *DB) GetMediaByFilePath(filePath string) (*Media, error) {
 }
 
 func scanMediaRows(rows *sql.Rows) ([]*Media, error) {
-	var items []*Media
+	items := make([]*Media, 0) // Initialize as empty slice, not nil (ensures JSON [] not null)
 	for rows.Next() {
 		media := &Media{}
 		if err := rows.Scan(&media.ID, &media.Title, &media.OriginalTitle, &media.Type,
@@ -322,4 +322,72 @@ func (db *DB) GetContinueWatching(userID int64, limit int) ([]*WatchProgress, er
 		items = append(items, p)
 	}
 	return items, nil
+}
+
+// Watchlist Repository Methods
+
+// AddToWatchlist adds a media item to user's watchlist
+func (db *DB) AddToWatchlist(userID, mediaID int64, mediaType MediaType) error {
+	_, err := db.conn.Exec(
+		`INSERT OR IGNORE INTO watchlist (user_id, media_id, media_type, added_at)
+		 VALUES (?, ?, ?, ?)`,
+		userID, mediaID, mediaType, time.Now(),
+	)
+	return err
+}
+
+// RemoveFromWatchlist removes a media item from user's watchlist
+func (db *DB) RemoveFromWatchlist(userID, mediaID int64, mediaType MediaType) error {
+	_, err := db.conn.Exec(
+		`DELETE FROM watchlist WHERE user_id = ? AND media_id = ? AND media_type = ?`,
+		userID, mediaID, mediaType,
+	)
+	return err
+}
+
+// IsInWatchlist checks if a media item is in user's watchlist
+func (db *DB) IsInWatchlist(userID, mediaID int64, mediaType MediaType) (bool, error) {
+	var count int
+	err := db.conn.QueryRow(
+		`SELECT COUNT(*) FROM watchlist WHERE user_id = ? AND media_id = ? AND media_type = ?`,
+		userID, mediaID, mediaType,
+	).Scan(&count)
+	return count > 0, err
+}
+
+// GetWatchlist retrieves user's watchlist with media details
+func (db *DB) GetWatchlist(userID int64, limit int) ([]*Media, error) {
+	rows, err := db.conn.Query(
+		`SELECT m.id, m.title, m.original_title, m.type, m.year, m.overview, m.poster_path, m.backdrop_path,
+			m.rating, m.runtime, m.genres, m.tmdb_id, m.imdb_id, m.season_count, m.episode_count, m.source_id,
+			m.file_path, m.file_size, m.duration, m.video_codec, m.audio_codec, m.resolution, m.audio_tracks,
+			m.subtitle_tracks, m.created_at, m.updated_at
+		 FROM watchlist w
+		 JOIN media m ON w.media_id = m.id
+		 WHERE w.user_id = ?
+		 ORDER BY w.added_at DESC LIMIT ?`,
+		userID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanMediaRows(rows)
+}
+
+// MarkAsWatched marks a media item as completed (100% watched)
+func (db *DB) MarkAsWatched(userID, mediaID int64, mediaType MediaType) error {
+	// Get media duration if available
+	var duration int
+	db.conn.QueryRow(`SELECT COALESCE(duration, 0) FROM media WHERE id = ?`, mediaID).Scan(&duration)
+
+	_, err := db.conn.Exec(
+		`INSERT INTO watch_progress (user_id, media_id, media_type, position, duration, completed, updated_at)
+		 VALUES (?, ?, ?, ?, ?, 1, ?)
+		 ON CONFLICT(user_id, media_id, media_type) DO UPDATE SET
+		 completed = 1, updated_at = excluded.updated_at`,
+		userID, mediaID, mediaType, duration, duration, time.Now(),
+	)
+	return err
 }
