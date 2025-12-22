@@ -597,3 +597,382 @@ func (db *DB) ReorderPlaylistItems(playlistID int64, itemIDs []int64) error {
 
 	return tx.Commit()
 }
+
+// ============ TV Show Repository Methods ============
+
+// CreateTVShow creates a new TV show
+func (db *DB) CreateTVShow(show *TVShow) (*TVShow, error) {
+	result, err := db.conn.Exec(
+		`INSERT INTO tv_shows (title, original_title, year, overview, poster_path, backdrop_path,
+			rating, genres, tmdb_id, imdb_id, status)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		show.Title, show.OriginalTitle, show.Year, show.Overview, show.PosterPath,
+		show.BackdropPath, show.Rating, show.Genres, show.TMDbID, show.IMDbID, show.Status,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return db.GetTVShowByID(id)
+}
+
+// GetTVShowByID retrieves a TV show by ID
+func (db *DB) GetTVShowByID(id int64) (*TVShow, error) {
+	show := &TVShow{}
+	err := db.conn.QueryRow(
+		`SELECT id, title, original_title, year, overview, poster_path, backdrop_path,
+			rating, genres, tmdb_id, imdb_id, status, created_at, updated_at
+		 FROM tv_shows WHERE id = ?`,
+		id,
+	).Scan(&show.ID, &show.Title, &show.OriginalTitle, &show.Year, &show.Overview,
+		&show.PosterPath, &show.BackdropPath, &show.Rating, &show.Genres, &show.TMDbID,
+		&show.IMDbID, &show.Status, &show.CreatedAt, &show.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return show, err
+}
+
+// GetTVShowByTMDBID retrieves a TV show by TMDB ID
+func (db *DB) GetTVShowByTMDBID(tmdbID int) (*TVShow, error) {
+	show := &TVShow{}
+	err := db.conn.QueryRow(
+		`SELECT id, title, original_title, year, overview, poster_path, backdrop_path,
+			rating, genres, tmdb_id, imdb_id, status, created_at, updated_at
+		 FROM tv_shows WHERE tmdb_id = ?`,
+		tmdbID,
+	).Scan(&show.ID, &show.Title, &show.OriginalTitle, &show.Year, &show.Overview,
+		&show.PosterPath, &show.BackdropPath, &show.Rating, &show.Genres, &show.TMDbID,
+		&show.IMDbID, &show.Status, &show.CreatedAt, &show.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return show, err
+}
+
+// GetTVShowByTitle retrieves a TV show by title
+func (db *DB) GetTVShowByTitle(title string) (*TVShow, error) {
+	show := &TVShow{}
+	err := db.conn.QueryRow(
+		`SELECT id, title, original_title, year, overview, poster_path, backdrop_path,
+			rating, genres, tmdb_id, imdb_id, status, created_at, updated_at
+		 FROM tv_shows WHERE title = ? COLLATE NOCASE`,
+		title,
+	).Scan(&show.ID, &show.Title, &show.OriginalTitle, &show.Year, &show.Overview,
+		&show.PosterPath, &show.BackdropPath, &show.Rating, &show.Genres, &show.TMDbID,
+		&show.IMDbID, &show.Status, &show.CreatedAt, &show.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return show, err
+}
+
+// GetAllTVShows retrieves all TV shows with season/episode counts
+func (db *DB) GetAllTVShows(limit, offset int) ([]*TVShow, int, error) {
+	// Get total count
+	var total int
+	db.conn.QueryRow(`SELECT COUNT(*) FROM tv_shows`).Scan(&total)
+
+	rows, err := db.conn.Query(
+		`SELECT s.id, s.title, s.original_title, s.year, s.overview, s.poster_path, s.backdrop_path,
+			s.rating, s.genres, s.tmdb_id, s.imdb_id, s.status, s.created_at, s.updated_at,
+			(SELECT COUNT(*) FROM seasons WHERE tv_show_id = s.id) as season_count,
+			(SELECT COUNT(*) FROM episodes WHERE tv_show_id = s.id) as episode_count
+		 FROM tv_shows s ORDER BY s.title LIMIT ? OFFSET ?`,
+		limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	shows := make([]*TVShow, 0)
+	for rows.Next() {
+		show := &TVShow{}
+		var seasonCount, episodeCount int
+		if err := rows.Scan(&show.ID, &show.Title, &show.OriginalTitle, &show.Year, &show.Overview,
+			&show.PosterPath, &show.BackdropPath, &show.Rating, &show.Genres, &show.TMDbID,
+			&show.IMDbID, &show.Status, &show.CreatedAt, &show.UpdatedAt,
+			&seasonCount, &episodeCount); err != nil {
+			return nil, 0, err
+		}
+		show.SeasonCount = seasonCount
+		show.EpisodeCount = episodeCount
+		shows = append(shows, show)
+	}
+	return shows, total, nil
+}
+
+// UpdateTVShow updates a TV show
+func (db *DB) UpdateTVShow(show *TVShow) error {
+	_, err := db.conn.Exec(
+		`UPDATE tv_shows SET title = ?, original_title = ?, year = ?, overview = ?,
+			poster_path = ?, backdrop_path = ?, rating = ?, genres = ?, tmdb_id = ?,
+			imdb_id = ?, status = ?, updated_at = ?
+		 WHERE id = ?`,
+		show.Title, show.OriginalTitle, show.Year, show.Overview, show.PosterPath,
+		show.BackdropPath, show.Rating, show.Genres, show.TMDbID, show.IMDbID,
+		show.Status, time.Now(), show.ID,
+	)
+	return err
+}
+
+// ============ Season Repository Methods ============
+
+// CreateSeason creates a new season
+func (db *DB) CreateSeason(season *Season) (*Season, error) {
+	result, err := db.conn.Exec(
+		`INSERT INTO seasons (tv_show_id, season_number, name, overview, poster_path, air_date, episode_count)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		season.TVShowID, season.SeasonNumber, season.Name, season.Overview,
+		season.PosterPath, season.AirDate, season.EpisodeCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return db.GetSeasonByID(id)
+}
+
+// GetSeasonByID retrieves a season by ID
+func (db *DB) GetSeasonByID(id int64) (*Season, error) {
+	season := &Season{}
+	err := db.conn.QueryRow(
+		`SELECT id, tv_show_id, season_number, name, overview, poster_path, air_date, episode_count, created_at
+		 FROM seasons WHERE id = ?`,
+		id,
+	).Scan(&season.ID, &season.TVShowID, &season.SeasonNumber, &season.Name, &season.Overview,
+		&season.PosterPath, &season.AirDate, &season.EpisodeCount, &season.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return season, err
+}
+
+// GetSeasonByNumber retrieves a season by show ID and season number
+func (db *DB) GetSeasonByNumber(showID int64, seasonNum int) (*Season, error) {
+	season := &Season{}
+	err := db.conn.QueryRow(
+		`SELECT id, tv_show_id, season_number, name, overview, poster_path, air_date, episode_count, created_at
+		 FROM seasons WHERE tv_show_id = ? AND season_number = ?`,
+		showID, seasonNum,
+	).Scan(&season.ID, &season.TVShowID, &season.SeasonNumber, &season.Name, &season.Overview,
+		&season.PosterPath, &season.AirDate, &season.EpisodeCount, &season.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return season, err
+}
+
+// GetSeasonsByShowID retrieves all seasons for a TV show
+func (db *DB) GetSeasonsByShowID(showID int64) ([]*Season, error) {
+	rows, err := db.conn.Query(
+		`SELECT s.id, s.tv_show_id, s.season_number, s.name, s.overview, s.poster_path, s.air_date,
+			s.episode_count, s.created_at,
+			(SELECT COUNT(*) FROM episodes WHERE season_id = s.id) as actual_episode_count
+		 FROM seasons s WHERE s.tv_show_id = ? ORDER BY s.season_number`,
+		showID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	seasons := make([]*Season, 0)
+	for rows.Next() {
+		season := &Season{}
+		var actualCount int
+		if err := rows.Scan(&season.ID, &season.TVShowID, &season.SeasonNumber, &season.Name,
+			&season.Overview, &season.PosterPath, &season.AirDate, &season.EpisodeCount,
+			&season.CreatedAt, &actualCount); err != nil {
+			return nil, err
+		}
+		// Use actual episode count from database if we have episodes
+		if actualCount > 0 {
+			season.EpisodeCount = actualCount
+		}
+		seasons = append(seasons, season)
+	}
+	return seasons, nil
+}
+
+// ============ Episode Repository Methods ============
+
+// CreateEpisode creates a new episode
+func (db *DB) CreateEpisode(episode *Episode) (*Episode, error) {
+	result, err := db.conn.Exec(
+		`INSERT INTO episodes (tv_show_id, season_id, season_number, episode_number, title, overview,
+			still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
+			video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		episode.TVShowID, episode.SeasonID, episode.SeasonNumber, episode.EpisodeNumber,
+		episode.Title, episode.Overview, episode.StillPath, episode.AirDate, episode.Runtime,
+		episode.Rating, episode.SourceID, episode.FilePath, episode.FileSize, episode.Duration,
+		episode.VideoCodec, episode.AudioCodec, episode.Resolution, episode.AudioTracks,
+		episode.SubtitleTracks,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return db.GetEpisodeByID(id)
+}
+
+// GetEpisodeByID retrieves an episode by ID
+func (db *DB) GetEpisodeByID(id int64) (*Episode, error) {
+	episode := &Episode{}
+	err := db.conn.QueryRow(
+		`SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
+			still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
+			video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM episodes WHERE id = ?`,
+		id,
+	).Scan(&episode.ID, &episode.TVShowID, &episode.SeasonID, &episode.SeasonNumber,
+		&episode.EpisodeNumber, &episode.Title, &episode.Overview, &episode.StillPath,
+		&episode.AirDate, &episode.Runtime, &episode.Rating, &episode.SourceID, &episode.FilePath,
+		&episode.FileSize, &episode.Duration, &episode.VideoCodec, &episode.AudioCodec,
+		&episode.Resolution, &episode.AudioTracks, &episode.SubtitleTracks,
+		&episode.CreatedAt, &episode.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return episode, err
+}
+
+// GetEpisodeByFilePath retrieves an episode by file path
+func (db *DB) GetEpisodeByFilePath(filePath string) (*Episode, error) {
+	episode := &Episode{}
+	err := db.conn.QueryRow(
+		`SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
+			still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
+			video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM episodes WHERE file_path = ?`,
+		filePath,
+	).Scan(&episode.ID, &episode.TVShowID, &episode.SeasonID, &episode.SeasonNumber,
+		&episode.EpisodeNumber, &episode.Title, &episode.Overview, &episode.StillPath,
+		&episode.AirDate, &episode.Runtime, &episode.Rating, &episode.SourceID, &episode.FilePath,
+		&episode.FileSize, &episode.Duration, &episode.VideoCodec, &episode.AudioCodec,
+		&episode.Resolution, &episode.AudioTracks, &episode.SubtitleTracks,
+		&episode.CreatedAt, &episode.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return episode, err
+}
+
+// GetEpisodeByNumber retrieves an episode by show ID, season, and episode number
+func (db *DB) GetEpisodeByNumber(showID int64, seasonNum, episodeNum int) (*Episode, error) {
+	episode := &Episode{}
+	err := db.conn.QueryRow(
+		`SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
+			still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
+			video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM episodes WHERE tv_show_id = ? AND season_number = ? AND episode_number = ?`,
+		showID, seasonNum, episodeNum,
+	).Scan(&episode.ID, &episode.TVShowID, &episode.SeasonID, &episode.SeasonNumber,
+		&episode.EpisodeNumber, &episode.Title, &episode.Overview, &episode.StillPath,
+		&episode.AirDate, &episode.Runtime, &episode.Rating, &episode.SourceID, &episode.FilePath,
+		&episode.FileSize, &episode.Duration, &episode.VideoCodec, &episode.AudioCodec,
+		&episode.Resolution, &episode.AudioTracks, &episode.SubtitleTracks,
+		&episode.CreatedAt, &episode.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return episode, err
+}
+
+// GetEpisodesBySeasonID retrieves all episodes for a season
+func (db *DB) GetEpisodesBySeasonID(seasonID int64) ([]*Episode, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
+			still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
+			video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM episodes WHERE season_id = ? ORDER BY episode_number`,
+		seasonID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanEpisodeRows(rows)
+}
+
+// GetEpisodesByShowID retrieves all episodes for a TV show
+func (db *DB) GetEpisodesByShowID(showID int64) ([]*Episode, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
+			still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
+			video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM episodes WHERE tv_show_id = ? ORDER BY season_number, episode_number`,
+		showID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanEpisodeRows(rows)
+}
+
+// GetRandomEpisode retrieves a random episode from a TV show
+func (db *DB) GetRandomEpisode(showID int64) (*Episode, error) {
+	episode := &Episode{}
+	err := db.conn.QueryRow(
+		`SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
+			still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
+			video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM episodes WHERE tv_show_id = ? ORDER BY RANDOM() LIMIT 1`,
+		showID,
+	).Scan(&episode.ID, &episode.TVShowID, &episode.SeasonID, &episode.SeasonNumber,
+		&episode.EpisodeNumber, &episode.Title, &episode.Overview, &episode.StillPath,
+		&episode.AirDate, &episode.Runtime, &episode.Rating, &episode.SourceID, &episode.FilePath,
+		&episode.FileSize, &episode.Duration, &episode.VideoCodec, &episode.AudioCodec,
+		&episode.Resolution, &episode.AudioTracks, &episode.SubtitleTracks,
+		&episode.CreatedAt, &episode.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return episode, err
+}
+
+// GetRandomEpisodeFromSeason retrieves a random episode from a season
+func (db *DB) GetRandomEpisodeFromSeason(seasonID int64) (*Episode, error) {
+	episode := &Episode{}
+	err := db.conn.QueryRow(
+		`SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
+			still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
+			video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM episodes WHERE season_id = ? ORDER BY RANDOM() LIMIT 1`,
+		seasonID,
+	).Scan(&episode.ID, &episode.TVShowID, &episode.SeasonID, &episode.SeasonNumber,
+		&episode.EpisodeNumber, &episode.Title, &episode.Overview, &episode.StillPath,
+		&episode.AirDate, &episode.Runtime, &episode.Rating, &episode.SourceID, &episode.FilePath,
+		&episode.FileSize, &episode.Duration, &episode.VideoCodec, &episode.AudioCodec,
+		&episode.Resolution, &episode.AudioTracks, &episode.SubtitleTracks,
+		&episode.CreatedAt, &episode.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return episode, err
+}
+
+func scanEpisodeRows(rows *sql.Rows) ([]*Episode, error) {
+	episodes := make([]*Episode, 0)
+	for rows.Next() {
+		episode := &Episode{}
+		if err := rows.Scan(&episode.ID, &episode.TVShowID, &episode.SeasonID, &episode.SeasonNumber,
+			&episode.EpisodeNumber, &episode.Title, &episode.Overview, &episode.StillPath,
+			&episode.AirDate, &episode.Runtime, &episode.Rating, &episode.SourceID, &episode.FilePath,
+			&episode.FileSize, &episode.Duration, &episode.VideoCodec, &episode.AudioCodec,
+			&episode.Resolution, &episode.AudioTracks, &episode.SubtitleTracks,
+			&episode.CreatedAt, &episode.UpdatedAt); err != nil {
+			return nil, err
+		}
+		episodes = append(episodes, episode)
+	}
+	return episodes, nil
+}

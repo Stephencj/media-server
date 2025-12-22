@@ -78,6 +78,9 @@ type TVShow struct {
 	Status       string    `json:"status,omitempty"` // Returning Series, Ended, etc.
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
+	// Computed fields (populated by queries with JOINs, not stored in DB)
+	SeasonCount  int `json:"season_count,omitempty"`
+	EpisodeCount int `json:"episode_count,omitempty"`
 }
 
 // Season represents a TV season

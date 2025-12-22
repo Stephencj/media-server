@@ -45,25 +45,48 @@ func (h *StreamHandler) GetManifest(c *gin.Context) {
 		return
 	}
 
-	media, err := h.db.GetMediaByID(id)
-	if err == db.ErrNotFound {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Media not found"})
-		return
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch media"})
-		return
+	mediaType := c.Query("type")
+	var filePath string
+	var duration int
+	var resolution string
+
+	if mediaType == "episode" {
+		episode, err := h.db.GetEpisodeByID(id)
+		if err == db.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Episode not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch episode"})
+			return
+		}
+		filePath = episode.FilePath
+		duration = episode.Duration
+		resolution = episode.Resolution
+	} else {
+		media, err := h.db.GetMediaByID(id)
+		if err == db.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Media not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch media"})
+			return
+		}
+		filePath = media.FilePath
+		duration = media.Duration
+		resolution = media.Resolution
 	}
 
 	// Check if file exists
-	if _, err := os.Stat(media.FilePath); os.IsNotExist(err) {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Media file not found"})
 		return
 	}
 
 	// Check if direct play is possible (H.264/HEVC in MP4/MKV)
-	if h.canDirectPlay(media.FilePath) {
-		manifest := h.generateDirectPlayManifest(media, id)
+	if h.canDirectPlay(filePath) {
+		manifest := h.generateDirectPlayManifestForFile(filePath, duration, id, mediaType)
 		c.Header("Content-Type", "application/vnd.apple.mpegurl")
 		c.String(http.StatusOK, manifest)
 		return
@@ -86,8 +109,8 @@ func (h *StreamHandler) GetManifest(c *gin.Context) {
 	// Start or get existing transcode session
 	profile := ffmpeg.Profiles["1080p"]
 	// Use resolution string to determine profile (e.g., "1920x1080")
-	if media.Resolution != "" && strings.Contains(media.Resolution, "x") {
-		parts := strings.Split(media.Resolution, "x")
+	if resolution != "" && strings.Contains(resolution, "x") {
+		parts := strings.Split(resolution, "x")
 		if len(parts) == 2 {
 			if height, err := strconv.Atoi(parts[1]); err == nil && height <= 720 {
 				profile = ffmpeg.Profiles["720p"]
@@ -95,7 +118,7 @@ func (h *StreamHandler) GetManifest(c *gin.Context) {
 		}
 	}
 
-	_, err = h.sessionManager.GetOrStartSession(id, media.FilePath, profile)
+	_, err = h.sessionManager.GetOrStartSession(id, filePath, profile)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transcoding: " + err.Error()})
 		return
@@ -196,28 +219,47 @@ func (h *StreamHandler) DirectPlay(c *gin.Context) {
 		return
 	}
 
-	media, err := h.db.GetMediaByID(id)
-	if err == db.ErrNotFound {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Media not found"})
-		return
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch media"})
-		return
+	mediaType := c.Query("type")
+	var filePath string
+
+	if mediaType == "episode" {
+		// Look up episode from episodes table
+		episode, err := h.db.GetEpisodeByID(id)
+		if err == db.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Episode not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch episode"})
+			return
+		}
+		filePath = episode.FilePath
+	} else {
+		// Look up from media table (movies)
+		media, err := h.db.GetMediaByID(id)
+		if err == db.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Media not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch media"})
+			return
+		}
+		filePath = media.FilePath
 	}
 
 	// Check if file exists
-	if _, err := os.Stat(media.FilePath); os.IsNotExist(err) {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Media file not found"})
 		return
 	}
 
 	// Determine content type
-	contentType := h.getContentType(media.FilePath)
+	contentType := h.getContentType(filePath)
 	c.Header("Content-Type", contentType)
 	c.Header("Accept-Ranges", "bytes")
 
-	c.File(media.FilePath)
+	c.File(filePath)
 }
 
 // StopTranscode stops an active transcode session
@@ -262,6 +304,27 @@ func (h *StreamHandler) generateDirectPlayManifest(media *db.Media, id int64) st
 /api/stream/%d/direct
 #EXT-X-ENDLIST
 `, duration, duration, id)
+}
+
+func (h *StreamHandler) generateDirectPlayManifestForFile(filePath string, duration int, id int64, mediaType string) string {
+	if duration == 0 {
+		duration = 3600 // Default 1 hour
+	}
+
+	typeParam := ""
+	if mediaType != "" {
+		typeParam = "?type=" + mediaType
+	}
+
+	return fmt.Sprintf(`#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-TARGETDURATION:%d
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXTINF:%d.0,
+/api/stream/%d/direct%s
+#EXT-X-ENDLIST
+`, duration, duration, id, typeParam)
 }
 
 func (h *StreamHandler) getContentType(filePath string) string {

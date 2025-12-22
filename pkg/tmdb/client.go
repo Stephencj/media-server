@@ -85,6 +85,7 @@ type TVDetails struct {
 	NumberOfSeasons int      `json:"number_of_seasons"`
 	NumberOfEpisodes int     `json:"number_of_episodes"`
 	Genres          []Genre  `json:"genres"`
+	Status          string   `json:"status"` // Returning Series, Ended, Canceled, etc.
 	ExternalIDs     *ExternalIDs `json:"external_ids,omitempty"`
 }
 
@@ -97,6 +98,42 @@ type Genre struct {
 // ExternalIDs contains external IDs like IMDB
 type ExternalIDs struct {
 	IMDbID string `json:"imdb_id"`
+}
+
+// SeasonDetails represents detailed TV season info
+type SeasonDetails struct {
+	ID           int              `json:"id"`
+	SeasonNumber int              `json:"season_number"`
+	Name         string           `json:"name"`
+	Overview     string           `json:"overview"`
+	PosterPath   string           `json:"poster_path"`
+	AirDate      string           `json:"air_date"`
+	Episodes     []EpisodeSummary `json:"episodes"`
+}
+
+// EpisodeSummary represents an episode in season details
+type EpisodeSummary struct {
+	ID            int     `json:"id"`
+	EpisodeNumber int     `json:"episode_number"`
+	Name          string  `json:"name"`
+	Overview      string  `json:"overview"`
+	StillPath     string  `json:"still_path"`
+	AirDate       string  `json:"air_date"`
+	Runtime       int     `json:"runtime"`
+	VoteAverage   float64 `json:"vote_average"`
+}
+
+// EpisodeDetails represents detailed TV episode info
+type EpisodeDetails struct {
+	ID            int     `json:"id"`
+	EpisodeNumber int     `json:"episode_number"`
+	SeasonNumber  int     `json:"season_number"`
+	Name          string  `json:"name"`
+	Overview      string  `json:"overview"`
+	StillPath     string  `json:"still_path"`
+	AirDate       string  `json:"air_date"`
+	Runtime       int     `json:"runtime"`
+	VoteAverage   float64 `json:"vote_average"`
 }
 
 type searchResponse struct {
@@ -224,6 +261,54 @@ func (c *Client) GetTVDetails(tmdbID int) (*TVDetails, error) {
 	}
 
 	var details TVDetails
+	if err := json.NewDecoder(resp.Body).Decode(&details); err != nil {
+		return nil, err
+	}
+
+	return &details, nil
+}
+
+// GetTVSeasonDetails fetches detailed season info by TMDB show ID and season number
+func (c *Client) GetTVSeasonDetails(showID int, seasonNum int) (*SeasonDetails, error) {
+	if !c.IsConfigured() {
+		return nil, fmt.Errorf("TMDB API key not configured")
+	}
+
+	resp, err := c.httpClient.Get(fmt.Sprintf("%s/tv/%d/season/%d?api_key=%s", baseURL, showID, seasonNum, c.apiKey))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("TMDB API error: %d", resp.StatusCode)
+	}
+
+	var details SeasonDetails
+	if err := json.NewDecoder(resp.Body).Decode(&details); err != nil {
+		return nil, err
+	}
+
+	return &details, nil
+}
+
+// GetTVEpisodeDetails fetches detailed episode info by TMDB show ID, season and episode number
+func (c *Client) GetTVEpisodeDetails(showID int, seasonNum int, episodeNum int) (*EpisodeDetails, error) {
+	if !c.IsConfigured() {
+		return nil, fmt.Errorf("TMDB API key not configured")
+	}
+
+	resp, err := c.httpClient.Get(fmt.Sprintf("%s/tv/%d/season/%d/episode/%d?api_key=%s", baseURL, showID, seasonNum, episodeNum, c.apiKey))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("TMDB API error: %d", resp.StatusCode)
+	}
+
+	var details EpisodeDetails
 	if err := json.NewDecoder(resp.Body).Decode(&details); err != nil {
 		return nil, err
 	}

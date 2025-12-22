@@ -24,6 +24,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	sourceHandler := handlers.NewSourceHandler(database)
 	watchlistHandler := handlers.NewWatchlistHandler(database)
 	playlistHandler := handlers.NewPlaylistHandler(database)
+	showsHandler := handlers.NewShowsHandler(database)
 
 	// Serve web admin interface
 	router.StaticFile("/", "./web/index.html")
@@ -114,6 +115,22 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 				playlists.DELETE("/:playlistId/items/:mediaId", playlistHandler.RemoveFromPlaylist)
 				playlists.PUT("/:playlistId/reorder", playlistHandler.ReorderPlaylist)
 			}
+
+			// TV Shows (hierarchical)
+			shows := protected.Group("/shows")
+			{
+				shows.GET("", showsHandler.GetShows)
+				shows.GET("/:showId", showsHandler.GetShow)
+				shows.GET("/:showId/seasons", showsHandler.GetSeasons)
+				shows.GET("/:showId/seasons/:seasonNum", showsHandler.GetSeason)
+				shows.GET("/:showId/seasons/:seasonNum/episodes", showsHandler.GetEpisodes)
+				shows.GET("/:showId/episodes", showsHandler.GetAllEpisodes)
+				shows.GET("/:showId/random", showsHandler.GetRandomEpisode)
+				shows.GET("/:showId/seasons/:seasonNum/random", showsHandler.GetRandomEpisodeFromSeason)
+			}
+
+			// Episodes (direct access)
+			protected.GET("/episodes/:episodeId", showsHandler.GetEpisode)
 		}
 	}
 

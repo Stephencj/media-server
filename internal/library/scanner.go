@@ -155,7 +155,15 @@ func (s *Scanner) ScanSource(source *db.MediaSource) error {
 }
 
 func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
-	// Check if already in database
+	// Parse filename to extract title, year, and season/episode info
+	title, year, mediaType, seasonNum, episodeNum := parseFilename(filePath)
+
+	// If it's a TV episode with season/episode info, use the TV episode processor
+	if mediaType == db.MediaTypeTVShow && seasonNum > 0 && episodeNum > 0 {
+		return s.processTVEpisode(filePath, source, title, year, seasonNum, episodeNum)
+	}
+
+	// Check if already in database (for movies)
 	if existing, err := s.db.GetMediaByFilePath(filePath); err == nil {
 		// Already exists - check if we should refresh metadata
 		if s.tmdb.IsConfigured() && existing.TMDbID == 0 {
@@ -171,9 +179,6 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 		return err
 	}
 
-	// Parse filename to extract title and year
-	title, year, mediaType := parseFilename(filePath)
-
 	// Get video metadata using ffprobe
 	metadata, err := s.ffprobe.GetMetadata(filePath)
 	if err != nil {
@@ -181,7 +186,7 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 		metadata = &ffmpeg.Metadata{}
 	}
 
-	// Create media entry with basic info
+	// Create media entry with basic info (for movies)
 	media := &db.Media{
 		Title:          title,
 		Type:           mediaType,
@@ -205,7 +210,191 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 		return err
 	}
 
-	log.Printf("Added: %s (%d)", media.Title, media.Year)
+	log.Printf("Added movie: %s (%d)", media.Title, media.Year)
+	return nil
+}
+
+// processTVEpisode handles TV show episode files with proper hierarchy
+func (s *Scanner) processTVEpisode(filePath string, source *db.MediaSource, showTitle string, year, seasonNum, episodeNum int) error {
+	// Check if episode already exists by file path
+	if _, err := s.db.GetEpisodeByFilePath(filePath); err == nil {
+		return nil // Already exists
+	}
+
+	// Get file info
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return err
+	}
+
+	// Get video metadata using ffprobe
+	metadata, err := s.ffprobe.GetMetadata(filePath)
+	if err != nil {
+		log.Printf("Warning: Could not get metadata for %s: %v", filePath, err)
+		metadata = &ffmpeg.Metadata{}
+	}
+
+	// Try to find or create the TV show
+	var show *db.TVShow
+	var tmdbShowID int
+
+	if s.tmdb.IsConfigured() {
+		// Search TMDB for the show
+		result, err := s.tmdb.SearchTV(showTitle, year)
+		if err != nil {
+			log.Printf("TMDB TV search failed for %s: %v", showTitle, err)
+		} else if result != nil {
+			tmdbShowID = result.ID
+
+			// Check if we already have this show by TMDB ID
+			show, err = s.db.GetTVShowByTMDBID(tmdbShowID)
+			if err != nil {
+				// Show doesn't exist, get full details and create it
+				details, err := s.tmdb.GetTVDetails(tmdbShowID)
+				if err != nil {
+					log.Printf("TMDB TV details failed for %s: %v", showTitle, err)
+				} else {
+					showYear := 0
+					if len(details.FirstAirDate) >= 4 {
+						showYear, _ = strconv.Atoi(details.FirstAirDate[:4])
+					}
+
+					show = &db.TVShow{
+						Title:        details.Name,
+						OriginalTitle: details.OriginalName,
+						Year:         showYear,
+						Overview:     details.Overview,
+						PosterPath:   details.PosterPath,
+						BackdropPath: details.BackdropPath,
+						Rating:       details.VoteAverage,
+						Genres:       tmdb.GenresToString(details.Genres),
+						TMDbID:       details.ID,
+						Status:       details.Status,
+					}
+					if details.ExternalIDs != nil {
+						show.IMDbID = details.ExternalIDs.IMDbID
+					}
+
+					show, err = s.db.CreateTVShow(show)
+					if err != nil {
+						log.Printf("Failed to create TV show %s: %v", showTitle, err)
+						return err
+					}
+					log.Printf("Created TV show: %s (TMDB ID: %d)", show.Title, show.TMDbID)
+				}
+			}
+		}
+	}
+
+	// If we couldn't find/create via TMDB, create a basic show entry
+	if show == nil {
+		// Try to find by title
+		show, err = s.db.GetTVShowByTitle(showTitle)
+		if err != nil {
+			// Create basic show entry
+			show = &db.TVShow{
+				Title: showTitle,
+				Year:  year,
+			}
+			show, err = s.db.CreateTVShow(show)
+			if err != nil {
+				log.Printf("Failed to create TV show %s: %v", showTitle, err)
+				return err
+			}
+			log.Printf("Created TV show (no TMDB): %s", show.Title)
+		}
+	}
+
+	// Find or create the season
+	season, err := s.db.GetSeasonByNumber(show.ID, seasonNum)
+	if err != nil {
+		// Season doesn't exist, try to get details from TMDB
+		var seasonName, seasonOverview, seasonPoster, seasonAirDate string
+		var seasonEpisodeCount int
+
+		if s.tmdb.IsConfigured() && tmdbShowID > 0 {
+			seasonDetails, err := s.tmdb.GetTVSeasonDetails(tmdbShowID, seasonNum)
+			if err == nil && seasonDetails != nil {
+				seasonName = seasonDetails.Name
+				seasonOverview = seasonDetails.Overview
+				seasonPoster = seasonDetails.PosterPath
+				seasonAirDate = seasonDetails.AirDate
+				seasonEpisodeCount = len(seasonDetails.Episodes)
+			}
+		}
+
+		if seasonName == "" {
+			seasonName = "Season " + strconv.Itoa(seasonNum)
+		}
+
+		season = &db.Season{
+			TVShowID:     show.ID,
+			SeasonNumber: seasonNum,
+			Name:         seasonName,
+			Overview:     seasonOverview,
+			PosterPath:   seasonPoster,
+			AirDate:      seasonAirDate,
+			EpisodeCount: seasonEpisodeCount,
+		}
+		season, err = s.db.CreateSeason(season)
+		if err != nil {
+			log.Printf("Failed to create season %d for %s: %v", seasonNum, show.Title, err)
+			return err
+		}
+		log.Printf("Created season: %s S%02d", show.Title, seasonNum)
+	}
+
+	// Get episode details from TMDB if available
+	var episodeTitle, episodeOverview, episodeStillPath, episodeAirDate string
+	var episodeRuntime int
+	var episodeRating float64
+
+	if s.tmdb.IsConfigured() && tmdbShowID > 0 {
+		episodeDetails, err := s.tmdb.GetTVEpisodeDetails(tmdbShowID, seasonNum, episodeNum)
+		if err == nil && episodeDetails != nil {
+			episodeTitle = episodeDetails.Name
+			episodeOverview = episodeDetails.Overview
+			episodeStillPath = episodeDetails.StillPath
+			episodeAirDate = episodeDetails.AirDate
+			episodeRuntime = episodeDetails.Runtime
+			episodeRating = episodeDetails.VoteAverage
+		}
+	}
+
+	if episodeTitle == "" {
+		episodeTitle = "Episode " + strconv.Itoa(episodeNum)
+	}
+
+	// Create the episode record
+	episode := &db.Episode{
+		TVShowID:       show.ID,
+		SeasonID:       season.ID,
+		SeasonNumber:   seasonNum,
+		EpisodeNumber:  episodeNum,
+		Title:          episodeTitle,
+		Overview:       episodeOverview,
+		StillPath:      episodeStillPath,
+		AirDate:        episodeAirDate,
+		Runtime:        episodeRuntime,
+		Rating:         episodeRating,
+		SourceID:       source.ID,
+		FilePath:       filePath,
+		FileSize:       info.Size(),
+		Duration:       metadata.Duration,
+		VideoCodec:     metadata.VideoCodec,
+		AudioCodec:     metadata.AudioCodec,
+		Resolution:     metadata.Resolution,
+		AudioTracks:    metadata.AudioTracksJSON,
+		SubtitleTracks: metadata.SubtitleTracksJSON,
+	}
+
+	_, err = s.db.CreateEpisode(episode)
+	if err != nil {
+		log.Printf("Failed to create episode S%02dE%02d for %s: %v", seasonNum, episodeNum, show.Title, err)
+		return err
+	}
+
+	log.Printf("Added episode: %s S%02dE%02d - %s", show.Title, seasonNum, episodeNum, episodeTitle)
 	return nil
 }
 
@@ -384,10 +573,39 @@ func (s *Scanner) enrichWithTMDB(media *db.Media, title string, year int, mediaT
 	}
 }
 
-// parseFilename extracts title, year, and type from filename
-func parseFilename(filePath string) (title string, year int, mediaType db.MediaType) {
+// parseFilename extracts title, year, type, and season/episode numbers from filename
+func parseFilename(filePath string) (title string, year int, mediaType db.MediaType, seasonNum int, episodeNum int) {
 	filename := filepath.Base(filePath)
 	filename = strings.TrimSuffix(filename, filepath.Ext(filename))
+
+	// Extract season/episode FIRST before any cleanup
+	// Match S01E01 format (case insensitive)
+	tvRegex := regexp.MustCompile(`(?i)[Ss](\d{1,2})[Ee](\d{1,2})`)
+	tvMatch := tvRegex.FindStringSubmatch(filename)
+	if len(tvMatch) == 3 {
+		mediaType = db.MediaTypeTVShow
+		seasonNum, _ = strconv.Atoi(tvMatch[1])
+		episodeNum, _ = strconv.Atoi(tvMatch[2])
+		// Remove pattern from filename for title extraction
+		filename = tvRegex.ReplaceAllString(filename, " ")
+	}
+
+	// Also support 1x01 format
+	if seasonNum == 0 {
+		altRegex := regexp.MustCompile(`(\d{1,2})x(\d{1,2})`)
+		altMatch := altRegex.FindStringSubmatch(filename)
+		if len(altMatch) == 3 {
+			mediaType = db.MediaTypeTVShow
+			seasonNum, _ = strconv.Atoi(altMatch[1])
+			episodeNum, _ = strconv.Atoi(altMatch[2])
+			filename = altRegex.ReplaceAllString(filename, " ")
+		}
+	}
+
+	// Set default media type if not TV
+	if mediaType == "" {
+		mediaType = db.MediaTypeMovie
+	}
 
 	// Remove quality indicators FIRST (before separators become spaces)
 	// This prevents "1080p" from being parsed as year "1080"
@@ -412,14 +630,6 @@ func parseFilename(filePath string) (title string, year int, mediaType db.MediaT
 		filename = yearRegex.ReplaceAllString(filename, "")
 	}
 
-	// Check for TV show patterns (S01E01, 1x01, etc.)
-	tvRegex := regexp.MustCompile(`(?i)S\d{1,2}E\d{1,2}|\d{1,2}x\d{1,2}`)
-	if tvRegex.MatchString(filename) {
-		mediaType = db.MediaTypeTVShow
-	} else {
-		mediaType = db.MediaTypeMovie
-	}
-
 	// Clean up multiple spaces and trim
 	spaceRegex := regexp.MustCompile(`\s+`)
 	title = spaceRegex.ReplaceAllString(filename, " ")
@@ -429,9 +639,29 @@ func parseFilename(filePath string) (title string, year int, mediaType db.MediaT
 	leadingNumRegex := regexp.MustCompile(`^0\d\s+`)
 	title = leadingNumRegex.ReplaceAllString(title, "")
 
+	// Remove trailing episode titles for cleaner show name extraction
+	// e.g., "Breaking Bad Pilot" -> "Breaking Bad"
+	if mediaType == db.MediaTypeTVShow && seasonNum > 0 {
+		// Try to get just the show name by looking for common patterns
+		// This helps with files like "Breaking.Bad.S01E01.Pilot.mkv"
+		words := strings.Fields(title)
+		if len(words) > 2 {
+			// Keep first few words as show title (heuristic)
+			// Most show names are 1-4 words
+			title = strings.Join(words[:min(len(words), 4)], " ")
+		}
+	}
+
 	if title == "" {
 		title = filepath.Base(filePath)
 	}
 
 	return
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
