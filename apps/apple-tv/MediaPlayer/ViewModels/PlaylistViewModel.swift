@@ -1,4 +1,6 @@
 import Foundation
+import AVKit
+import Combine
 
 @MainActor
 class PlaylistViewModel: ObservableObject {
@@ -53,8 +55,11 @@ class PlaylistDetailViewModel: ObservableObject {
     // Playback state
     @Published var isPlaying = false
     @Published var currentIndex = 0
+    @Published var playerViewModel: PlayerViewModel?
+    @Published var videoEnded = false
 
     private let api = APIClient.shared
+    private var cancellables = Set<AnyCancellable>()
 
     func loadPlaylist(id: Int64) async {
         isLoading = true
@@ -110,6 +115,7 @@ class PlaylistDetailViewModel: ObservableObject {
         guard !items.isEmpty else { return }
         currentIndex = 0
         isPlaying = true
+        setupPlayer()
     }
 
     func shuffle() {
@@ -117,21 +123,40 @@ class PlaylistDetailViewModel: ObservableObject {
         items.shuffle()
         currentIndex = 0
         isPlaying = true
+        setupPlayer()
     }
 
     func playItem(at index: Int) {
         guard index >= 0 && index < items.count else { return }
         currentIndex = index
         isPlaying = true
+        setupPlayer()
     }
 
     func playNext() -> Bool {
         if currentIndex < items.count - 1 {
             currentIndex += 1
+            setupPlayer()
             return true
         }
         isPlaying = false
         return false
+    }
+
+    func setupPlayer() {
+        guard let item = currentItem else { return }
+        let media = item.toMedia()
+        playerViewModel = PlayerViewModel(media: media, startPosition: 0)
+        videoEnded = false
+    }
+
+    func handleVideoEnd() {
+        videoEnded = true
+    }
+
+    func cleanup() {
+        playerViewModel?.cleanup()
+        playerViewModel = nil
     }
 
     var currentItem: PlaylistItem? {

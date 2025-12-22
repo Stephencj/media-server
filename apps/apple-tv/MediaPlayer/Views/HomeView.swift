@@ -111,7 +111,11 @@ struct MediaRowView: View {
             }
         }
         .navigationDestination(for: Media.self) { media in
-            MediaDetailView(media: media)
+            if media.type == .tvshow {
+                TVShowDetailView(show: media)
+            } else {
+                MediaDetailView(media: media)
+            }
         }
         .alert("Saved", isPresented: $showingSaveConfirmation) {
             Button("OK", role: .cancel) { }

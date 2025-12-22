@@ -40,6 +40,7 @@ class HomeViewModel: ObservableObject {
             recentlyAdded = response.items
         } catch {
             errorMessage = error.localizedDescription
+            AppState.shared.showError("Failed to Load Recent Media", message: error.localizedDescription)
         }
     }
 
@@ -48,7 +49,7 @@ class HomeViewModel: ObservableObject {
             let response = try await api.getMovies(limit: 15, offset: 0)
             movies = response.items
         } catch {
-            // Error already captured above
+            AppState.shared.showError("Failed to Load Movies", message: error.localizedDescription)
         }
     }
 
@@ -57,7 +58,7 @@ class HomeViewModel: ObservableObject {
             let response = try await api.getShows(limit: 15, offset: 0)
             tvShows = response.items
         } catch {
-            // Error already captured above
+            AppState.shared.showError("Failed to Load TV Shows", message: error.localizedDescription)
         }
     }
 }

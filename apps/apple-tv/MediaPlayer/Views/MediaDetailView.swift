@@ -5,10 +5,34 @@ struct MediaDetailView: View {
 
     @StateObject private var viewModel: MediaDetailViewModel
     @State private var showPlayer = false
+    @State private var showAddToPlaylist = false
 
     init(media: Media) {
         self.media = media
         _viewModel = StateObject(wrappedValue: MediaDetailViewModel(media: media))
+    }
+
+    private var backdropPlaceholder: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [.blue.opacity(0.3), .black],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(height: 600)
+    }
+
+    private var posterPlaceholder: some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(Color.gray.opacity(0.3))
+            .frame(width: 200, height: 300)
+            .overlay {
+                Image(systemName: media.type == .movie ? "film" : "tv")
+                    .font(.system(size: 60))
+                    .foregroundColor(.gray)
+            }
     }
 
     var body: some View {
@@ -16,28 +40,56 @@ struct MediaDetailView: View {
             VStack(spacing: 0) {
                 // Hero section with backdrop
                 ZStack(alignment: .bottomLeading) {
-                    // Backdrop placeholder
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [.blue.opacity(0.3), .black],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
+                    // Backdrop image or placeholder
+                    if let backdropPath = media.backdropPath {
+                        AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w1280\(backdropPath)")) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(height: 600)
+                                    .clipped()
+                                    .overlay {
+                                        LinearGradient(
+                                            colors: [.clear, .black.opacity(0.7)],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    }
+                            case .failure, .empty:
+                                backdropPlaceholder
+                            @unknown default:
+                                backdropPlaceholder
+                            }
+                        }
                         .frame(height: 600)
+                    } else {
+                        backdropPlaceholder
+                    }
 
                     // Content overlay
                     HStack(alignment: .bottom, spacing: 40) {
                         // Poster
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: 200, height: 300)
-                            .overlay {
-                                Image(systemName: "film")
-                                    .font(.system(size: 60))
-                                    .foregroundColor(.gray)
+                        if let posterPath = media.posterPath {
+                            AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w342\(posterPath)")) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 200, height: 300)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                case .failure, .empty:
+                                    posterPlaceholder
+                                @unknown default:
+                                    posterPlaceholder
+                                }
                             }
+                            .frame(width: 200, height: 300)
+                        } else {
+                            posterPlaceholder
+                        }
 
                         // Info
                         VStack(alignment: .leading, spacing: 20) {
@@ -93,6 +145,14 @@ struct MediaDetailView: View {
                             .fontWeight(.semibold)
                             .frame(minWidth: 200)
                         }
+
+                        Button {
+                            showAddToPlaylist = true
+                        } label: {
+                            Label("Add to Playlist", systemImage: "text.badge.plus")
+                                .font(.title3)
+                        }
+                        .buttonStyle(.plain)
 
                         if let progress = viewModel.progress {
                             Text("\(progress.formattedRemaining) remaining")
@@ -177,6 +237,9 @@ struct MediaDetailView: View {
                 media: media,
                 startPosition: viewModel.progress?.position ?? 0
             )
+        }
+        .sheet(isPresented: $showAddToPlaylist) {
+            AddToPlaylistSheet(media: media)
         }
         .task {
             await viewModel.loadProgress()

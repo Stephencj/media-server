@@ -77,6 +77,44 @@ class PlayerViewModel: ObservableObject {
                 self?.duration = duration.seconds
             }
             .store(in: &cancellables)
+
+        // Apply preferences when player item is ready
+        player.publisher(for: \.currentItem)
+            .compactMap { $0 }
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    await self?.applyPreferences()
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func applyPreferences() async {
+        guard let playerItem = player.currentItem else { return }
+
+        // Apply audio preference
+        let preferredAudioLanguage = AppState.shared.preferredAudioLanguage
+        if let audioGroup = try? await playerItem.asset.loadMediaSelectionGroup(for: .audible) {
+            if let option = audioGroup.options.first(where: {
+                $0.locale?.language.languageCode?.identifier == preferredAudioLanguage
+            }) {
+                playerItem.select(option, in: audioGroup)
+            }
+        }
+
+        // Apply subtitle preference
+        if AppState.shared.subtitlesEnabled,
+           let preferredSubtitleLanguage = AppState.shared.preferredSubtitleLanguage,
+           let subtitleGroup = try? await playerItem.asset.loadMediaSelectionGroup(for: .legible) {
+            if let option = subtitleGroup.options.first(where: {
+                $0.locale?.language.languageCode?.identifier == preferredSubtitleLanguage
+            }) {
+                playerItem.select(option, in: subtitleGroup)
+            }
+        } else if let subtitleGroup = try? await playerItem.asset.loadMediaSelectionGroup(for: .legible) {
+            // Disable subtitles if not enabled in preferences
+            playerItem.select(nil, in: subtitleGroup)
+        }
     }
 
     private func updateTime(_ time: CMTime) {

@@ -194,3 +194,13 @@ struct Episode: Identifiable, Codable {
         String(format: "S%02dE%02d", seasonNumber, episodeNumber)
     }
 }
+
+struct RandomEpisodeResponse: Codable {
+    let episode: Episode
+    let showTitle: String
+
+    enum CodingKeys: String, CodingKey {
+        case episode
+        case showTitle = "show_title"
+    }
+}

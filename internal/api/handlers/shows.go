@@ -93,7 +93,7 @@ func (h *ShowsHandler) GetSeasons(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"seasons": seasons})
+	c.JSON(http.StatusOK, gin.H{"items": seasons})
 }
 
 // GetSeason returns a single season with episode count
@@ -158,7 +158,7 @@ func (h *ShowsHandler) GetEpisodes(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"episodes": episodes})
+	c.JSON(http.StatusOK, gin.H{"items": episodes})
 }
 
 // GetAllEpisodes returns all episodes for a show
@@ -176,7 +176,7 @@ func (h *ShowsHandler) GetAllEpisodes(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"episodes": episodes})
+	c.JSON(http.StatusOK, gin.H{"items": episodes})
 }
 
 // GetEpisode returns a single episode by ID

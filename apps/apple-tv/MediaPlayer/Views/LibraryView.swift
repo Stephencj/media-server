@@ -25,7 +25,7 @@ struct LibraryView: View {
                     )
                 } else {
                     LazyVGrid(columns: columns, spacing: 50) {
-                        ForEach(viewModel.items) { media in
+                        ForEach(viewModel.sortedItems) { media in
                             NavigationLink(value: media) {
                                 MediaCardView(media: media)
                             }
@@ -36,8 +36,34 @@ struct LibraryView: View {
                 }
             }
             .navigationTitle(mediaType == .movie ? "Movies" : "TV Shows")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Picker("Sort by", selection: $viewModel.sortOption) {
+                            ForEach(SortOption.allCases, id: \.self) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+
+                        Button {
+                            viewModel.sortOrder = viewModel.sortOrder == .ascending ? .descending : .ascending
+                        } label: {
+                            Label(
+                                viewModel.sortOrder == .ascending ? "Ascending" : "Descending",
+                                systemImage: viewModel.sortOrder == .ascending ? "arrow.up" : "arrow.down"
+                            )
+                        }
+                    } label: {
+                        Label("Sort", systemImage: "arrow.up.arrow.down")
+                    }
+                }
+            }
             .navigationDestination(for: Media.self) { media in
-                MediaDetailView(media: media)
+                if media.type == .tvshow {
+                    TVShowDetailView(show: media)
+                } else {
+                    MediaDetailView(media: media)
+                }
             }
             .overlay {
                 if viewModel.isLoading && viewModel.items.isEmpty {

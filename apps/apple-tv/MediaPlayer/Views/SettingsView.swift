@@ -38,6 +38,40 @@ struct SettingsView: View {
                     }
                 }
 
+                // Playback Preferences section
+                Section("Playback Preferences") {
+                    Picker("Audio Language", selection: $appState.preferredAudioLanguage) {
+                        Text("English").tag("en")
+                        Text("Spanish").tag("es")
+                        Text("French").tag("fr")
+                        Text("German").tag("de")
+                        Text("Italian").tag("it")
+                        Text("Portuguese").tag("pt")
+                        Text("Japanese").tag("ja")
+                        Text("Korean").tag("ko")
+                        Text("Chinese").tag("zh")
+                    }
+
+                    Toggle("Subtitles", isOn: $appState.subtitlesEnabled)
+
+                    if appState.subtitlesEnabled {
+                        Picker("Subtitle Language", selection: Binding(
+                            get: { appState.preferredSubtitleLanguage ?? "en" },
+                            set: { appState.preferredSubtitleLanguage = $0 }
+                        )) {
+                            Text("English").tag("en")
+                            Text("Spanish").tag("es")
+                            Text("French").tag("fr")
+                            Text("German").tag("de")
+                            Text("Italian").tag("it")
+                            Text("Portuguese").tag("pt")
+                            Text("Japanese").tag("ja")
+                            Text("Korean").tag("ko")
+                            Text("Chinese").tag("zh")
+                        }
+                    }
+                }
+
                 // Server section
                 Section("Server") {
                     HStack {

@@ -405,7 +405,7 @@ func (s *Scanner) refreshMetadata(media *db.Media) {
 	}
 
 	// Parse title to get clean search term
-	title, year, _ := parseFilename(media.FilePath)
+	title, year, _, _, _ := parseFilename(media.FilePath)
 	if media.Title != "" {
 		title = media.Title // Use existing title if available
 	}

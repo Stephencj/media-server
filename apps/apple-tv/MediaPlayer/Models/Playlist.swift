@@ -51,6 +51,38 @@ struct PlaylistItem: Identifiable, Codable, Hashable {
         }
         return "\(minutes)m"
     }
+
+    // Convert PlaylistItem to Media for playback
+    func toMedia() -> Media {
+        return Media(
+            id: mediaId,
+            title: title,
+            originalTitle: nil,
+            type: mediaType,
+            year: year,
+            overview: overview,
+            posterPath: posterPath,
+            backdropPath: nil,
+            rating: rating,
+            runtime: nil,
+            genres: nil,
+            tmdbId: nil,
+            imdbId: nil,
+            seasonCount: nil,
+            episodeCount: nil,
+            sourceId: nil,
+            filePath: nil,
+            fileSize: nil,
+            duration: duration,
+            videoCodec: nil,
+            audioCodec: nil,
+            resolution: resolution,
+            audioTracks: nil,
+            subtitleTracks: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+    }
 }
 
 struct PlaylistWithItems: Codable {

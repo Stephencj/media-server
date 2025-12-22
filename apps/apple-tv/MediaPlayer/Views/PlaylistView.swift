@@ -1,4 +1,5 @@
 import SwiftUI
+import AVKit
 
 struct PlaylistView: View {
     @StateObject private var viewModel = PlaylistViewModel()
@@ -315,38 +316,32 @@ struct PlaylistPlayerView: View {
 
     @State private var showUpNext = false
     @State private var autoPlayCountdown = 10
+    @State private var countdownTimer: Timer?
 
     var body: some View {
         ZStack {
-            // Video Player would go here
-            Color.black.ignoresSafeArea()
-
-            VStack {
-                // Header
-                HStack {
-                    if let item = viewModel.currentItem {
-                        Text(item.title)
-                            .font(.headline)
-                            .foregroundColor(.white)
+            // Real Video Player
+            if let playerVM = viewModel.playerViewModel {
+                AVPlayerView(player: playerVM.player)
+                    .ignoresSafeArea()
+                    .onAppear {
+                        playerVM.play()
                     }
 
+                // Loading indicator
+                if playerVM.isBuffering {
+                    ProgressView()
+                        .scaleEffect(2)
+                }
+            } else {
+                Color.black.ignoresSafeArea()
+            }
+
+            // Up Next overlay
+            if showUpNext, let nextItem = viewModel.nextItem {
+                VStack {
                     Spacer()
 
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title)
-                            .foregroundColor(.white)
-                    }
-                }
-                .padding()
-                .background(LinearGradient(colors: [.black.opacity(0.8), .clear], startPoint: .top, endPoint: .bottom))
-
-                Spacer()
-
-                // Up Next overlay
-                if showUpNext, let nextItem = viewModel.nextItem {
                     HStack {
                         Spacer()
 
@@ -355,18 +350,44 @@ struct PlaylistPlayerView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
 
-                            Text(nextItem.title)
-                                .font(.headline)
-                                .foregroundColor(.white)
+                            HStack(spacing: 16) {
+                                if let posterPath = nextItem.posterPath {
+                                    AsyncImage(url: URL(string: "https://image.tmdb.org/t/p/w92\(posterPath)")) { image in
+                                        image.resizable().aspectRatio(contentMode: .fill)
+                                    } placeholder: {
+                                        Color.gray.opacity(0.3)
+                                    }
+                                    .frame(width: 60, height: 90)
+                                    .cornerRadius(4)
+                                }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(nextItem.title)
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+
+                                    if let year = nextItem.year {
+                                        Text(String(year))
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
 
                             HStack(spacing: 12) {
                                 Button("Play Now") {
-                                    _ = viewModel.playNext()
+                                    cancelAutoPlayTimer()
                                     showUpNext = false
+                                    if viewModel.playNext() {
+                                        // Player will be updated automatically via setupPlayer()
+                                    }
                                 }
+                                .buttonStyle(.borderedProminent)
 
                                 Button("Cancel") {
+                                    cancelAutoPlayTimer()
                                     showUpNext = false
+                                    dismiss()
                                 }
                                 .buttonStyle(.bordered)
                             }
@@ -378,50 +399,59 @@ struct PlaylistPlayerView: View {
                     }
                 }
             }
-
-            // Placeholder for actual video player integration
-            VStack {
-                Text("Now Playing")
-                    .font(.title2)
-                    .foregroundColor(.white)
-
-                if let item = viewModel.currentItem {
-                    Text(item.title)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-
-                    Text("\(viewModel.currentIndex + 1) of \(viewModel.items.count)")
-                        .foregroundColor(.secondary)
-                }
-
-                Button("Simulate End") {
-                    if viewModel.hasNextItem {
-                        showUpNext = true
-                        startAutoPlayTimer()
-                    } else {
-                        dismiss()
-                    }
-                }
-                .padding(.top, 40)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
+            // Check if this notification is for our current player
+            if let playerVM = viewModel.playerViewModel,
+               notification.object as? AVPlayerItem === playerVM.player.currentItem {
+                handleVideoEnd()
             }
+        }
+        .onDisappear {
+            cancelAutoPlayTimer()
+            viewModel.cleanup()
+        }
+        .onExitCommand {
+            viewModel.playerViewModel?.pause()
+            dismiss()
+        }
+    }
+
+    private func handleVideoEnd() {
+        // Mark video as completed
+        viewModel.playerViewModel?.markAsCompleted()
+        viewModel.handleVideoEnd()
+
+        if viewModel.hasNextItem {
+            showUpNext = true
+            startAutoPlayTimer()
+        } else {
+            // Last item in playlist - dismiss player
+            dismiss()
         }
     }
 
     private func startAutoPlayTimer() {
         autoPlayCountdown = 10
-        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
             if autoPlayCountdown > 0 && showUpNext {
                 autoPlayCountdown -= 1
                 if autoPlayCountdown == 0 {
                     timer.invalidate()
-                    _ = viewModel.playNext()
                     showUpNext = false
+                    if viewModel.playNext() {
+                        // Player will be updated automatically via setupPlayer()
+                    }
                 }
             } else {
                 timer.invalidate()
             }
         }
+    }
+
+    private func cancelAutoPlayTimer() {
+        countdownTimer?.invalidate()
+        countdownTimer = nil
     }
 }
 

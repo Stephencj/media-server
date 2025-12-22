@@ -4,6 +4,7 @@ struct SearchView: View {
     @State private var searchText = ""
     @State private var results: [Media] = []
     @State private var isSearching = false
+    @State private var searchTask: Task<Void, Never>?
 
     private let columns = [
         GridItem(.adaptive(minimum: 250, maximum: 300), spacing: 40)
@@ -46,6 +47,9 @@ struct SearchView: View {
     }
 
     private func performSearch(query: String) {
+        // Cancel previous search task
+        searchTask?.cancel()
+
         guard !query.isEmpty else {
             results = []
             return
@@ -53,18 +57,16 @@ struct SearchView: View {
 
         isSearching = true
 
-        // Local filtering - in a real app, you'd call an API endpoint
-        Task {
-            // Simulate search delay
+        searchTask = Task {
+            // 300ms debounce
             try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
 
-            // For now, we'll need to fetch all and filter client-side
-            // In production, add a search endpoint to the API
+            // Use cached media for faster search
             do {
-                let movies = try await APIClient.shared.getMovies(limit: 100, offset: 0)
-                let shows = try await APIClient.shared.getShows(limit: 100, offset: 0)
+                let allMedia = await APIClient.shared.getCachedMedia()
+                guard !Task.isCancelled else { return }
 
-                let allMedia = movies.items + shows.items
                 let lowercaseQuery = query.lowercased()
 
                 await MainActor.run {
@@ -75,6 +77,7 @@ struct SearchView: View {
                     isSearching = false
                 }
             } catch {
+                guard !Task.isCancelled else { return }
                 await MainActor.run {
                     isSearching = false
                 }

@@ -40,6 +40,8 @@ class APIClient: ObservableObject {
 
     private let session: URLSession
     private let decoder: JSONDecoder
+    private var mediaCache: [Media] = []
+    private var lastCacheUpdate: Date?
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -119,6 +121,27 @@ class APIClient: ObservableObject {
         } catch {
             throw APIError.networkError(error)
         }
+    }
+
+    // MARK: - Media Cache
+
+    func getCachedMedia() async -> [Media] {
+        // Refresh cache if older than 5 minutes or empty
+        if mediaCache.isEmpty || (lastCacheUpdate?.addingTimeInterval(300) ?? .distantPast) < Date() {
+            do {
+                // Fetch all media in parallel
+                async let movies = getMovies(limit: 1000, offset: 0)
+                async let shows = getShows(limit: 1000, offset: 0)
+
+                let (moviesResponse, showsResponse) = try await (movies, shows)
+                mediaCache = moviesResponse.items + showsResponse.items
+                lastCacheUpdate = Date()
+            } catch {
+                // Return existing cache on error
+                return mediaCache
+            }
+        }
+        return mediaCache
     }
 
     // MARK: - Library Endpoints
@@ -250,6 +273,24 @@ class APIClient: ObservableObject {
     func reorderPlaylist(playlistId: Int64, itemIds: [Int64]) async throws {
         let body = ReorderPlaylistRequest(itemIds: itemIds)
         let _: MessageResponse = try await self.request("/api/playlists/\(playlistId)/reorder", method: "PUT", body: body, authenticated: true)
+    }
+
+    // MARK: - TV Show Endpoints
+
+    func getSeasons(showId: Int64) async throws -> ItemsResponse<Season> {
+        try await get("/api/shows/\(showId)/seasons")
+    }
+
+    func getEpisodes(showId: Int64, seasonNumber: Int) async throws -> ItemsResponse<Episode> {
+        try await get("/api/shows/\(showId)/seasons/\(seasonNumber)/episodes")
+    }
+
+    func getRandomEpisode(showId: Int64) async throws -> RandomEpisodeResponse {
+        try await get("/api/shows/\(showId)/random")
+    }
+
+    func getRandomEpisodeFromSeason(showId: Int64, seasonNumber: Int) async throws -> RandomEpisodeResponse {
+        try await get("/api/shows/\(showId)/seasons/\(seasonNumber)/random")
     }
 }
 
