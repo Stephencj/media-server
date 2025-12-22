@@ -1391,7 +1391,7 @@
             try {
                 const res = await api(`/api/shows/${showId}/seasons/${seasonNum}/episodes`);
                 const data = await res.json();
-                currentMediaEpisodes = data.episodes || [];
+                currentMediaEpisodes = data.items || [];
                 renderEpisodes(showId, seasonNum);
             } catch (err) {
                 console.error('Failed to load episodes:', err);
