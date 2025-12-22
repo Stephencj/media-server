@@ -25,6 +25,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	watchlistHandler := handlers.NewWatchlistHandler(database)
 	playlistHandler := handlers.NewPlaylistHandler(database)
 	showsHandler := handlers.NewShowsHandler(database)
+	extrasHandler := handlers.NewExtrasHandler(database)
 
 	// Serve web admin interface
 	router.StaticFile("/", "./web/index.html")
@@ -131,6 +132,20 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 
 			// Episodes (direct access)
 			protected.GET("/episodes/:episodeId", showsHandler.GetEpisode)
+
+			// Extras (browsable library)
+			extras := protected.Group("/extras")
+			{
+				extras.GET("", extrasHandler.GetExtras)
+				extras.GET("/categories", extrasHandler.GetExtraCategories)
+				extras.GET("/category/:category", extrasHandler.GetExtrasByCategory)
+				extras.GET("/:id", extrasHandler.GetExtra)
+			}
+
+			// Extras by parent media
+			protected.GET("/media/:id/extras", extrasHandler.GetMovieExtras)
+			shows.GET("/:showId/extras", extrasHandler.GetShowExtras)
+			protected.GET("/episodes/:episodeId/extras", extrasHandler.GetEpisodeExtras)
 		}
 	}
 

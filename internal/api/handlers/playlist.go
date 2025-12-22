@@ -59,8 +59,8 @@ func (h *PlaylistHandler) GetPlaylist(c *gin.Context) {
 		return
 	}
 
-	// Check ownership
-	if playlist.UserID != userID {
+	// Check ownership or public access
+	if playlist.UserID != userID && !playlist.IsPublic {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}

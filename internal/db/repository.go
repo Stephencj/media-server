@@ -268,6 +268,25 @@ func scanMediaRows(rows *sql.Rows) ([]*Media, error) {
 	return items, nil
 }
 
+// SearchMedia searches for media by title with fuzzy matching
+func (db *DB) SearchMedia(query string, mediaType MediaType, limit int) ([]*Media, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, title, original_title, type, year, overview, poster_path, backdrop_path,
+			rating, runtime, genres, tmdb_id, imdb_id, season_count, episode_count, source_id,
+			file_path, file_size, duration, video_codec, audio_codec, resolution, audio_tracks,
+			subtitle_tracks, created_at, updated_at
+		 FROM media WHERE type = ? AND (title LIKE ? OR original_title LIKE ?)
+		 ORDER BY title LIMIT ?`,
+		mediaType, "%"+query+"%", "%"+query+"%", limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanMediaRows(rows)
+}
+
 // Watch Progress Repository Methods
 
 // UpsertWatchProgress creates or updates watch progress
@@ -427,25 +446,27 @@ func (db *DB) CreatePlaylist(userID int64, name, description string) (*Playlist,
 func (db *DB) GetPlaylistByID(id int64) (*Playlist, error) {
 	playlist := &Playlist{}
 	err := db.conn.QueryRow(
-		`SELECT p.id, p.user_id, p.name, p.description, p.created_at, p.updated_at,
+		`SELECT p.id, p.user_id, p.name, p.description, p.is_public, p.created_at, p.updated_at,
 			(SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
 		 FROM playlists p WHERE p.id = ?`,
 		id,
 	).Scan(&playlist.ID, &playlist.UserID, &playlist.Name, &playlist.Description,
-		&playlist.CreatedAt, &playlist.UpdatedAt, &playlist.ItemCount)
+		&playlist.IsPublic, &playlist.CreatedAt, &playlist.UpdatedAt, &playlist.ItemCount)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
 	return playlist, err
 }
 
-// GetUserPlaylists retrieves all playlists for a user
+// GetUserPlaylists retrieves all playlists for a user (including public playlists)
 func (db *DB) GetUserPlaylists(userID int64) ([]*Playlist, error) {
 	rows, err := db.conn.Query(
-		`SELECT p.id, p.user_id, p.name, p.description, p.created_at, p.updated_at,
+		`SELECT p.id, p.user_id, p.name, p.description, p.is_public, p.created_at, p.updated_at,
 			(SELECT COUNT(*) FROM playlist_items WHERE playlist_id = p.id) as item_count
-		 FROM playlists p WHERE p.user_id = ? ORDER BY p.updated_at DESC`,
-		userID,
+		 FROM playlists p
+		 WHERE p.user_id = ? OR p.is_public = 1
+		 ORDER BY p.user_id = ? DESC, p.updated_at DESC`,
+		userID, userID,
 	)
 	if err != nil {
 		return nil, err
@@ -456,7 +477,7 @@ func (db *DB) GetUserPlaylists(userID int64) ([]*Playlist, error) {
 	for rows.Next() {
 		p := &Playlist{}
 		if err := rows.Scan(&p.ID, &p.UserID, &p.Name, &p.Description,
-			&p.CreatedAt, &p.UpdatedAt, &p.ItemCount); err != nil {
+			&p.IsPublic, &p.CreatedAt, &p.UpdatedAt, &p.ItemCount); err != nil {
 			return nil, err
 		}
 		playlists = append(playlists, p)
@@ -547,14 +568,24 @@ func (db *DB) RemoveFromPlaylist(playlistID, mediaID int64, mediaType MediaType)
 
 // GetPlaylistItems retrieves all items in a playlist with media details
 func (db *DB) GetPlaylistItems(playlistID int64) ([]*PlaylistItemWithMedia, error) {
+	// Use UNION to get items from both media table (movies) and episodes table
 	rows, err := db.conn.Query(
 		`SELECT pi.id, pi.playlist_id, pi.media_id, pi.media_type, pi.position, pi.added_at,
 			m.title, m.year, m.poster_path, m.duration, m.overview, m.rating, m.resolution
 		 FROM playlist_items pi
 		 JOIN media m ON pi.media_id = m.id
-		 WHERE pi.playlist_id = ?
-		 ORDER BY pi.position ASC`,
-		playlistID,
+		 WHERE pi.playlist_id = ? AND pi.media_type = 'movie'
+
+		 UNION ALL
+
+		 SELECT pi.id, pi.playlist_id, pi.media_id, pi.media_type, pi.position, pi.added_at,
+			e.title, 0 as year, e.still_path as poster_path, e.duration, e.overview, e.rating, e.resolution
+		 FROM playlist_items pi
+		 JOIN episodes e ON pi.media_id = e.id
+		 WHERE pi.playlist_id = ? AND pi.media_type = 'episode'
+
+		 ORDER BY position ASC`,
+		playlistID, playlistID,
 	)
 	if err != nil {
 		return nil, err
@@ -716,6 +747,106 @@ func (db *DB) UpdateTVShow(show *TVShow) error {
 		show.Status, time.Now(), show.ID,
 	)
 	return err
+}
+
+// SearchTVShows searches for TV shows by title with fuzzy matching
+func (db *DB) SearchTVShows(query string, limit int) ([]*TVShow, error) {
+	rows, err := db.conn.Query(
+		`SELECT t.id, t.title, t.original_title, t.year, t.overview, t.poster_path, t.backdrop_path,
+			t.rating, t.genres, t.tmdb_id, t.imdb_id, t.status, t.created_at, t.updated_at,
+			(SELECT COUNT(DISTINCT season_number) FROM episodes WHERE tv_show_id = t.id) as season_count,
+			(SELECT COUNT(*) FROM episodes WHERE tv_show_id = t.id) as episode_count
+		 FROM tv_shows t WHERE t.title LIKE ? OR t.original_title LIKE ?
+		 ORDER BY t.title LIMIT ?`,
+		"%"+query+"%", "%"+query+"%", limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	shows := make([]*TVShow, 0)
+	for rows.Next() {
+		show := &TVShow{}
+		if err := rows.Scan(&show.ID, &show.Title, &show.OriginalTitle, &show.Year, &show.Overview,
+			&show.PosterPath, &show.BackdropPath, &show.Rating, &show.Genres, &show.TMDbID,
+			&show.IMDbID, &show.Status, &show.CreatedAt, &show.UpdatedAt,
+			&show.SeasonCount, &show.EpisodeCount); err != nil {
+			return nil, err
+		}
+		shows = append(shows, show)
+	}
+	return shows, nil
+}
+
+// SearchTVShowsFuzzy searches for TV shows with bidirectional fuzzy matching
+// This allows "Psych Commentary" to match "Psych" by checking if query CONTAINS show title
+func (db *DB) SearchTVShowsFuzzy(query string, limit int) ([]*TVShow, error) {
+	// First try standard search (show title contains query)
+	shows, err := db.SearchTVShows(query, limit)
+	if err == nil && len(shows) > 0 {
+		return shows, nil
+	}
+
+	// If no results, try reverse match: find shows where query CONTAINS the show title
+	// This handles "Psych Commentary" matching "Psych"
+	rows, err := db.conn.Query(
+		`SELECT t.id, t.title, t.original_title, t.year, t.overview, t.poster_path, t.backdrop_path,
+			t.rating, t.genres, t.tmdb_id, t.imdb_id, t.status, t.created_at, t.updated_at,
+			(SELECT COUNT(DISTINCT season_number) FROM episodes WHERE tv_show_id = t.id) as season_count,
+			(SELECT COUNT(*) FROM episodes WHERE tv_show_id = t.id) as episode_count
+		 FROM tv_shows t
+		 WHERE ? LIKE '%' || t.title || '%' COLLATE NOCASE
+		    OR ? LIKE '%' || t.original_title || '%' COLLATE NOCASE
+		 ORDER BY LENGTH(t.title) DESC
+		 LIMIT ?`,
+		query, query, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	shows = make([]*TVShow, 0)
+	for rows.Next() {
+		show := &TVShow{}
+		if err := rows.Scan(&show.ID, &show.Title, &show.OriginalTitle, &show.Year, &show.Overview,
+			&show.PosterPath, &show.BackdropPath, &show.Rating, &show.Genres, &show.TMDbID,
+			&show.IMDbID, &show.Status, &show.CreatedAt, &show.UpdatedAt,
+			&show.SeasonCount, &show.EpisodeCount); err != nil {
+			return nil, err
+		}
+		shows = append(shows, show)
+	}
+	return shows, nil
+}
+
+// SearchMediaFuzzy searches for media with bidirectional fuzzy matching
+func (db *DB) SearchMediaFuzzy(query string, mediaType MediaType, limit int) ([]*Media, error) {
+	// First try standard search
+	media, err := db.SearchMedia(query, mediaType, limit)
+	if err == nil && len(media) > 0 {
+		return media, nil
+	}
+
+	// Try reverse match: query CONTAINS title
+	rows, err := db.conn.Query(
+		`SELECT id, title, original_title, type, year, overview, poster_path, backdrop_path,
+			rating, runtime, genres, tmdb_id, imdb_id, season_count, episode_count, source_id,
+			file_path, file_size, duration, video_codec, audio_codec, resolution, audio_tracks,
+			subtitle_tracks, created_at, updated_at
+		 FROM media
+		 WHERE type = ? AND (? LIKE '%' || title || '%' COLLATE NOCASE
+		    OR ? LIKE '%' || original_title || '%' COLLATE NOCASE)
+		 ORDER BY LENGTH(title) DESC LIMIT ?`,
+		mediaType, query, query, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanMediaRows(rows)
 }
 
 // ============ Season Repository Methods ============
@@ -975,4 +1106,219 @@ func scanEpisodeRows(rows *sql.Rows) ([]*Episode, error) {
 		episodes = append(episodes, episode)
 	}
 	return episodes, nil
+}
+
+// ============ Extras Repository Methods ============
+
+// CreateExtra creates a new extra content record
+func (db *DB) CreateExtra(extra *Extra) (*Extra, error) {
+	result, err := db.conn.Exec(
+		`INSERT INTO extras (title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
+			source_id, file_path, file_size, duration, video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		extra.Title, extra.Category, extra.MovieID, extra.TVShowID, extra.EpisodeID,
+		extra.SeasonNumber, extra.EpisodeNumber, extra.SourceID, extra.FilePath, extra.FileSize,
+		extra.Duration, extra.VideoCodec, extra.AudioCodec, extra.Resolution,
+		extra.AudioTracks, extra.SubtitleTracks,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return db.GetExtraByID(id)
+}
+
+// GetExtraByID retrieves an extra by ID
+func (db *DB) GetExtraByID(id int64) (*Extra, error) {
+	extra := &Extra{}
+	err := db.conn.QueryRow(
+		`SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
+			source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
+			audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM extras WHERE id = ?`,
+		id,
+	).Scan(&extra.ID, &extra.Title, &extra.Category, &extra.MovieID, &extra.TVShowID, &extra.EpisodeID,
+		&extra.SeasonNumber, &extra.EpisodeNumber, &extra.SourceID, &extra.FilePath, &extra.FileSize,
+		&extra.Duration, &extra.VideoCodec, &extra.AudioCodec, &extra.Resolution,
+		&extra.AudioTracks, &extra.SubtitleTracks, &extra.CreatedAt, &extra.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return extra, err
+}
+
+// GetExtraByFilePath checks if an extra with given path exists
+func (db *DB) GetExtraByFilePath(filePath string) (*Extra, error) {
+	extra := &Extra{}
+	err := db.conn.QueryRow(
+		`SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
+			source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
+			audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM extras WHERE file_path = ?`,
+		filePath,
+	).Scan(&extra.ID, &extra.Title, &extra.Category, &extra.MovieID, &extra.TVShowID, &extra.EpisodeID,
+		&extra.SeasonNumber, &extra.EpisodeNumber, &extra.SourceID, &extra.FilePath, &extra.FileSize,
+		&extra.Duration, &extra.VideoCodec, &extra.AudioCodec, &extra.Resolution,
+		&extra.AudioTracks, &extra.SubtitleTracks, &extra.CreatedAt, &extra.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return extra, err
+}
+
+// GetExtrasByMovieID gets all extras for a movie
+func (db *DB) GetExtrasByMovieID(movieID int64) ([]*Extra, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
+			source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
+			audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM extras WHERE movie_id = ? ORDER BY category, title`,
+		movieID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanExtraRows(rows)
+}
+
+// GetExtrasByTVShowID gets all extras for a TV show (including episode-specific)
+func (db *DB) GetExtrasByTVShowID(showID int64) ([]*Extra, error) {
+	rows, err := db.conn.Query(
+		`SELECT e.id, e.title, e.category, e.movie_id, e.tv_show_id, e.episode_id, e.season_number, e.episode_number,
+			e.source_id, e.file_path, e.file_size, e.duration, e.video_codec, e.audio_codec, e.resolution,
+			e.audio_tracks, e.subtitle_tracks, e.created_at, e.updated_at
+		 FROM extras e
+		 WHERE e.tv_show_id = ?
+		    OR e.episode_id IN (SELECT id FROM episodes WHERE tv_show_id = ?)
+		 ORDER BY e.season_number, e.episode_number, e.category, e.title`,
+		showID, showID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanExtraRows(rows)
+}
+
+// GetExtrasByEpisodeID gets episode-specific extras
+func (db *DB) GetExtrasByEpisodeID(episodeID int64) ([]*Extra, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
+			source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
+			audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM extras WHERE episode_id = ? ORDER BY category, title`,
+		episodeID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanExtraRows(rows)
+}
+
+// GetAllExtras retrieves all extras with pagination
+func (db *DB) GetAllExtras(limit, offset int) ([]*Extra, int, error) {
+	// Get total count
+	var total int
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM extras`).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := db.conn.Query(
+		`SELECT e.id, e.title, e.category, e.movie_id, e.tv_show_id, e.episode_id, e.season_number, e.episode_number,
+			e.source_id, e.file_path, e.file_size, e.duration, e.video_codec, e.audio_codec, e.resolution,
+			e.audio_tracks, e.subtitle_tracks, e.created_at, e.updated_at
+		 FROM extras e ORDER BY e.created_at DESC LIMIT ? OFFSET ?`,
+		limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	extras, err := scanExtraRows(rows)
+	return extras, total, err
+}
+
+// GetExtrasByCategory gets all extras of a specific category with pagination
+func (db *DB) GetExtrasByCategory(category ExtraCategory, limit, offset int) ([]*Extra, int, error) {
+	// Get total count
+	var total int
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM extras WHERE category = ?`, category).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := db.conn.Query(
+		`SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
+			source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
+			audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM extras WHERE category = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+		category, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	extras, err := scanExtraRows(rows)
+	return extras, total, err
+}
+
+// CategoryCount represents a category with its count
+type CategoryCount struct {
+	Category ExtraCategory `json:"category"`
+	Count    int           `json:"count"`
+}
+
+// GetExtraCategories returns list of categories with counts
+func (db *DB) GetExtraCategories() ([]CategoryCount, error) {
+	rows, err := db.conn.Query(
+		`SELECT category, COUNT(*) as count FROM extras GROUP BY category ORDER BY count DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	categories := make([]CategoryCount, 0)
+	for rows.Next() {
+		var cc CategoryCount
+		if err := rows.Scan(&cc.Category, &cc.Count); err != nil {
+			return nil, err
+		}
+		categories = append(categories, cc)
+	}
+	return categories, nil
+}
+
+// GetExtrasCount returns total count of extras
+func (db *DB) GetExtrasCount() (int, error) {
+	var count int
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM extras`).Scan(&count)
+	return count, err
+}
+
+// DeleteExtrasBySourceID removes all extras from a source
+func (db *DB) DeleteExtrasBySourceID(sourceID int64) error {
+	_, err := db.conn.Exec(`DELETE FROM extras WHERE source_id = ?`, sourceID)
+	return err
+}
+
+func scanExtraRows(rows *sql.Rows) ([]*Extra, error) {
+	extras := make([]*Extra, 0)
+	for rows.Next() {
+		extra := &Extra{}
+		if err := rows.Scan(&extra.ID, &extra.Title, &extra.Category, &extra.MovieID, &extra.TVShowID,
+			&extra.EpisodeID, &extra.SeasonNumber, &extra.EpisodeNumber, &extra.SourceID, &extra.FilePath,
+			&extra.FileSize, &extra.Duration, &extra.VideoCodec, &extra.AudioCodec, &extra.Resolution,
+			&extra.AudioTracks, &extra.SubtitleTracks, &extra.CreatedAt, &extra.UpdatedAt); err != nil {
+			return nil, err
+		}
+		extras = append(extras, extra)
+	}
+	return extras, nil
 }

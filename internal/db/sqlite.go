@@ -200,6 +200,32 @@ func (db *DB) Migrate() error {
 			UNIQUE(playlist_id, media_id, media_type)
 		)`,
 
+		`CREATE TABLE IF NOT EXISTS extras (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			title TEXT NOT NULL,
+			category TEXT NOT NULL,
+			movie_id INTEGER,
+			tv_show_id INTEGER,
+			episode_id INTEGER,
+			season_number INTEGER,
+			episode_number INTEGER,
+			source_id INTEGER,
+			file_path TEXT UNIQUE NOT NULL,
+			file_size INTEGER,
+			duration INTEGER,
+			video_codec TEXT,
+			audio_codec TEXT,
+			resolution TEXT,
+			audio_tracks TEXT,
+			subtitle_tracks TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (movie_id) REFERENCES media(id) ON DELETE SET NULL,
+			FOREIGN KEY (tv_show_id) REFERENCES tv_shows(id) ON DELETE SET NULL,
+			FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE SET NULL,
+			FOREIGN KEY (source_id) REFERENCES media_sources(id)
+		)`,
+
 		// Indexes for common queries
 		`CREATE INDEX IF NOT EXISTS idx_media_type ON media(type)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_title ON media(title)`,
@@ -210,6 +236,10 @@ func (db *DB) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_watchlist_user ON watchlist(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_playlists_user ON playlists(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_playlist_items_playlist ON playlist_items(playlist_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_extras_movie ON extras(movie_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_extras_tv_show ON extras(tv_show_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_extras_episode ON extras(episode_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_extras_category ON extras(category)`,
 	}
 
 	for _, migration := range migrations {

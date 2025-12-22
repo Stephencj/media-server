@@ -21,6 +21,21 @@ const (
 	MediaTypeMovie   MediaType = "movie"
 	MediaTypeTVShow  MediaType = "tvshow"
 	MediaTypeEpisode MediaType = "episode"
+	MediaTypeExtra   MediaType = "extra"
+)
+
+// ExtraCategory represents the type of extra content
+type ExtraCategory string
+
+const (
+	ExtraCategoryCommentary      ExtraCategory = "commentary"
+	ExtraCategoryDeletedScene    ExtraCategory = "deleted_scene"
+	ExtraCategoryFeaturette      ExtraCategory = "featurette"
+	ExtraCategoryInterview       ExtraCategory = "interview"
+	ExtraCategoryGagReel         ExtraCategory = "gag_reel"
+	ExtraCategoryMusicVideo      ExtraCategory = "music_video"
+	ExtraCategoryBehindTheScenes ExtraCategory = "behind_the_scenes"
+	ExtraCategoryOther           ExtraCategory = "other"
 )
 
 // Media represents a media item (movie or TV show)
@@ -166,6 +181,7 @@ type Playlist struct {
 	UserID      int64     `json:"user_id"`
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
+	IsPublic    bool      `json:"is_public"`
 	ItemCount   int       `json:"item_count"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
@@ -196,4 +212,35 @@ type PlaylistItemWithMedia struct {
 	Overview     string    `json:"overview,omitempty"`
 	Rating       float64   `json:"rating,omitempty"`
 	Resolution   string    `json:"resolution,omitempty"`
+}
+
+// Extra represents bonus content (commentaries, deleted scenes, featurettes, etc.)
+type Extra struct {
+	ID            int64         `json:"id"`
+	Title         string        `json:"title"`
+	Category      ExtraCategory `json:"category"`
+
+	// Parent references (only one should be set)
+	MovieID       *int64 `json:"movie_id,omitempty"`
+	TVShowID      *int64 `json:"tv_show_id,omitempty"`
+	EpisodeID     *int64 `json:"episode_id,omitempty"`
+	SeasonNumber  *int   `json:"season_number,omitempty"`
+	EpisodeNumber *int   `json:"episode_number,omitempty"`
+
+	// File info
+	SourceID       int64  `json:"source_id"`
+	FilePath       string `json:"file_path"`
+	FileSize       int64  `json:"file_size"`
+	Duration       int    `json:"duration"`
+	VideoCodec     string `json:"video_codec,omitempty"`
+	AudioCodec     string `json:"audio_codec,omitempty"`
+	Resolution     string `json:"resolution,omitempty"`
+	AudioTracks    string `json:"audio_tracks,omitempty"`
+	SubtitleTracks string `json:"subtitle_tracks,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+
+	// Populated by joins (not stored in DB)
+	ParentTitle string `json:"parent_title,omitempty"`
 }

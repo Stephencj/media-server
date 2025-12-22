@@ -106,9 +106,25 @@ func (s *Scanner) ScanAll() error {
 	return nil
 }
 
+// isExtrasSource checks if a source path is for extras content
+func isExtrasSource(path string) bool {
+	lower := strings.ToLower(path)
+	return strings.Contains(lower, "special feature") ||
+		strings.Contains(lower, "special-feature") ||
+		strings.Contains(lower, "specialfeature") ||
+		strings.Contains(lower, "commentar") ||
+		strings.Contains(lower, "extras") ||
+		strings.Contains(lower, "bonus")
+}
+
 // ScanSource scans a single media source
 func (s *Scanner) ScanSource(source *db.MediaSource) error {
 	log.Printf("Scanning source: %s (%s)", source.Name, source.Path)
+
+	// Check if this is an extras source
+	if isExtrasSource(source.Path) {
+		return s.ScanExtrasSource(source)
+	}
 
 	// Verify path exists
 	info, err := os.Stat(source.Path)

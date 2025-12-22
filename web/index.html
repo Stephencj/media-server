@@ -591,6 +591,98 @@
             outline: none;
             border-color: #1e88e5;
         }
+
+        /* Extras Filter Chips */
+        .filter-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .filter-chips {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+        .filter-chip {
+            padding: 6px 14px;
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 20px;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .filter-chip:hover {
+            background: #252542;
+            color: #fff;
+            border-color: #444;
+        }
+        .filter-chip.active {
+            background: #1e88e5;
+            border-color: #1e88e5;
+            color: white;
+        }
+        .filter-chip .chip-icon {
+            margin-right: 4px;
+        }
+        .sort-select {
+            padding: 8px 12px;
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #eee;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .sort-select:focus {
+            outline: none;
+            border-color: #1e88e5;
+        }
+
+        /* Extras Category Icon Colors (brighter) */
+        .extra-icon-commentary { color: #ff9800; }
+        .extra-icon-deleted_scene { color: #f44336; }
+        .extra-icon-featurette { color: #2196f3; }
+        .extra-icon-interview { color: #4caf50; }
+        .extra-icon-gag_reel { color: #ffeb3b; }
+        .extra-icon-music_video { color: #e91e63; }
+        .extra-icon-behind_the_scenes { color: #9c27b0; }
+        .extra-icon-other { color: #607d8b; }
+
+        /* Extras Group (in detail modals) */
+        .extras-group {
+            margin-bottom: 20px;
+        }
+        .extras-group-title {
+            color: #90caf9;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .extras-group-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .extra-item {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .extra-item:hover {
+            background: #2a2a2a;
+        }
     </style>
 </head>
 <body>
@@ -651,6 +743,7 @@
             <button class="nav-tab active" data-view="home" onclick="showView('home')">Home</button>
             <button class="nav-tab" data-view="movies" onclick="showView('movies')">Movies</button>
             <button class="nav-tab" data-view="shows" onclick="showView('shows')">TV Shows</button>
+            <button class="nav-tab" data-view="extras" onclick="showView('extras')">Extras</button>
             <button class="nav-tab" data-view="playlists" onclick="showView('playlists')">Playlists</button>
             <button class="nav-tab" data-view="admin" onclick="showView('admin')">Admin</button>
         </nav>
@@ -714,6 +807,36 @@
                     <div class="empty-state-icon">📺</div>
                     <p>No TV shows found in your library.</p>
                     <p>Add a TV shows source in the Admin tab to get started.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- EXTRAS VIEW -->
+        <div id="extras-view" class="view">
+            <div class="wide-container">
+                <div class="section-header">
+                    <h2 class="section-title">Extras & Special Features</h2>
+                </div>
+                <div class="filter-controls">
+                    <div class="filter-chips" id="extras-filter-chips">
+                        <button class="filter-chip active" data-category="" onclick="selectExtrasCategory('')">All</button>
+                    </div>
+                    <input type="text" class="search-input" id="extras-search" placeholder="Search extras..." style="max-width: 250px;" oninput="searchExtras(this.value)">
+                    <select class="sort-select" id="extras-sort" onchange="sortExtras(this.value)">
+                        <option value="recent">Recently Added</option>
+                        <option value="title">Title A-Z</option>
+                        <option value="duration">Duration</option>
+                        <option value="category">Category</option>
+                    </select>
+                </div>
+                <div id="extras-grid" class="media-grid"></div>
+                <div class="load-more-container" id="extras-load-more" style="display: none;">
+                    <button class="btn-load-more" onclick="loadMoreExtras()">Load More</button>
+                </div>
+                <div id="extras-empty" class="empty-state" style="display: none;">
+                    <div class="empty-state-icon">🎬</div>
+                    <p>No extras found in your library.</p>
+                    <p>Add an extras source (commentaries, special features, etc.) in the Admin tab.</p>
                 </div>
             </div>
         </div>
@@ -793,6 +916,11 @@
                     <div class="seasons-container" id="seasons-container" style="display: none;">
                         <div class="season-selector" id="season-selector"></div>
                         <div class="episodes-list" id="episodes-list"></div>
+                    </div>
+                    <!-- Extras Section -->
+                    <div class="extras-container" id="extras-container" style="display: none; margin-top: 24px;">
+                        <h3 style="color: #fff; margin-bottom: 12px;">Extras & Special Features</h3>
+                        <div class="extras-list" id="detail-extras-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;"></div>
                     </div>
                 </div>
             </div>
@@ -1021,6 +1149,7 @@
             if (viewName === 'home') loadHomeView();
             else if (viewName === 'movies') loadMovies(true);
             else if (viewName === 'shows') loadShows(true);
+            else if (viewName === 'extras') { loadExtras(true); loadExtrasCategories(); }
             else if (viewName === 'playlists') loadPlaylists();
             else if (viewName === 'admin') loadSources();
         }
@@ -1244,6 +1373,189 @@
             }, 300);
         }
 
+        // ============ EXTRAS VIEW ============
+        let extrasData = [];
+        let extrasOffset = 0;
+        let extrasTotal = 0;
+        let extrasSearchQuery = '';
+        let extrasCategoryFilter = '';
+        let extrasSearchTimeout = null;
+        let extrasCategories = [];
+        let extrasSortOrder = 'recent';
+
+        async function loadExtras(reset = true) {
+            if (reset) {
+                extrasOffset = 0;
+                extrasData = [];
+            }
+
+            try {
+                let url;
+                if (extrasCategoryFilter) {
+                    url = `/api/extras/category/${extrasCategoryFilter}?limit=50&offset=${extrasOffset}`;
+                } else {
+                    url = `/api/extras?limit=50&offset=${extrasOffset}`;
+                }
+
+                const res = await api(url);
+                const data = await res.json();
+                const items = data.items || [];
+                extrasTotal = data.total || 0;
+
+                if (reset) {
+                    extrasData = items;
+                } else {
+                    extrasData = [...extrasData, ...items];
+                }
+                extrasOffset += items.length;
+
+                renderExtras();
+            } catch (err) {
+                console.error('Failed to load extras:', err);
+            }
+        }
+
+        async function loadExtrasCategories() {
+            try {
+                const res = await api('/api/extras/categories');
+                const data = await res.json();
+                extrasCategories = data.categories || [];
+
+                // Render filter chips
+                const chips = document.getElementById('extras-filter-chips');
+                chips.innerHTML = `<button class="filter-chip ${extrasCategoryFilter === '' ? 'active' : ''}" data-category="" onclick="selectExtrasCategory('')">All</button>` +
+                    extrasCategories.map(cat =>
+                        `<button class="filter-chip ${extrasCategoryFilter === cat.category ? 'active' : ''}" data-category="${cat.category}" onclick="selectExtrasCategory('${cat.category}')">
+                            <span class="chip-icon">${getCategoryIcon(cat.category)}</span>${formatCategory(cat.category)}
+                        </button>`
+                    ).join('');
+            } catch (err) {
+                console.error('Failed to load extras categories:', err);
+            }
+        }
+
+        function getCategoryIcon(category) {
+            const icons = {
+                'commentary': '🎙️',
+                'deleted_scene': '✂️',
+                'featurette': '🎬',
+                'interview': '🎤',
+                'gag_reel': '😂',
+                'music_video': '🎵',
+                'behind_the_scenes': '🎥',
+                'other': '📀'
+            };
+            return icons[category] || '📀';
+        }
+
+        function selectExtrasCategory(category) {
+            extrasCategoryFilter = category;
+            // Update chip active states
+            document.querySelectorAll('#extras-filter-chips .filter-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.category === category);
+            });
+            loadExtras(true);
+        }
+
+        function sortExtras(order) {
+            extrasSortOrder = order;
+            renderExtras();
+        }
+
+        function formatCategory(cat) {
+            const names = {
+                'commentary': 'Commentaries',
+                'deleted_scene': 'Deleted Scenes',
+                'featurette': 'Featurettes',
+                'interview': 'Interviews',
+                'gag_reel': 'Gag Reels',
+                'music_video': 'Music Videos',
+                'behind_the_scenes': 'Behind the Scenes',
+                'other': 'Other'
+            };
+            return names[cat] || cat;
+        }
+
+        function renderExtras() {
+            const grid = document.getElementById('extras-grid');
+            const loadMore = document.getElementById('extras-load-more');
+            const empty = document.getElementById('extras-empty');
+
+            let filtered = extrasData;
+            if (extrasSearchQuery) {
+                const q = extrasSearchQuery.toLowerCase();
+                filtered = extrasData.filter(e =>
+                    e.title.toLowerCase().includes(q) ||
+                    (e.parent_title && e.parent_title.toLowerCase().includes(q))
+                );
+            }
+
+            // Apply sorting
+            filtered = [...filtered].sort((a, b) => {
+                switch (extrasSortOrder) {
+                    case 'title':
+                        return a.title.localeCompare(b.title);
+                    case 'duration':
+                        return (b.duration || 0) - (a.duration || 0);
+                    case 'category':
+                        return a.category.localeCompare(b.category);
+                    case 'recent':
+                    default:
+                        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                }
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '';
+                loadMore.style.display = 'none';
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+            grid.innerHTML = filtered.map(e => renderExtraCard(e)).join('');
+            loadMore.style.display = extrasOffset < extrasTotal ? 'block' : 'none';
+        }
+
+        function renderExtraCard(extra) {
+            const icon = getCategoryIcon(extra.category);
+            const duration = extra.duration ? formatDuration(extra.duration) : '';
+            const parentInfo = extra.parent_title ? `<div class="media-card-year">${escapeHtml(extra.parent_title)}</div>` : '';
+            const iconClass = `extra-icon-${extra.category}`;
+
+            return `
+                <div class="media-card" onclick="playExtra(${extra.id})">
+                    <div class="media-poster" style="display: flex; align-items: center; justify-content: center; font-size: 3rem; background: linear-gradient(135deg, #1a1a1a, #2d2d2d);">
+                        <span class="${iconClass}">${icon}</span>
+                    </div>
+                    <div class="media-card-overlay">
+                        <button class="play-btn-large" onclick="event.stopPropagation(); playExtra(${extra.id})">&#9658;</button>
+                    </div>
+                    <div class="media-card-info">
+                        <div class="media-card-title">${escapeHtml(extra.title)}</div>
+                        ${parentInfo}
+                        <div class="media-card-year">${formatCategory(extra.category)}${duration ? ' • ' + duration : ''}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function loadMoreExtras() {
+            loadExtras(false);
+        }
+
+        function searchExtras(query) {
+            clearTimeout(extrasSearchTimeout);
+            extrasSearchTimeout = setTimeout(() => {
+                extrasSearchQuery = query;
+                renderExtras();
+            }, 300);
+        }
+
+        function playExtra(extraId) {
+            openPlayerWithPosition(extraId, 'extra', 0);
+        }
+
         // ============ MEDIA CARD RENDERER ============
         function renderMediaCard(media) {
             const posterUrl = media.poster_path
@@ -1339,6 +1651,9 @@
             // Hide seasons container for movies
             document.getElementById('seasons-container').style.display = 'none';
             document.getElementById('detail-play-btn').style.display = 'inline-flex';
+
+            // Load extras for this movie
+            loadDetailExtras('movie', media.id);
         }
 
         function renderTVShowDetail(show) {
@@ -1377,6 +1692,9 @@
                     </button>`
                 ).join('')}
             `;
+
+            // Load extras for this TV show
+            loadDetailExtras('show', show.id);
         }
 
         function hideMediaDetail() {
@@ -1385,6 +1703,78 @@
             currentMediaEpisodes = [];
             currentShowSeasons = [];
             currentShowId = null;
+            // Hide extras container
+            document.getElementById('extras-container').style.display = 'none';
+        }
+
+        async function loadDetailExtras(type, id) {
+            const container = document.getElementById('extras-container');
+            const list = document.getElementById('detail-extras-list');
+
+            try {
+                let endpoint;
+                if (type === 'movie') {
+                    endpoint = `/api/media/${id}/extras`;
+                } else if (type === 'show') {
+                    endpoint = `/api/shows/${id}/extras`;
+                } else if (type === 'episode') {
+                    endpoint = `/api/episodes/${id}/extras`;
+                } else {
+                    return; // Unknown type
+                }
+
+                const res = await api(endpoint);
+                const data = await res.json();
+                const extras = data.items || [];
+
+                if (extras.length === 0) {
+                    container.style.display = 'none';
+                    return;
+                }
+
+                // Group extras by category
+                const grouped = {};
+                extras.forEach(e => {
+                    if (!grouped[e.category]) grouped[e.category] = [];
+                    grouped[e.category].push(e);
+                });
+
+                // Render grouped extras
+                container.style.display = 'block';
+                list.innerHTML = Object.entries(grouped).map(([cat, items]) => `
+                    <div class="extras-group">
+                        <div class="extras-group-title">
+                            <span class="extra-icon-${cat}">${getCategoryIcon(cat)}</span>
+                            ${formatCategory(cat)}
+                        </div>
+                        <div class="extras-group-grid">
+                            ${items.map(e => renderDetailExtraCard(e)).join('')}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Failed to load extras:', err);
+                container.style.display = 'none';
+            }
+        }
+
+        function renderDetailExtraCard(extra) {
+            const icon = getCategoryIcon(extra.category);
+            const iconClass = `extra-icon-${extra.category}`;
+            const duration = extra.duration ? formatDuration(extra.duration) : '';
+
+            return `
+                <div class="extra-item" onclick="playExtra(${extra.id})">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span class="${iconClass}" style="font-size: 1.5rem;">${icon}</span>
+                        <div style="flex: 1; overflow: hidden;">
+                            <div style="color: #fff; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(extra.title)}</div>
+                            <div style="color: #888; font-size: 0.85rem;">${duration || ''}</div>
+                        </div>
+                        <button onclick="event.stopPropagation(); playExtra(${extra.id})" style="background: #1e88e5; border: none; color: white; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;">&#9658;</button>
+                    </div>
+                </div>
+            `;
         }
 
         async function loadSeasonEpisodes(showId, seasonNum) {

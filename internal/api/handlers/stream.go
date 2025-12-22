@@ -50,7 +50,8 @@ func (h *StreamHandler) GetManifest(c *gin.Context) {
 	var duration int
 	var resolution string
 
-	if mediaType == "episode" {
+	switch mediaType {
+	case "episode":
 		episode, err := h.db.GetEpisodeByID(id)
 		if err == db.ErrNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Episode not found"})
@@ -63,7 +64,20 @@ func (h *StreamHandler) GetManifest(c *gin.Context) {
 		filePath = episode.FilePath
 		duration = episode.Duration
 		resolution = episode.Resolution
-	} else {
+	case "extra":
+		extra, err := h.db.GetExtraByID(id)
+		if err == db.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Extra not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch extra"})
+			return
+		}
+		filePath = extra.FilePath
+		duration = extra.Duration
+		resolution = extra.Resolution
+	default:
 		media, err := h.db.GetMediaByID(id)
 		if err == db.ErrNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Media not found"})
@@ -222,7 +236,8 @@ func (h *StreamHandler) DirectPlay(c *gin.Context) {
 	mediaType := c.Query("type")
 	var filePath string
 
-	if mediaType == "episode" {
+	switch mediaType {
+	case "episode":
 		// Look up episode from episodes table
 		episode, err := h.db.GetEpisodeByID(id)
 		if err == db.ErrNotFound {
@@ -234,7 +249,19 @@ func (h *StreamHandler) DirectPlay(c *gin.Context) {
 			return
 		}
 		filePath = episode.FilePath
-	} else {
+	case "extra":
+		// Look up from extras table
+		extra, err := h.db.GetExtraByID(id)
+		if err == db.ErrNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Extra not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch extra"})
+			return
+		}
+		filePath = extra.FilePath
+	default:
 		// Look up from media table (movies)
 		media, err := h.db.GetMediaByID(id)
 		if err == db.ErrNotFound {
