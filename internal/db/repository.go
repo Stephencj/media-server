@@ -708,9 +708,9 @@ func (db *DB) CreateTVShow(show *TVShow) (*TVShow, error) {
 func (db *DB) GetTVShowByID(id int64) (*TVShow, error) {
 	query := `
 		SELECT
-			s.id, s.title, s.original_title, s.year, s.overview,
-			s.poster_path, s.backdrop_path, s.rating, s.genres,
-			s.tmdb_id, s.imdb_id, s.status, s.created_at, s.updated_at,
+			s.id, s.title, COALESCE(s.original_title, ''), s.year, COALESCE(s.overview, ''),
+			COALESCE(s.poster_path, ''), COALESCE(s.backdrop_path, ''), s.rating, COALESCE(s.genres, ''),
+			s.tmdb_id, COALESCE(s.imdb_id, ''), COALESCE(s.status, ''), s.created_at, s.updated_at,
 			COUNT(DISTINCT se.id) as season_count,
 			COUNT(DISTINCT e.id) as episode_count,
 			(SELECT resolution FROM episodes WHERE tv_show_id = s.id
@@ -719,8 +719,8 @@ func (db *DB) GetTVShowByID(id int64) (*TVShow, error) {
 			 GROUP BY video_codec ORDER BY COUNT(*) DESC LIMIT 1) as common_video_codec,
 			(SELECT audio_codec FROM episodes WHERE tv_show_id = s.id
 			 GROUP BY audio_codec ORDER BY COUNT(*) DESC LIMIT 1) as common_audio_codec,
-			COALESCE(SUM(e.duration), 0) as total_duration,
-			COALESCE(AVG(e.duration), 0) as avg_episode_length,
+			CAST(COALESCE(SUM(e.duration), 0) AS INTEGER) as total_duration,
+			CAST(COALESCE(AVG(e.duration), 0) AS INTEGER) as avg_episode_length,
 			(SELECT resolution FROM episodes WHERE tv_show_id = s.id
 			 ORDER BY CAST(SUBSTR(resolution, 1, INSTR(resolution, 'x')-1) AS INTEGER) DESC
 			 LIMIT 1) as max_resolution
@@ -808,9 +808,9 @@ func (db *DB) GetAllTVShows(limit, offset int) ([]*TVShow, int, error) {
 
 	query := `
 		SELECT
-			s.id, s.title, s.original_title, s.year, s.overview,
-			s.poster_path, s.backdrop_path, s.rating, s.genres,
-			s.tmdb_id, s.imdb_id, s.status, s.created_at, s.updated_at,
+			s.id, s.title, COALESCE(s.original_title, ''), s.year, COALESCE(s.overview, ''),
+			COALESCE(s.poster_path, ''), COALESCE(s.backdrop_path, ''), s.rating, COALESCE(s.genres, ''),
+			s.tmdb_id, COALESCE(s.imdb_id, ''), COALESCE(s.status, ''), s.created_at, s.updated_at,
 			COUNT(DISTINCT se.id) as season_count,
 			COUNT(DISTINCT e.id) as episode_count,
 			(SELECT resolution FROM episodes WHERE tv_show_id = s.id
@@ -819,8 +819,8 @@ func (db *DB) GetAllTVShows(limit, offset int) ([]*TVShow, int, error) {
 			 GROUP BY video_codec ORDER BY COUNT(*) DESC LIMIT 1) as common_video_codec,
 			(SELECT audio_codec FROM episodes WHERE tv_show_id = s.id
 			 GROUP BY audio_codec ORDER BY COUNT(*) DESC LIMIT 1) as common_audio_codec,
-			COALESCE(SUM(e.duration), 0) as total_duration,
-			COALESCE(AVG(e.duration), 0) as avg_episode_length,
+			CAST(COALESCE(SUM(e.duration), 0) AS INTEGER) as total_duration,
+			CAST(COALESCE(AVG(e.duration), 0) AS INTEGER) as avg_episode_length,
 			(SELECT resolution FROM episodes WHERE tv_show_id = s.id
 			 ORDER BY CAST(SUBSTR(resolution, 1, INSTR(resolution, 'x')-1) AS INTEGER) DESC
 			 LIMIT 1) as max_resolution
