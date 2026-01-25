@@ -76,17 +76,11 @@ func (s *Scanner) processExtraFile(filePath string, source *db.MediaSource) erro
 		return nil // Already exists
 	}
 
-	// Get file info
-	info, err := os.Stat(filePath)
+	// Extract metadata using MetadataExtractor
+	mediaFile, err := s.metadataExtractor.ExtractFileMetadata(filePath)
 	if err != nil {
+		log.Printf("Error extracting metadata for extra %s: %v", filePath, err)
 		return err
-	}
-
-	// Get video metadata using ffprobe
-	metadata, err := s.ffprobe.GetMetadata(filePath)
-	if err != nil {
-		log.Printf("Warning: Could not get metadata for %s: %v", filePath, err)
-		metadata = nil
 	}
 
 	// Parse the filename and directory structure
@@ -94,23 +88,13 @@ func (s *Scanner) processExtraFile(filePath string, source *db.MediaSource) erro
 
 	// Create extra entry
 	extra := &db.Extra{
-		Title:          parseResult.Title,
-		Category:       parseResult.Category,
-		SourceID:       source.ID,
-		FilePath:       filePath,
-		FileSize:       info.Size(),
-		SeasonNumber:   parseResult.SeasonNumber,
-		EpisodeNumber:  parseResult.EpisodeNumber,
+		Title:         parseResult.Title,
+		Category:      parseResult.Category,
+		MediaFile:     *mediaFile,
+		SeasonNumber:  parseResult.SeasonNumber,
+		EpisodeNumber: parseResult.EpisodeNumber,
 	}
-
-	if metadata != nil {
-		extra.Duration = metadata.Duration
-		extra.VideoCodec = metadata.VideoCodec
-		extra.AudioCodec = metadata.AudioCodec
-		extra.Resolution = metadata.Resolution
-		extra.AudioTracks = metadata.AudioTracksJSON
-		extra.SubtitleTracks = metadata.SubtitleTracksJSON
-	}
+	extra.SourceID = source.ID
 
 	// Try to link to parent content
 	s.linkExtraToParent(extra, parseResult, source.Path, filePath)

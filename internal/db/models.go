@@ -4,6 +4,39 @@ import (
 	"time"
 )
 
+// MediaFile contains common fields for all playable media files
+type MediaFile struct {
+	SourceID       int64  `json:"source_id"`
+	FilePath       string `json:"file_path"`
+	FileSize       int64  `json:"file_size"`
+	Duration       int    `json:"duration"`
+	VideoCodec     string `json:"video_codec,omitempty"`
+	AudioCodec     string `json:"audio_codec,omitempty"`
+	Resolution     string `json:"resolution,omitempty"`
+	AudioTracks    string `json:"audio_tracks,omitempty"`
+	SubtitleTracks string `json:"subtitle_tracks,omitempty"`
+}
+
+// TMDBMetadata contains common TMDB metadata fields
+type TMDBMetadata struct {
+	Title         string  `json:"title"`
+	OriginalTitle string  `json:"original_title,omitempty"`
+	Overview      string  `json:"overview,omitempty"`
+	PosterPath    string  `json:"poster_path,omitempty"`
+	BackdropPath  string  `json:"backdrop_path,omitempty"`
+	Rating        float64 `json:"rating,omitempty"`
+	Year          int     `json:"year,omitempty"`
+	Genres        string  `json:"genres,omitempty"`
+	TMDbID        int     `json:"tmdb_id,omitempty"`
+	IMDbID        string  `json:"imdb_id,omitempty"`
+}
+
+// Timestamps contains common timestamp fields
+type Timestamps struct {
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // User represents a user account
 type User struct {
 	ID           int64     `json:"id"`
@@ -40,41 +73,14 @@ const (
 
 // Media represents a media item (movie or TV show)
 type Media struct {
-	ID          int64     `json:"id"`
-	Title       string    `json:"title"`
-	OriginalTitle string  `json:"original_title,omitempty"`
-	Type        MediaType `json:"type"`
-	Year        int       `json:"year,omitempty"`
-	Overview    string    `json:"overview,omitempty"`
-	PosterPath  string    `json:"poster_path,omitempty"`
-	BackdropPath string   `json:"backdrop_path,omitempty"`
-	Rating      float64   `json:"rating,omitempty"`
-	Runtime     int       `json:"runtime,omitempty"` // in minutes
-	Genres      string    `json:"genres,omitempty"`  // comma-separated
-
-	// External IDs
-	TMDbID  int    `json:"tmdb_id,omitempty"`
-	IMDbID  string `json:"imdb_id,omitempty"`
-
-	// For TV Shows
-	SeasonCount  int `json:"season_count,omitempty"`
-	EpisodeCount int `json:"episode_count,omitempty"`
-
-	// File info
-	SourceID  int64  `json:"source_id"`
-	FilePath  string `json:"file_path"`
-	FileSize  int64  `json:"file_size"`
-
-	// Video info
-	Duration       int    `json:"duration"` // in seconds
-	VideoCodec     string `json:"video_codec,omitempty"`
-	AudioCodec     string `json:"audio_codec,omitempty"`
-	Resolution     string `json:"resolution,omitempty"`
-	AudioTracks    string `json:"audio_tracks,omitempty"`    // JSON array
-	SubtitleTracks string `json:"subtitle_tracks,omitempty"` // JSON array
-
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           int64     `json:"id"`
+	MediaFile              // Embedded
+	TMDBMetadata           // Embedded
+	Timestamps             // Embedded
+	Type         MediaType `json:"type"`
+	Runtime      int       `json:"runtime,omitempty"`
+	SeasonCount  int       `json:"season_count,omitempty"`
+	EpisodeCount int       `json:"episode_count,omitempty"`
 }
 
 // TVShow represents a TV series (parent of episodes)
@@ -113,31 +119,19 @@ type Season struct {
 
 // Episode represents a TV episode
 type Episode struct {
-	ID            int64     `json:"id"`
-	TVShowID      int64     `json:"tv_show_id"`
-	SeasonID      int64     `json:"season_id"`
-	SeasonNumber  int       `json:"season_number"`
-	EpisodeNumber int       `json:"episode_number"`
-	Title         string    `json:"title"`
-	Overview      string    `json:"overview,omitempty"`
-	StillPath     string    `json:"still_path,omitempty"`
-	AirDate       string    `json:"air_date,omitempty"`
-	Runtime       int       `json:"runtime,omitempty"`
-	Rating        float64   `json:"rating,omitempty"`
-
-	// File info
-	SourceID       int64  `json:"source_id"`
-	FilePath       string `json:"file_path"`
-	FileSize       int64  `json:"file_size"`
-	Duration       int    `json:"duration"`
-	VideoCodec     string `json:"video_codec,omitempty"`
-	AudioCodec     string `json:"audio_codec,omitempty"`
-	Resolution     string `json:"resolution,omitempty"`
-	AudioTracks    string `json:"audio_tracks,omitempty"`
-	SubtitleTracks string `json:"subtitle_tracks,omitempty"`
-
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID            int64   `json:"id"`
+	TVShowID      int64   `json:"tv_show_id"`
+	SeasonID      int64   `json:"season_id"`
+	SeasonNumber  int     `json:"season_number"`
+	EpisodeNumber int     `json:"episode_number"`
+	Title         string  `json:"title"`
+	Overview      string  `json:"overview,omitempty"`
+	StillPath     string  `json:"still_path,omitempty"`
+	AirDate       string  `json:"air_date,omitempty"`
+	Runtime       int     `json:"runtime,omitempty"`
+	Rating        float64 `json:"rating,omitempty"`
+	MediaFile               // Embedded
+	Timestamps              // Embedded
 }
 
 // MediaSource represents a configured media source
@@ -227,19 +221,8 @@ type Extra struct {
 	SeasonNumber  *int   `json:"season_number,omitempty"`
 	EpisodeNumber *int   `json:"episode_number,omitempty"`
 
-	// File info
-	SourceID       int64  `json:"source_id"`
-	FilePath       string `json:"file_path"`
-	FileSize       int64  `json:"file_size"`
-	Duration       int    `json:"duration"`
-	VideoCodec     string `json:"video_codec,omitempty"`
-	AudioCodec     string `json:"audio_codec,omitempty"`
-	Resolution     string `json:"resolution,omitempty"`
-	AudioTracks    string `json:"audio_tracks,omitempty"`
-	SubtitleTracks string `json:"subtitle_tracks,omitempty"`
-
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	MediaFile  // Embedded
+	Timestamps // Embedded
 
 	// Populated by joins (not stored in DB)
 	ParentTitle string `json:"parent_title,omitempty"`

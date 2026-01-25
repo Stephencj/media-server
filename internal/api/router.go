@@ -26,6 +26,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	playlistHandler := handlers.NewPlaylistHandler(database)
 	showsHandler := handlers.NewShowsHandler(database)
 	extrasHandler := handlers.NewExtrasHandler(database)
+	metadataHandler := handlers.NewMetadataHandler(database, cfg)
 	deployHandler := handlers.NewDeployHandler()
 
 	// Serve web admin interface
@@ -71,6 +72,11 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 
 			// Media
 			protected.GET("/media/:id", libraryHandler.GetMedia)
+
+			// Metadata management
+			protected.POST("/media/:id/metadata/search", metadataHandler.SearchTMDB)
+			protected.PUT("/media/:id/metadata/apply", metadataHandler.ApplyMetadata)
+			protected.POST("/media/:id/metadata/refresh", metadataHandler.RefreshMetadata)
 
 			// Streaming
 			stream := protected.Group("/stream")

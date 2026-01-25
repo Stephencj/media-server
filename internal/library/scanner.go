@@ -11,18 +11,17 @@ import (
 
 	"github.com/stephencjuliano/media-server/internal/config"
 	"github.com/stephencjuliano/media-server/internal/db"
-	"github.com/stephencjuliano/media-server/pkg/ffmpeg"
 	"github.com/stephencjuliano/media-server/pkg/tmdb"
 )
 
 // Scanner handles media library scanning
 type Scanner struct {
-	db      *db.DB
-	cfg     *config.Config
-	ffprobe *ffmpeg.FFprobe
-	tmdb    *tmdb.Client
-	mu      sync.Mutex
-	running bool
+	db                *db.DB
+	cfg               *config.Config
+	metadataExtractor *MetadataExtractor
+	tmdb              *tmdb.Client
+	mu                sync.Mutex
+	running           bool
 }
 
 // ScanStatus represents the current scan status
@@ -59,10 +58,10 @@ func NewScanner(database *db.DB, cfg *config.Config) *Scanner {
 	}
 
 	return &Scanner{
-		db:      database,
-		cfg:     cfg,
-		ffprobe: ffmpeg.NewFFprobe(cfg.FFmpegPath),
-		tmdb:    tmdbClient,
+		db:                database,
+		cfg:               cfg,
+		metadataExtractor: NewMetadataExtractor(cfg.FFmpegPath),
+		tmdb:              tmdbClient,
 	}
 }
 
@@ -189,34 +188,23 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 		return nil
 	}
 
-	// Get file info
-	info, err := os.Stat(filePath)
+	// Extract file metadata using the metadata extractor
+	mediaFile, err := s.metadataExtractor.ExtractFileMetadata(filePath)
 	if err != nil {
+		log.Printf("Error extracting metadata for %s: %v", filePath, err)
 		return err
-	}
-
-	// Get video metadata using ffprobe
-	metadata, err := s.ffprobe.GetMetadata(filePath)
-	if err != nil {
-		log.Printf("Warning: Could not get metadata for %s: %v", filePath, err)
-		metadata = &ffmpeg.Metadata{}
 	}
 
 	// Create media entry with basic info (for movies)
 	media := &db.Media{
-		Title:          title,
-		Type:           mediaType,
-		Year:           year,
-		SourceID:       source.ID,
-		FilePath:       filePath,
-		FileSize:       info.Size(),
-		Duration:       metadata.Duration,
-		VideoCodec:     metadata.VideoCodec,
-		AudioCodec:     metadata.AudioCodec,
-		Resolution:     metadata.Resolution,
-		AudioTracks:    metadata.AudioTracksJSON,
-		SubtitleTracks: metadata.SubtitleTracksJSON,
+		MediaFile: *mediaFile,
+		TMDBMetadata: db.TMDBMetadata{
+			Title: title,
+			Year:  year,
+		},
+		Type: mediaType,
 	}
+	media.SourceID = source.ID
 
 	// Enrich with TMDB metadata if available
 	s.enrichWithTMDB(media, title, year, mediaType)
@@ -237,17 +225,11 @@ func (s *Scanner) processTVEpisode(filePath string, source *db.MediaSource, show
 		return nil // Already exists
 	}
 
-	// Get file info
-	info, err := os.Stat(filePath)
+	// Extract file metadata using the metadata extractor
+	mediaFile, err := s.metadataExtractor.ExtractFileMetadata(filePath)
 	if err != nil {
+		log.Printf("Error extracting metadata for episode %s: %v", filePath, err)
 		return err
-	}
-
-	// Get video metadata using ffprobe
-	metadata, err := s.ffprobe.GetMetadata(filePath)
-	if err != nil {
-		log.Printf("Warning: Could not get metadata for %s: %v", filePath, err)
-		metadata = &ffmpeg.Metadata{}
 	}
 
 	// Try to find or create the TV show
@@ -383,26 +365,19 @@ func (s *Scanner) processTVEpisode(filePath string, source *db.MediaSource, show
 
 	// Create the episode record
 	episode := &db.Episode{
-		TVShowID:       show.ID,
-		SeasonID:       season.ID,
-		SeasonNumber:   seasonNum,
-		EpisodeNumber:  episodeNum,
-		Title:          episodeTitle,
-		Overview:       episodeOverview,
-		StillPath:      episodeStillPath,
-		AirDate:        episodeAirDate,
-		Runtime:        episodeRuntime,
-		Rating:         episodeRating,
-		SourceID:       source.ID,
-		FilePath:       filePath,
-		FileSize:       info.Size(),
-		Duration:       metadata.Duration,
-		VideoCodec:     metadata.VideoCodec,
-		AudioCodec:     metadata.AudioCodec,
-		Resolution:     metadata.Resolution,
-		AudioTracks:    metadata.AudioTracksJSON,
-		SubtitleTracks: metadata.SubtitleTracksJSON,
+		MediaFile:     *mediaFile,
+		TVShowID:      show.ID,
+		SeasonID:      season.ID,
+		SeasonNumber:  seasonNum,
+		EpisodeNumber: episodeNum,
+		Title:         episodeTitle,
+		Overview:      episodeOverview,
+		StillPath:     episodeStillPath,
+		AirDate:       episodeAirDate,
+		Runtime:       episodeRuntime,
+		Rating:        episodeRating,
 	}
+	episode.SourceID = source.ID
 
 	_, err = s.db.CreateEpisode(episode)
 	if err != nil {

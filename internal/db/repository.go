@@ -8,6 +8,72 @@ import (
 
 var ErrNotFound = errors.New("record not found")
 
+// ============ Generic Helper Functions ============
+
+// Generic helper for getting a single record by ID
+func getByID[T any](db *sql.DB, query string, id int64, scanner func(*sql.Row) (T, error)) (T, error) {
+	row := db.QueryRow(query, id)
+	return scanner(row)
+}
+
+// Generic helper for getting a single record by file path
+func getByFilePath[T any](db *sql.DB, query string, path string, scanner func(*sql.Row) (T, error)) (T, error) {
+	row := db.QueryRow(query, path)
+	return scanner(row)
+}
+
+// Generic helper for scanning multiple rows
+func scanRows[T any](rows *sql.Rows, scanner func(*sql.Rows) (T, error)) ([]T, error) {
+	var results []T
+	for rows.Next() {
+		item, err := scanner(rows)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, item)
+	}
+	return results, rows.Err()
+}
+
+// ============ Scanner Helper Functions ============
+
+func scanMediaRow(row *sql.Row) (Media, error) {
+	var m Media
+	err := row.Scan(
+		&m.ID, &m.Title, &m.OriginalTitle, &m.Type, &m.Year,
+		&m.Overview, &m.PosterPath, &m.BackdropPath, &m.Rating, &m.Runtime,
+		&m.Genres, &m.TMDbID, &m.IMDbID, &m.SeasonCount, &m.EpisodeCount,
+		&m.SourceID, &m.FilePath, &m.FileSize, &m.Duration, &m.VideoCodec,
+		&m.AudioCodec, &m.Resolution, &m.AudioTracks, &m.SubtitleTracks,
+		&m.CreatedAt, &m.UpdatedAt,
+	)
+	return m, err
+}
+
+func scanEpisodeRow(row *sql.Row) (Episode, error) {
+	var e Episode
+	err := row.Scan(
+		&e.ID, &e.TVShowID, &e.SeasonID, &e.SeasonNumber,
+		&e.EpisodeNumber, &e.Title, &e.Overview, &e.StillPath,
+		&e.AirDate, &e.Runtime, &e.Rating, &e.SourceID, &e.FilePath,
+		&e.FileSize, &e.Duration, &e.VideoCodec, &e.AudioCodec,
+		&e.Resolution, &e.AudioTracks, &e.SubtitleTracks,
+		&e.CreatedAt, &e.UpdatedAt,
+	)
+	return e, err
+}
+
+func scanExtraRow(row *sql.Row) (Extra, error) {
+	var ex Extra
+	err := row.Scan(
+		&ex.ID, &ex.Title, &ex.Category, &ex.MovieID, &ex.TVShowID, &ex.EpisodeID,
+		&ex.SeasonNumber, &ex.EpisodeNumber, &ex.SourceID, &ex.FilePath, &ex.FileSize,
+		&ex.Duration, &ex.VideoCodec, &ex.AudioCodec, &ex.Resolution,
+		&ex.AudioTracks, &ex.SubtitleTracks, &ex.CreatedAt, &ex.UpdatedAt,
+	)
+	return ex, err
+}
+
 // User Repository Methods
 
 // CreateUser creates a new user
@@ -173,24 +239,19 @@ func (db *DB) CreateMedia(media *Media) (*Media, error) {
 
 // GetMediaByID retrieves media by ID
 func (db *DB) GetMediaByID(id int64) (*Media, error) {
-	media := &Media{}
-	err := db.conn.QueryRow(
-		`SELECT id, title, original_title, type, year, overview, poster_path, backdrop_path,
-			rating, runtime, genres, tmdb_id, imdb_id, season_count, episode_count, source_id,
-			file_path, file_size, duration, video_codec, audio_codec, resolution, audio_tracks,
-			subtitle_tracks, created_at, updated_at
-		 FROM media WHERE id = ?`,
-		id,
-	).Scan(&media.ID, &media.Title, &media.OriginalTitle, &media.Type, &media.Year,
-		&media.Overview, &media.PosterPath, &media.BackdropPath, &media.Rating, &media.Runtime,
-		&media.Genres, &media.TMDbID, &media.IMDbID, &media.SeasonCount, &media.EpisodeCount,
-		&media.SourceID, &media.FilePath, &media.FileSize, &media.Duration, &media.VideoCodec,
-		&media.AudioCodec, &media.Resolution, &media.AudioTracks, &media.SubtitleTracks,
-		&media.CreatedAt, &media.UpdatedAt)
+	query := `SELECT id, title, original_title, type, year, overview, poster_path, backdrop_path,
+		rating, runtime, genres, tmdb_id, imdb_id, season_count, episode_count, source_id,
+		file_path, file_size, duration, video_codec, audio_codec, resolution, audio_tracks,
+		subtitle_tracks, created_at, updated_at
+	 FROM media WHERE id = ?`
+	media, err := getByID(db.conn, query, id, scanMediaRow)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return media, err
+	if err != nil {
+		return nil, err
+	}
+	return &media, nil
 }
 
 // GetMediaByType retrieves all media of a specific type
@@ -231,24 +292,19 @@ func (db *DB) GetRecentMedia(limit int) ([]*Media, error) {
 
 // GetMediaByFilePath checks if media with given file path exists
 func (db *DB) GetMediaByFilePath(filePath string) (*Media, error) {
-	media := &Media{}
-	err := db.conn.QueryRow(
-		`SELECT id, title, original_title, type, year, overview, poster_path, backdrop_path,
-			rating, runtime, genres, tmdb_id, imdb_id, season_count, episode_count, source_id,
-			file_path, file_size, duration, video_codec, audio_codec, resolution, audio_tracks,
-			subtitle_tracks, created_at, updated_at
-		 FROM media WHERE file_path = ?`,
-		filePath,
-	).Scan(&media.ID, &media.Title, &media.OriginalTitle, &media.Type, &media.Year,
-		&media.Overview, &media.PosterPath, &media.BackdropPath, &media.Rating, &media.Runtime,
-		&media.Genres, &media.TMDbID, &media.IMDbID, &media.SeasonCount, &media.EpisodeCount,
-		&media.SourceID, &media.FilePath, &media.FileSize, &media.Duration, &media.VideoCodec,
-		&media.AudioCodec, &media.Resolution, &media.AudioTracks, &media.SubtitleTracks,
-		&media.CreatedAt, &media.UpdatedAt)
+	query := `SELECT id, title, original_title, type, year, overview, poster_path, backdrop_path,
+		rating, runtime, genres, tmdb_id, imdb_id, season_count, episode_count, source_id,
+		file_path, file_size, duration, video_codec, audio_codec, resolution, audio_tracks,
+		subtitle_tracks, created_at, updated_at
+	 FROM media WHERE file_path = ?`
+	media, err := getByFilePath(db.conn, query, filePath, scanMediaRow)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return media, err
+	if err != nil {
+		return nil, err
+	}
+	return &media, nil
 }
 
 func scanMediaRows(rows *sql.Rows) ([]*Media, error) {
@@ -954,44 +1010,34 @@ func (db *DB) CreateEpisode(episode *Episode) (*Episode, error) {
 
 // GetEpisodeByID retrieves an episode by ID
 func (db *DB) GetEpisodeByID(id int64) (*Episode, error) {
-	episode := &Episode{}
-	err := db.conn.QueryRow(
-		`SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
-			still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
-			video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
-		 FROM episodes WHERE id = ?`,
-		id,
-	).Scan(&episode.ID, &episode.TVShowID, &episode.SeasonID, &episode.SeasonNumber,
-		&episode.EpisodeNumber, &episode.Title, &episode.Overview, &episode.StillPath,
-		&episode.AirDate, &episode.Runtime, &episode.Rating, &episode.SourceID, &episode.FilePath,
-		&episode.FileSize, &episode.Duration, &episode.VideoCodec, &episode.AudioCodec,
-		&episode.Resolution, &episode.AudioTracks, &episode.SubtitleTracks,
-		&episode.CreatedAt, &episode.UpdatedAt)
+	query := `SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
+		still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
+		video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
+	 FROM episodes WHERE id = ?`
+	episode, err := getByID(db.conn, query, id, scanEpisodeRow)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return episode, err
+	if err != nil {
+		return nil, err
+	}
+	return &episode, nil
 }
 
 // GetEpisodeByFilePath retrieves an episode by file path
 func (db *DB) GetEpisodeByFilePath(filePath string) (*Episode, error) {
-	episode := &Episode{}
-	err := db.conn.QueryRow(
-		`SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
-			still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
-			video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
-		 FROM episodes WHERE file_path = ?`,
-		filePath,
-	).Scan(&episode.ID, &episode.TVShowID, &episode.SeasonID, &episode.SeasonNumber,
-		&episode.EpisodeNumber, &episode.Title, &episode.Overview, &episode.StillPath,
-		&episode.AirDate, &episode.Runtime, &episode.Rating, &episode.SourceID, &episode.FilePath,
-		&episode.FileSize, &episode.Duration, &episode.VideoCodec, &episode.AudioCodec,
-		&episode.Resolution, &episode.AudioTracks, &episode.SubtitleTracks,
-		&episode.CreatedAt, &episode.UpdatedAt)
+	query := `SELECT id, tv_show_id, season_id, season_number, episode_number, title, overview,
+		still_path, air_date, runtime, rating, source_id, file_path, file_size, duration,
+		video_codec, audio_codec, resolution, audio_tracks, subtitle_tracks, created_at, updated_at
+	 FROM episodes WHERE file_path = ?`
+	episode, err := getByFilePath(db.conn, query, filePath, scanEpisodeRow)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return episode, err
+	if err != nil {
+		return nil, err
+	}
+	return &episode, nil
 }
 
 // GetEpisodeByNumber retrieves an episode by show ID, season, and episode number
@@ -1131,40 +1177,34 @@ func (db *DB) CreateExtra(extra *Extra) (*Extra, error) {
 
 // GetExtraByID retrieves an extra by ID
 func (db *DB) GetExtraByID(id int64) (*Extra, error) {
-	extra := &Extra{}
-	err := db.conn.QueryRow(
-		`SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
-			source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
-			audio_tracks, subtitle_tracks, created_at, updated_at
-		 FROM extras WHERE id = ?`,
-		id,
-	).Scan(&extra.ID, &extra.Title, &extra.Category, &extra.MovieID, &extra.TVShowID, &extra.EpisodeID,
-		&extra.SeasonNumber, &extra.EpisodeNumber, &extra.SourceID, &extra.FilePath, &extra.FileSize,
-		&extra.Duration, &extra.VideoCodec, &extra.AudioCodec, &extra.Resolution,
-		&extra.AudioTracks, &extra.SubtitleTracks, &extra.CreatedAt, &extra.UpdatedAt)
+	query := `SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
+		source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
+		audio_tracks, subtitle_tracks, created_at, updated_at
+	 FROM extras WHERE id = ?`
+	extra, err := getByID(db.conn, query, id, scanExtraRow)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return extra, err
+	if err != nil {
+		return nil, err
+	}
+	return &extra, nil
 }
 
 // GetExtraByFilePath checks if an extra with given path exists
 func (db *DB) GetExtraByFilePath(filePath string) (*Extra, error) {
-	extra := &Extra{}
-	err := db.conn.QueryRow(
-		`SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
-			source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
-			audio_tracks, subtitle_tracks, created_at, updated_at
-		 FROM extras WHERE file_path = ?`,
-		filePath,
-	).Scan(&extra.ID, &extra.Title, &extra.Category, &extra.MovieID, &extra.TVShowID, &extra.EpisodeID,
-		&extra.SeasonNumber, &extra.EpisodeNumber, &extra.SourceID, &extra.FilePath, &extra.FileSize,
-		&extra.Duration, &extra.VideoCodec, &extra.AudioCodec, &extra.Resolution,
-		&extra.AudioTracks, &extra.SubtitleTracks, &extra.CreatedAt, &extra.UpdatedAt)
+	query := `SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
+		source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
+		audio_tracks, subtitle_tracks, created_at, updated_at
+	 FROM extras WHERE file_path = ?`
+	extra, err := getByFilePath(db.conn, query, filePath, scanExtraRow)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return extra, err
+	if err != nil {
+		return nil, err
+	}
+	return &extra, nil
 }
 
 // GetExtrasByMovieID gets all extras for a movie

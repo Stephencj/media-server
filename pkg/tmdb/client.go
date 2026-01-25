@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -41,8 +44,12 @@ type MovieResult struct {
 	PosterPath   string  `json:"poster_path"`
 	BackdropPath string  `json:"backdrop_path"`
 	VoteAverage  float64 `json:"vote_average"`
+	Popularity   float64 `json:"popularity"`
 	GenreIDs     []int   `json:"genre_ids"`
 }
+
+// MovieSearchResult is an alias for MovieResult for consistency
+type MovieSearchResult = MovieResult
 
 // MovieDetails represents detailed movie info
 type MovieDetails struct {
@@ -69,8 +76,12 @@ type TVResult struct {
 	PosterPath   string  `json:"poster_path"`
 	BackdropPath string  `json:"backdrop_path"`
 	VoteAverage  float64 `json:"vote_average"`
+	Popularity   float64 `json:"popularity"`
 	GenreIDs     []int   `json:"genre_ids"`
 }
+
+// TVSearchResult is an alias for TVResult for consistency
+type TVSearchResult = TVResult
 
 // TVDetails represents detailed TV show info
 type TVDetails struct {
@@ -140,8 +151,8 @@ type searchResponse struct {
 	Results []json.RawMessage `json:"results"`
 }
 
-// SearchMovie searches for movies by title and optional year
-func (c *Client) SearchMovie(title string, year int) (*MovieResult, error) {
+// SearchMovieWithResults returns all matching movies for manual selection
+func (c *Client) SearchMovieWithResults(title string, year int) ([]MovieSearchResult, error) {
 	if !c.IsConfigured() {
 		return nil, fmt.Errorf("TMDB API key not configured")
 	}
@@ -150,7 +161,7 @@ func (c *Client) SearchMovie(title string, year int) (*MovieResult, error) {
 	params.Set("api_key", c.apiKey)
 	params.Set("query", title)
 	if year > 0 {
-		params.Set("year", fmt.Sprintf("%d", year))
+		params.Set("year", strconv.Itoa(year))
 	}
 
 	resp, err := c.httpClient.Get(fmt.Sprintf("%s/search/movie?%s", baseURL, params.Encode()))
@@ -163,21 +174,25 @@ func (c *Client) SearchMovie(title string, year int) (*MovieResult, error) {
 		return nil, fmt.Errorf("TMDB API error: %d", resp.StatusCode)
 	}
 
-	var searchResp searchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&searchResp); err != nil {
+	var result struct {
+		Results []MovieSearchResult `json:"results"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	if len(searchResp.Results) == 0 {
-		return nil, nil // No results found
-	}
+	return result.Results, nil
+}
 
-	var movie MovieResult
-	if err := json.Unmarshal(searchResp.Results[0], &movie); err != nil {
+// SearchMovie searches for movies by title and optional year, returning the best match
+func (c *Client) SearchMovie(title string, year int) (*MovieResult, error) {
+	results, err := c.SearchMovieWithResults(title, year)
+	if err != nil {
 		return nil, err
 	}
 
-	return &movie, nil
+	return c.FindBestMovieMatch(results, title, year), nil
 }
 
 // GetMovieDetails fetches detailed movie info by TMDB ID
@@ -204,8 +219,8 @@ func (c *Client) GetMovieDetails(tmdbID int) (*MovieDetails, error) {
 	return &details, nil
 }
 
-// SearchTV searches for TV shows by title
-func (c *Client) SearchTV(title string, year int) (*TVResult, error) {
+// SearchTVWithResults returns all matching TV shows for manual selection
+func (c *Client) SearchTVWithResults(title string, year int) ([]TVSearchResult, error) {
 	if !c.IsConfigured() {
 		return nil, fmt.Errorf("TMDB API key not configured")
 	}
@@ -214,7 +229,7 @@ func (c *Client) SearchTV(title string, year int) (*TVResult, error) {
 	params.Set("api_key", c.apiKey)
 	params.Set("query", title)
 	if year > 0 {
-		params.Set("first_air_date_year", fmt.Sprintf("%d", year))
+		params.Set("first_air_date_year", strconv.Itoa(year))
 	}
 
 	resp, err := c.httpClient.Get(fmt.Sprintf("%s/search/tv?%s", baseURL, params.Encode()))
@@ -227,21 +242,25 @@ func (c *Client) SearchTV(title string, year int) (*TVResult, error) {
 		return nil, fmt.Errorf("TMDB API error: %d", resp.StatusCode)
 	}
 
-	var searchResp searchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&searchResp); err != nil {
+	var result struct {
+		Results []TVSearchResult `json:"results"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 
-	if len(searchResp.Results) == 0 {
-		return nil, nil
-	}
+	return result.Results, nil
+}
 
-	var tv TVResult
-	if err := json.Unmarshal(searchResp.Results[0], &tv); err != nil {
+// SearchTV searches for TV shows by title, returning the best match
+func (c *Client) SearchTV(title string, year int) (*TVResult, error) {
+	results, err := c.SearchTVWithResults(title, year)
+	if err != nil {
 		return nil, err
 	}
 
-	return &tv, nil
+	return c.FindBestTVMatch(results, title, year), nil
 }
 
 // GetTVDetails fetches detailed TV show info by TMDB ID
@@ -314,6 +333,198 @@ func (c *Client) GetTVEpisodeDetails(showID int, seasonNum int, episodeNum int) 
 	}
 
 	return &details, nil
+}
+
+// FindBestMovieMatch scores and ranks search results to find the best match
+// Returns nil if no match meets the minimum confidence threshold (50.0)
+func (c *Client) FindBestMovieMatch(results []MovieSearchResult, searchTitle string, searchYear int) *MovieSearchResult {
+	if len(results) == 0 {
+		return nil
+	}
+
+	var bestMatch *MovieSearchResult
+	bestScore := 0.0
+
+	for i := range results {
+		score := calculateMovieMatchScore(&results[i], searchTitle, searchYear)
+		if score > bestScore {
+			bestScore = score
+			bestMatch = &results[i]
+		}
+	}
+
+	// Only return if score is above threshold (50.0)
+	if bestScore >= 50.0 {
+		return bestMatch
+	}
+
+	return nil
+}
+
+// FindBestTVMatch scores and ranks search results to find the best match
+// Returns nil if no match meets the minimum confidence threshold (50.0)
+func (c *Client) FindBestTVMatch(results []TVSearchResult, searchTitle string, searchYear int) *TVSearchResult {
+	if len(results) == 0 {
+		return nil
+	}
+
+	var bestMatch *TVSearchResult
+	bestScore := 0.0
+
+	for i := range results {
+		score := calculateTVMatchScore(&results[i], searchTitle, searchYear)
+		if score > bestScore {
+			bestScore = score
+			bestMatch = &results[i]
+		}
+	}
+
+	// Only return if score is above threshold (50.0)
+	if bestScore >= 50.0 {
+		return bestMatch
+	}
+
+	return nil
+}
+
+// calculateMovieMatchScore calculates a confidence score (0-100) for a movie match
+// Scoring breakdown:
+// - Title similarity: 0-50 points (exact match = 50, contains = 40, partial = 25)
+// - Year proximity: 0-30 points (exact = 30, ±1 year = 20, ±2 years = 10, ±3-5 years = 5)
+// - Popularity boost: 0-20 points (higher popularity results get slight preference)
+func calculateMovieMatchScore(result *MovieSearchResult, searchTitle string, searchYear int) float64 {
+	score := 0.0
+
+	// Title similarity (0-50 points)
+	titleScore := titleSimilarity(result.Title, searchTitle)
+	score += titleScore * 50.0
+
+	// Year proximity (0-30 points)
+	if searchYear > 0 && result.ReleaseDate != "" {
+		resultYear := extractYearFromDate(result.ReleaseDate)
+		yearDiff := abs(resultYear - searchYear)
+
+		if yearDiff == 0 {
+			score += 30.0
+		} else if yearDiff == 1 {
+			score += 20.0
+		} else if yearDiff == 2 {
+			score += 10.0
+		} else if yearDiff <= 5 {
+			score += 5.0
+		}
+	}
+
+	// Popularity boost (0-20 points)
+	// More popular results get slight preference to help disambiguate
+	popularityScore := min(result.Popularity/100.0*20.0, 20.0)
+	score += popularityScore
+
+	return score
+}
+
+// calculateTVMatchScore calculates a confidence score (0-100) for a TV show match
+// Uses the same scoring logic as movies but with FirstAirDate instead of ReleaseDate
+func calculateTVMatchScore(result *TVSearchResult, searchTitle string, searchYear int) float64 {
+	score := 0.0
+
+	// Title similarity (0-50 points)
+	titleScore := titleSimilarity(result.Name, searchTitle)
+	score += titleScore * 50.0
+
+	// Year proximity (0-30 points)
+	if searchYear > 0 && result.FirstAirDate != "" {
+		resultYear := extractYearFromDate(result.FirstAirDate)
+		yearDiff := abs(resultYear - searchYear)
+
+		if yearDiff == 0 {
+			score += 30.0
+		} else if yearDiff == 1 {
+			score += 20.0
+		} else if yearDiff == 2 {
+			score += 10.0
+		} else if yearDiff <= 5 {
+			score += 5.0
+		}
+	}
+
+	// Popularity boost (0-20 points)
+	popularityScore := min(result.Popularity/100.0*20.0, 20.0)
+	score += popularityScore
+
+	return score
+}
+
+// titleSimilarity compares two titles and returns a similarity score (0.0-1.0)
+// 1.0 = exact match after normalization
+// 0.8 = one title contains the other
+// 0.5 = fallback for any other case (potential partial match)
+func titleSimilarity(title1, title2 string) float64 {
+	// Normalize titles for comparison
+	t1 := normalizeTitle(title1)
+	t2 := normalizeTitle(title2)
+
+	// Exact match
+	if t1 == t2 {
+		return 1.0
+	}
+
+	// Contains match (one title is substring of other)
+	if strings.Contains(t1, t2) || strings.Contains(t2, t1) {
+		return 0.8
+	}
+
+	// Fallback - could implement Levenshtein distance or other fuzzy matching
+	// For now, use simple approach with moderate score
+	return 0.5
+}
+
+// normalizeTitle normalizes a title for comparison by:
+// - Converting to lowercase
+// - Removing common articles (the, a, an)
+// - Removing special characters
+// - Normalizing whitespace
+func normalizeTitle(title string) string {
+	// Lowercase
+	t := strings.ToLower(title)
+
+	// Remove common articles at start
+	t = strings.TrimPrefix(t, "the ")
+	t = strings.TrimPrefix(t, "a ")
+	t = strings.TrimPrefix(t, "an ")
+
+	// Remove special characters, keep only alphanumeric and spaces
+	t = regexp.MustCompile(`[^a-z0-9\s]`).ReplaceAllString(t, "")
+
+	// Normalize whitespace (remove extra spaces)
+	t = strings.Join(strings.Fields(t), " ")
+
+	return strings.TrimSpace(t)
+}
+
+// extractYearFromDate extracts the year from a date string (expects YYYY-MM-DD format)
+func extractYearFromDate(date string) int {
+	if len(date) >= 4 {
+		year, _ := strconv.Atoi(date[:4])
+		return year
+	}
+	return 0
+}
+
+// abs returns the absolute value of an integer
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+// min returns the minimum of two float64 values
+func min(a, b float64) float64 {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // GenresToString converts genre slice to comma-separated string
