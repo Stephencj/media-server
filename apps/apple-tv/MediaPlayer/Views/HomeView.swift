@@ -16,49 +16,38 @@ struct HomeView: View {
                         )
                     }
 
-                    // Recently Added
-                    if !viewModel.recentlyAdded.isEmpty {
-                        MediaRowView(
-                            title: "Recently Added",
-                            items: viewModel.recentlyAdded
-                        )
-                    }
-
-                    // Movies
-                    if !viewModel.movies.isEmpty {
-                        MediaRowView(
-                            title: "Movies",
-                            items: viewModel.movies
-                        )
-                    }
-
-                    // TV Shows
-                    if !viewModel.tvShows.isEmpty {
-                        MediaRowView(
-                            title: "TV Shows",
-                            items: viewModel.tvShows
-                        )
+                    // Dynamic sections based on what's loaded from API
+                    ForEach(viewModel.sections.sorted(by: { $0.displayOrder < $1.displayOrder })) { section in
+                        if let media = viewModel.sectionMedia[section.slug], !media.isEmpty {
+                            MediaRowView(
+                                title: section.name,
+                                items: media
+                            )
+                        }
                     }
                 }
                 .padding(.vertical, 50)
             }
             .navigationTitle("Home")
             .overlay {
-                if viewModel.isLoading && viewModel.recentlyAdded.isEmpty {
+                if viewModel.isLoading && viewModel.sections.isEmpty {
                     ProgressView("Loading...")
                 }
             }
-            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-                Button("OK") { viewModel.errorMessage = nil }
+            .alert("Error", isPresented: Binding(
+                get: { viewModel.error != nil },
+                set: { if !$0 { viewModel.error = nil } }
+            )) {
+                Button("OK") { viewModel.error = nil }
             } message: {
-                Text(viewModel.errorMessage ?? "")
+                Text(viewModel.error?.localizedDescription ?? "")
             }
         }
         .task {
-            await viewModel.loadContent()
+            await viewModel.loadData()
         }
         .refreshable {
-            await viewModel.loadContent()
+            await viewModel.loadData()
         }
     }
 }

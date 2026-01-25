@@ -294,6 +294,45 @@ class APIClient: ObservableObject {
     func getRandomEpisodeFromSeason(showId: Int64, seasonNumber: Int) async throws -> RandomEpisodeResponse {
         try await get("/api/shows/\(showId)/seasons/\(seasonNumber)/random")
     }
+
+    // MARK: - Sections
+
+    /// Get all visible sections
+    func getSections() async throws -> [LibrarySection] {
+        let response: SectionsResponse = try await get("/api/sections?visible=true&with_counts=true")
+        return response.sections
+    }
+
+    /// Get section by slug
+    func getSection(slug: String) async throws -> LibrarySection {
+        return try await get("/api/sections/slug/\(slug)")
+    }
+
+    /// Get media items in a section
+    func getSectionMedia(slug: String, limit: Int = 50, offset: Int = 0) async throws -> [Media] {
+        struct Response: Codable {
+            let items: [Media]
+            let total: Int
+            let limit: Int
+            let offset: Int
+        }
+
+        let response: Response = try await get("/api/sections/slug/\(slug)/media?limit=\(limit)&offset=\(offset)")
+        return response.items
+    }
+
+    /// Get media items in a section by ID
+    func getSectionMediaById(id: Int64, limit: Int = 50, offset: Int = 0) async throws -> [Media] {
+        struct Response: Codable {
+            let items: [Media]
+            let total: Int
+            let limit: Int
+            let offset: Int
+        }
+
+        let response: Response = try await get("/api/sections/\(id)/media?limit=\(limit)&offset=\(offset)")
+        return response.items
+    }
 }
 
 struct MessageResponse: Codable {

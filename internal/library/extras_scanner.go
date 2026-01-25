@@ -104,6 +104,11 @@ func (s *Scanner) processExtraFile(filePath string, source *db.MediaSource) erro
 		return err
 	}
 
+	// Auto-assign to smart sections
+	// Note: Extras are a different entity type and would require conversion to Media
+	// for rule evaluation. For now, we skip auto-assignment for extras.
+	// This can be implemented separately if needed.
+
 	log.Printf("Added extra: %s [%s]", extra.Title, extra.Category)
 	return nil
 }

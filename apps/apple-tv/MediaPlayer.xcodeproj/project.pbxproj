@@ -34,6 +34,7 @@
 		A10000000000000000000025 /* AddToPlaylistSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* AddToPlaylistSheet.swift */; };
 		A10000000000000000000026 /* TVShowDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* TVShowDetailView.swift */; };
 		A10000000000000000000027 /* TVShowDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* TVShowDetailViewModel.swift */; };
+		A10000000000000000000028 /* Section.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* Section.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -64,6 +65,7 @@
 		A20000000000000000000025 /* AddToPlaylistSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddToPlaylistSheet.swift; sourceTree = "<group>"; };
 		A20000000000000000000026 /* TVShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVShowDetailView.swift; sourceTree = "<group>"; };
 		A20000000000000000000027 /* TVShowDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVShowDetailViewModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000028 /* Section.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Section.swift; sourceTree = "<group>"; };
 		A30000000000000000000001 /* MediaPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediaPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -146,6 +148,7 @@
 				A20000000000000000000016 /* User.swift */,
 				A20000000000000000000017 /* Progress.swift */,
 				A20000000000000000000022 /* Playlist.swift */,
+				A20000000000000000000028 /* Section.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -267,6 +270,7 @@
 				A10000000000000000000016 /* User.swift in Sources */,
 				A10000000000000000000017 /* Progress.swift in Sources */,
 				A10000000000000000000022 /* Playlist.swift in Sources */,
+				A10000000000000000000028 /* Section.swift in Sources */,
 				A10000000000000000000018 /* APIClient.swift in Sources */,
 				A10000000000000000000019 /* AuthService.swift in Sources */,
 				A10000000000000000000020 /* MediaCardView.swift in Sources */,

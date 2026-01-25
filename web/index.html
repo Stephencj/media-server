@@ -174,6 +174,19 @@
         .toast.error { background: #e53935; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
+        /* Section Management */
+        .section-card {
+            background: #16213e; padding: 20px; border-radius: 12px;
+            transition: box-shadow 0.2s;
+        }
+        .section-card:hover { box-shadow: 0 4px 12px rgba(30, 136, 229, 0.2); }
+        .section-card h3 { margin-top: 0; color: #1e88e5; font-size: 1.3rem; }
+        .rule-tag {
+            display: inline-block; background: #1a1a2e; padding: 6px 12px;
+            border-radius: 6px; margin-right: 8px; margin-top: 8px;
+            font-size: 0.85rem; color: #90caf9; border: 1px solid #333;
+        }
+
         /* Media Grid */
         .media-grid {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px;
@@ -745,6 +758,7 @@
             <button class="nav-tab" data-view="shows" onclick="showView('shows')">TV Shows</button>
             <button class="nav-tab" data-view="extras" onclick="showView('extras')">Extras</button>
             <button class="nav-tab" data-view="playlists" onclick="showView('playlists')">Playlists</button>
+            <button class="nav-tab" data-view="sections" onclick="showView('sections')">Sections</button>
             <button class="nav-tab" data-view="admin" onclick="showView('admin')">Admin</button>
         </nav>
 
@@ -895,6 +909,23 @@
         </div>
     </div>
 
+    <!-- SECTIONS VIEW -->
+    <div id="sections-view" class="view">
+        <div class="container" style="max-width: 1200px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <h1>Section Management</h1>
+                <button onclick="showCreateSection()" style="padding: 10px 20px; background: #1e88e5; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem;">
+                    + Create Section
+                </button>
+            </div>
+
+            <!-- Sections List -->
+            <div id="sections-list" style="display: grid; gap: 20px;">
+                <!-- Sections will be loaded here via JavaScript -->
+            </div>
+        </div>
+    </div>
+
     <!-- Media Detail Modal -->
     <div class="modal-overlay media-detail-modal" id="media-detail-modal">
         <div class="modal">
@@ -1002,6 +1033,112 @@
                 <button class="btn-secondary" onclick="hideAddToPlaylist()">Cancel</button>
                 <button onclick="showCreatePlaylistFromAdd()">New Playlist</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Section Modal -->
+    <div class="modal-overlay" id="section-modal">
+        <div class="modal" style="max-width: 600px;">
+            <h2 id="section-modal-title">Create Section</h2>
+
+            <form id="section-form" style="margin-top: 20px;">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="section-name" required placeholder="e.g., Action Movies, 4K Collection">
+                </div>
+
+                <div class="form-group">
+                    <label>Slug</label>
+                    <input type="text" id="section-slug" required placeholder="e.g., action-movies, 4k-collection">
+                    <small style="color: #888; font-size: 0.85rem;">Auto-generated from name. Used in URLs.</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Icon</label>
+                    <input type="text" id="section-icon" placeholder="e.g., film, tv, star">
+                    <small style="color: #888; font-size: 0.85rem;">Optional icon identifier</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="section-description" style="min-height: 80px; resize: vertical;" placeholder="Optional description of this section"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="section-type">
+                        <option value="smart">Smart (Rule-based)</option>
+                        <option value="standard">Standard (Manual)</option>
+                        <option value="folder">Folder (Source-based)</option>
+                    </select>
+                    <small style="color: #888; font-size: 0.85rem;">Smart sections auto-populate based on rules</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Display Order</label>
+                    <input type="number" id="section-order" value="0" min="0">
+                    <small style="color: #888; font-size: 0.85rem;">Lower numbers appear first</small>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="section-visible" checked style="width: auto;">
+                        Visible to users
+                    </label>
+                </div>
+
+                <div id="section-form-error" class="error"></div>
+
+                <div class="modal-actions" style="margin-top: 30px;">
+                    <button type="button" class="btn-secondary" onclick="closeSectionModal()">Cancel</button>
+                    <button type="submit">Save Section</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Rule Builder Modal -->
+    <div class="modal-overlay" id="rule-modal">
+        <div class="modal" style="max-width: 500px;">
+            <h2>Add Rule</h2>
+
+            <form id="rule-form" style="margin-top: 20px;">
+                <div class="form-group">
+                    <label>Field</label>
+                    <select id="rule-field">
+                        <option value="type">Type</option>
+                        <option value="genre">Genre</option>
+                        <option value="year">Year</option>
+                        <option value="rating">Rating</option>
+                        <option value="resolution">Resolution</option>
+                        <option value="video_codec">Video Codec</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Operator</label>
+                    <select id="rule-operator">
+                        <option value="equals">Equals</option>
+                        <option value="contains">Contains</option>
+                        <option value="greater_than">Greater Than</option>
+                        <option value="less_than">Less Than</option>
+                        <option value="in_range">In Range</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Value</label>
+                    <input type="text" id="rule-value" required placeholder='e.g., "movie" or 2020'>
+                    <small style="color: #888; font-size: 0.85rem;">For text values, use quotes: "movie"</small>
+                </div>
+
+                <div id="rule-form-error" class="error"></div>
+
+                <div class="modal-actions" style="margin-top: 20px;">
+                    <button type="button" class="btn-secondary" onclick="closeRuleModal()">Cancel</button>
+                    <button type="submit">Add Rule</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1151,6 +1288,7 @@
             else if (viewName === 'shows') loadShows(true);
             else if (viewName === 'extras') { loadExtras(true); loadExtrasCategories(); }
             else if (viewName === 'playlists') loadPlaylists();
+            else if (viewName === 'sections') loadSections();
             else if (viewName === 'admin') loadSources();
         }
 
@@ -2530,6 +2668,178 @@
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);
         }
+
+        // ============ SECTION MANAGEMENT ============
+        let currentSectionId = null;
+
+        async function loadSections() {
+            try {
+                const response = await fetch('/api/sections', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await response.json();
+
+                const container = document.getElementById('sections-list');
+                if (!data.sections || data.sections.length === 0) {
+                    container.innerHTML = '<div class="empty">No sections yet. Create your first section to organize your media.</div>';
+                    return;
+                }
+
+                container.innerHTML = data.sections.map(section => `
+                    <div class="section-card">
+                        <div style="display: flex; justify-content: space-between; align-items: start; gap: 20px;">
+                            <div style="flex: 1;">
+                                <h3>${section.icon ? section.icon + ' ' : ''}${escapeHtml(section.name)}</h3>
+                                <p style="color: #888; margin: 10px 0 15px;">${escapeHtml(section.description || '')}</p>
+                                <div>
+                                    <span class="rule-tag">Type: ${section.section_type}</span>
+                                    <span class="rule-tag">Order: ${section.display_order}</span>
+                                    <span class="rule-tag">${section.is_visible ? 'Visible' : 'Hidden'}</span>
+                                    ${section.slug ? `<span class="rule-tag">Slug: ${escapeHtml(section.slug)}</span>` : ''}
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 10px; flex-shrink: 0;">
+                                <button onclick="editSection(${section.id})" class="btn-sm">
+                                    Edit
+                                </button>
+                                <button onclick="deleteSection(${section.id})" class="btn-sm btn-danger">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load sections:', error);
+                showToast('Failed to load sections', 'error');
+            }
+        }
+
+        function showCreateSection() {
+            currentSectionId = null;
+            document.getElementById('section-modal-title').textContent = 'Create Section';
+            document.getElementById('section-form').reset();
+            document.getElementById('section-visible').checked = true;
+            document.getElementById('section-order').value = 0;
+            document.getElementById('section-form-error').textContent = '';
+            document.getElementById('section-modal').classList.add('active');
+        }
+
+        async function editSection(id) {
+            try {
+                const response = await fetch(`/api/sections/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const section = await response.json();
+
+                currentSectionId = id;
+                document.getElementById('section-modal-title').textContent = 'Edit Section';
+                document.getElementById('section-name').value = section.name;
+                document.getElementById('section-slug').value = section.slug || '';
+                document.getElementById('section-icon').value = section.icon || '';
+                document.getElementById('section-description').value = section.description || '';
+                document.getElementById('section-type').value = section.section_type;
+                document.getElementById('section-order').value = section.display_order;
+                document.getElementById('section-visible').checked = section.is_visible;
+                document.getElementById('section-form-error').textContent = '';
+
+                document.getElementById('section-modal').classList.add('active');
+            } catch (error) {
+                console.error('Failed to load section:', error);
+                showToast('Failed to load section', 'error');
+            }
+        }
+
+        async function deleteSection(id) {
+            if (!confirm('Are you sure you want to delete this section? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/sections/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Delete failed');
+
+                showToast('Section deleted successfully', 'success');
+                loadSections();
+            } catch (error) {
+                console.error('Failed to delete section:', error);
+                showToast('Failed to delete section', 'error');
+            }
+        }
+
+        function closeSectionModal() {
+            document.getElementById('section-modal').classList.remove('active');
+            currentSectionId = null;
+        }
+
+        document.getElementById('section-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const errorEl = document.getElementById('section-form-error');
+            errorEl.textContent = '';
+
+            const data = {
+                name: document.getElementById('section-name').value,
+                slug: document.getElementById('section-slug').value,
+                icon: document.getElementById('section-icon').value || null,
+                description: document.getElementById('section-description').value || null,
+                section_type: document.getElementById('section-type').value,
+                display_order: parseInt(document.getElementById('section-order').value),
+                is_visible: document.getElementById('section-visible').checked
+            };
+
+            try {
+                const method = currentSectionId ? 'PUT' : 'POST';
+                const url = currentSectionId ? `/api/sections/${currentSectionId}` : '/api/sections';
+
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to save section');
+                }
+
+                showToast(`Section ${currentSectionId ? 'updated' : 'created'} successfully`, 'success');
+                closeSectionModal();
+                loadSections();
+            } catch (error) {
+                console.error('Failed to save section:', error);
+                errorEl.textContent = error.message;
+            }
+        });
+
+        // Auto-generate slug from name
+        document.getElementById('section-name').addEventListener('input', (e) => {
+            if (!currentSectionId) {
+                const slug = e.target.value
+                    .toLowerCase()
+                    .replace(/\s+/g, '-')
+                    .replace(/[^a-z0-9-]/g, '');
+                document.getElementById('section-slug').value = slug;
+            }
+        });
+
+        function closeRuleModal() {
+            document.getElementById('rule-modal').classList.remove('active');
+        }
+
+        document.getElementById('rule-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            // Rule functionality to be implemented when backend supports it
+            showToast('Rule functionality coming soon', 'success');
+            closeRuleModal();
+        });
 
     </script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>

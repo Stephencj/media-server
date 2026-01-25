@@ -209,12 +209,17 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 	// Enrich with TMDB metadata if available
 	s.enrichWithTMDB(media, title, year, mediaType)
 
-	_, err = s.db.CreateMedia(media)
+	created, err := s.db.CreateMedia(media)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("Added movie: %s (%d)", media.Title, media.Year)
+	// Auto-assign to smart sections
+	if err := s.db.AutoAssignMediaToSections(created); err != nil {
+		log.Printf("Warning: Failed to auto-assign media to sections: %v", err)
+	}
+
+	log.Printf("Added movie: %s (%d)", created.Title, created.Year)
 	return nil
 }
 

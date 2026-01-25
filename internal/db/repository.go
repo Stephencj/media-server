@@ -704,21 +704,66 @@ func (db *DB) CreateTVShow(show *TVShow) (*TVShow, error) {
 	return db.GetTVShowByID(id)
 }
 
-// GetTVShowByID retrieves a TV show by ID
+// GetTVShowByID retrieves a TV show by ID with aggregated metadata
 func (db *DB) GetTVShowByID(id int64) (*TVShow, error) {
+	query := `
+		SELECT
+			s.id, s.title, s.original_title, s.year, s.overview,
+			s.poster_path, s.backdrop_path, s.rating, s.genres,
+			s.tmdb_id, s.imdb_id, s.status, s.created_at, s.updated_at,
+			COUNT(DISTINCT se.id) as season_count,
+			COUNT(DISTINCT e.id) as episode_count,
+			(SELECT resolution FROM episodes WHERE tv_show_id = s.id
+			 GROUP BY resolution ORDER BY COUNT(*) DESC LIMIT 1) as common_resolution,
+			(SELECT video_codec FROM episodes WHERE tv_show_id = s.id
+			 GROUP BY video_codec ORDER BY COUNT(*) DESC LIMIT 1) as common_video_codec,
+			(SELECT audio_codec FROM episodes WHERE tv_show_id = s.id
+			 GROUP BY audio_codec ORDER BY COUNT(*) DESC LIMIT 1) as common_audio_codec,
+			COALESCE(SUM(e.duration), 0) as total_duration,
+			COALESCE(AVG(e.duration), 0) as avg_episode_length,
+			(SELECT resolution FROM episodes WHERE tv_show_id = s.id
+			 ORDER BY CAST(SUBSTR(resolution, 1, INSTR(resolution, 'x')-1) AS INTEGER) DESC
+			 LIMIT 1) as max_resolution
+		FROM tv_shows s
+		LEFT JOIN seasons se ON se.tv_show_id = s.id
+		LEFT JOIN episodes e ON e.tv_show_id = s.id
+		WHERE s.id = ?
+		GROUP BY s.id
+	`
+
 	show := &TVShow{}
-	err := db.conn.QueryRow(
-		`SELECT id, title, original_title, year, overview, poster_path, backdrop_path,
-			rating, genres, tmdb_id, imdb_id, status, created_at, updated_at
-		 FROM tv_shows WHERE id = ?`,
-		id,
-	).Scan(&show.ID, &show.Title, &show.OriginalTitle, &show.Year, &show.Overview,
-		&show.PosterPath, &show.BackdropPath, &show.Rating, &show.Genres, &show.TMDbID,
-		&show.IMDbID, &show.Status, &show.CreatedAt, &show.UpdatedAt)
+	var commonResolution, commonVideoCodec, commonAudioCodec, maxResolution sql.NullString
+	err := db.conn.QueryRow(query, id).Scan(
+		&show.ID, &show.Title, &show.OriginalTitle, &show.Year, &show.Overview,
+		&show.PosterPath, &show.BackdropPath, &show.Rating, &show.Genres,
+		&show.TMDbID, &show.IMDbID, &show.Status, &show.CreatedAt, &show.UpdatedAt,
+		&show.SeasonCount, &show.EpisodeCount,
+		&commonResolution, &commonVideoCodec, &commonAudioCodec,
+		&show.TotalDuration, &show.AvgEpisodeLength, &maxResolution,
+	)
+
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return show, err
+	if err != nil {
+		return nil, err
+	}
+
+	// Handle nullable fields
+	if commonResolution.Valid {
+		show.CommonResolution = commonResolution.String
+	}
+	if commonVideoCodec.Valid {
+		show.CommonVideoCodec = commonVideoCodec.String
+	}
+	if commonAudioCodec.Valid {
+		show.CommonAudioCodec = commonAudioCodec.String
+	}
+	if maxResolution.Valid {
+		show.MaxResolution = maxResolution.String
+	}
+
+	return show, nil
 }
 
 // GetTVShowByTMDBID retrieves a TV show by TMDB ID
@@ -755,20 +800,39 @@ func (db *DB) GetTVShowByTitle(title string) (*TVShow, error) {
 	return show, err
 }
 
-// GetAllTVShows retrieves all TV shows with season/episode counts
+// GetAllTVShows retrieves all TV shows with season/episode counts and aggregated metadata
 func (db *DB) GetAllTVShows(limit, offset int) ([]*TVShow, int, error) {
 	// Get total count
 	var total int
 	db.conn.QueryRow(`SELECT COUNT(*) FROM tv_shows`).Scan(&total)
 
-	rows, err := db.conn.Query(
-		`SELECT s.id, s.title, s.original_title, s.year, s.overview, s.poster_path, s.backdrop_path,
-			s.rating, s.genres, s.tmdb_id, s.imdb_id, s.status, s.created_at, s.updated_at,
-			(SELECT COUNT(*) FROM seasons WHERE tv_show_id = s.id) as season_count,
-			(SELECT COUNT(*) FROM episodes WHERE tv_show_id = s.id) as episode_count
-		 FROM tv_shows s ORDER BY s.title LIMIT ? OFFSET ?`,
-		limit, offset,
-	)
+	query := `
+		SELECT
+			s.id, s.title, s.original_title, s.year, s.overview,
+			s.poster_path, s.backdrop_path, s.rating, s.genres,
+			s.tmdb_id, s.imdb_id, s.status, s.created_at, s.updated_at,
+			COUNT(DISTINCT se.id) as season_count,
+			COUNT(DISTINCT e.id) as episode_count,
+			(SELECT resolution FROM episodes WHERE tv_show_id = s.id
+			 GROUP BY resolution ORDER BY COUNT(*) DESC LIMIT 1) as common_resolution,
+			(SELECT video_codec FROM episodes WHERE tv_show_id = s.id
+			 GROUP BY video_codec ORDER BY COUNT(*) DESC LIMIT 1) as common_video_codec,
+			(SELECT audio_codec FROM episodes WHERE tv_show_id = s.id
+			 GROUP BY audio_codec ORDER BY COUNT(*) DESC LIMIT 1) as common_audio_codec,
+			COALESCE(SUM(e.duration), 0) as total_duration,
+			COALESCE(AVG(e.duration), 0) as avg_episode_length,
+			(SELECT resolution FROM episodes WHERE tv_show_id = s.id
+			 ORDER BY CAST(SUBSTR(resolution, 1, INSTR(resolution, 'x')-1) AS INTEGER) DESC
+			 LIMIT 1) as max_resolution
+		FROM tv_shows s
+		LEFT JOIN seasons se ON se.tv_show_id = s.id
+		LEFT JOIN episodes e ON e.tv_show_id = s.id
+		GROUP BY s.id
+		ORDER BY s.title
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := db.conn.Query(query, limit, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -777,15 +841,32 @@ func (db *DB) GetAllTVShows(limit, offset int) ([]*TVShow, int, error) {
 	shows := make([]*TVShow, 0)
 	for rows.Next() {
 		show := &TVShow{}
-		var seasonCount, episodeCount int
-		if err := rows.Scan(&show.ID, &show.Title, &show.OriginalTitle, &show.Year, &show.Overview,
-			&show.PosterPath, &show.BackdropPath, &show.Rating, &show.Genres, &show.TMDbID,
-			&show.IMDbID, &show.Status, &show.CreatedAt, &show.UpdatedAt,
-			&seasonCount, &episodeCount); err != nil {
+		var commonResolution, commonVideoCodec, commonAudioCodec, maxResolution sql.NullString
+		if err := rows.Scan(
+			&show.ID, &show.Title, &show.OriginalTitle, &show.Year, &show.Overview,
+			&show.PosterPath, &show.BackdropPath, &show.Rating, &show.Genres,
+			&show.TMDbID, &show.IMDbID, &show.Status, &show.CreatedAt, &show.UpdatedAt,
+			&show.SeasonCount, &show.EpisodeCount,
+			&commonResolution, &commonVideoCodec, &commonAudioCodec,
+			&show.TotalDuration, &show.AvgEpisodeLength, &maxResolution,
+		); err != nil {
 			return nil, 0, err
 		}
-		show.SeasonCount = seasonCount
-		show.EpisodeCount = episodeCount
+
+		// Handle nullable fields
+		if commonResolution.Valid {
+			show.CommonResolution = commonResolution.String
+		}
+		if commonVideoCodec.Valid {
+			show.CommonVideoCodec = commonVideoCodec.String
+		}
+		if commonAudioCodec.Valid {
+			show.CommonAudioCodec = commonAudioCodec.String
+		}
+		if maxResolution.Valid {
+			show.MaxResolution = maxResolution.String
+		}
+
 		shows = append(shows, show)
 	}
 	return shows, total, nil
@@ -1361,4 +1442,357 @@ func scanExtraRows(rows *sql.Rows) ([]*Extra, error) {
 		extras = append(extras, extra)
 	}
 	return extras, nil
+}
+
+// ==================== Section Methods ====================
+
+// GetAllSections returns all sections ordered by display_order
+func (db *DB) GetAllSections() ([]Section, error) {
+	query := `
+        SELECT id, name, slug, icon, description, section_type,
+               display_order, is_visible, created_at, updated_at
+        FROM sections
+        ORDER BY display_order ASC
+    `
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sections []Section
+	for rows.Next() {
+		var s Section
+		err := rows.Scan(
+			&s.ID, &s.Name, &s.Slug, &s.Icon, &s.Description,
+			&s.SectionType, &s.DisplayOrder, &s.IsVisible,
+			&s.CreatedAt, &s.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		sections = append(sections, s)
+	}
+
+	return sections, rows.Err()
+}
+
+// GetVisibleSections returns only visible sections
+func (db *DB) GetVisibleSections() ([]Section, error) {
+	query := `
+        SELECT id, name, slug, icon, description, section_type,
+               display_order, is_visible, created_at, updated_at
+        FROM sections
+        WHERE is_visible = 1
+        ORDER BY display_order ASC
+    `
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sections []Section
+	for rows.Next() {
+		var s Section
+		err := rows.Scan(
+			&s.ID, &s.Name, &s.Slug, &s.Icon, &s.Description,
+			&s.SectionType, &s.DisplayOrder, &s.IsVisible,
+			&s.CreatedAt, &s.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		sections = append(sections, s)
+	}
+
+	return sections, rows.Err()
+}
+
+// GetSectionByID retrieves a section by ID
+func (db *DB) GetSectionByID(id int64) (*Section, error) {
+	query := `
+        SELECT id, name, slug, icon, description, section_type,
+               display_order, is_visible, created_at, updated_at
+        FROM sections
+        WHERE id = ?
+    `
+
+	var s Section
+	err := db.conn.QueryRow(query, id).Scan(
+		&s.ID, &s.Name, &s.Slug, &s.Icon, &s.Description,
+		&s.SectionType, &s.DisplayOrder, &s.IsVisible,
+		&s.CreatedAt, &s.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &s, nil
+}
+
+// GetSectionBySlug retrieves a section by slug
+func (db *DB) GetSectionBySlug(slug string) (*Section, error) {
+	query := `
+        SELECT id, name, slug, icon, description, section_type,
+               display_order, is_visible, created_at, updated_at
+        FROM sections
+        WHERE slug = ?
+    `
+
+	var s Section
+	err := db.conn.QueryRow(query, slug).Scan(
+		&s.ID, &s.Name, &s.Slug, &s.Icon, &s.Description,
+		&s.SectionType, &s.DisplayOrder, &s.IsVisible,
+		&s.CreatedAt, &s.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &s, nil
+}
+
+// CreateSection creates a new section
+func (db *DB) CreateSection(section *Section) error {
+	query := `
+        INSERT INTO sections (name, slug, icon, description, section_type, display_order, is_visible)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
+
+	result, err := db.conn.Exec(query,
+		section.Name, section.Slug, section.Icon, section.Description,
+		section.SectionType, section.DisplayOrder, section.IsVisible,
+	)
+	if err != nil {
+		return err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	section.ID = id
+	return nil
+}
+
+// UpdateSection updates an existing section
+func (db *DB) UpdateSection(section *Section) error {
+	query := `
+        UPDATE sections
+        SET name = ?, slug = ?, icon = ?, description = ?,
+            section_type = ?, display_order = ?, is_visible = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    `
+
+	_, err := db.conn.Exec(query,
+		section.Name, section.Slug, section.Icon, section.Description,
+		section.SectionType, section.DisplayOrder, section.IsVisible,
+		section.ID,
+	)
+
+	return err
+}
+
+// DeleteSection deletes a section
+func (db *DB) DeleteSection(id int64) error {
+	query := `DELETE FROM sections WHERE id = ?`
+	_, err := db.conn.Exec(query, id)
+	return err
+}
+
+// GetSectionRules returns all rules for a section
+func (db *DB) GetSectionRules(sectionID int64) ([]SectionRule, error) {
+	query := `
+        SELECT id, section_id, field, operator, value, created_at
+        FROM section_rules
+        WHERE section_id = ?
+        ORDER BY id ASC
+    `
+
+	rows, err := db.conn.Query(query, sectionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rules []SectionRule
+	for rows.Next() {
+		var r SectionRule
+		err := rows.Scan(&r.ID, &r.SectionID, &r.Field, &r.Operator, &r.Value, &r.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, r)
+	}
+
+	return rules, rows.Err()
+}
+
+// CreateSectionRule creates a new rule for a section
+func (db *DB) CreateSectionRule(rule *SectionRule) error {
+	query := `
+        INSERT INTO section_rules (section_id, field, operator, value)
+        VALUES (?, ?, ?, ?)
+    `
+
+	result, err := db.conn.Exec(query, rule.SectionID, rule.Field, rule.Operator, rule.Value)
+	if err != nil {
+		return err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	rule.ID = id
+	return nil
+}
+
+// DeleteSectionRule deletes a rule
+func (db *DB) DeleteSectionRule(id int64) error {
+	query := `DELETE FROM section_rules WHERE id = ?`
+	_, err := db.conn.Exec(query, id)
+	return err
+}
+
+// AddMediaToSection adds a media item to a section
+func (db *DB) AddMediaToSection(mediaID int64, mediaType MediaType, sectionID int64) error {
+	query := `
+        INSERT OR IGNORE INTO media_sections (media_id, media_type, section_id)
+        VALUES (?, ?, ?)
+    `
+
+	_, err := db.conn.Exec(query, mediaID, mediaType, sectionID)
+	return err
+}
+
+// RemoveMediaFromSection removes a media item from a section
+func (db *DB) RemoveMediaFromSection(mediaID int64, mediaType MediaType, sectionID int64) error {
+	query := `
+        DELETE FROM media_sections
+        WHERE media_id = ? AND media_type = ? AND section_id = ?
+    `
+
+	_, err := db.conn.Exec(query, mediaID, mediaType, sectionID)
+	return err
+}
+
+// GetMediaSections returns all section IDs a media item belongs to
+func (db *DB) GetMediaSections(mediaID int64, mediaType MediaType) ([]int64, error) {
+	query := `
+        SELECT section_id
+        FROM media_sections
+        WHERE media_id = ? AND media_type = ?
+    `
+
+	rows, err := db.conn.Query(query, mediaID, mediaType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sectionIDs []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		sectionIDs = append(sectionIDs, id)
+	}
+
+	return sectionIDs, rows.Err()
+}
+
+// GetMediaBySectionID returns media items in a section
+func (db *DB) GetMediaBySectionID(sectionID int64, limit, offset int) ([]interface{}, int, error) {
+	// First get the section to determine its type
+	section, err := db.GetSectionByID(sectionID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var items []interface{}
+	var total int
+
+	if section.SectionType == SectionTypeSmart {
+		// For smart sections, evaluate rules
+		items, total, err = db.evaluateSmartSection(section, limit, offset)
+	} else {
+		// For standard sections, get manually assigned media
+		items, total, err = db.getManualSectionMedia(sectionID, limit, offset)
+	}
+
+	return items, total, err
+}
+
+// Helper method for manual sections
+func (db *DB) getManualSectionMedia(sectionID int64, limit, offset int) ([]interface{}, int, error) {
+	// Get total count
+	countQuery := `
+        SELECT COUNT(*)
+        FROM media_sections
+        WHERE section_id = ?
+    `
+
+	var total int
+	err := db.conn.QueryRow(countQuery, sectionID).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Get media items
+	query := `
+        SELECT ms.media_id, ms.media_type
+        FROM media_sections ms
+        WHERE ms.section_id = ?
+        ORDER BY ms.added_at DESC
+        LIMIT ? OFFSET ?
+    `
+
+	rows, err := db.conn.Query(query, sectionID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var items []interface{}
+	for rows.Next() {
+		var mediaID int64
+		var mediaType MediaType
+
+		if err := rows.Scan(&mediaID, &mediaType); err != nil {
+			continue
+		}
+
+		// Fetch the actual media item based on type
+		switch mediaType {
+		case MediaTypeMovie:
+			if media, err := db.GetMediaByID(mediaID); err == nil {
+				items = append(items, media)
+			}
+		case MediaTypeEpisode:
+			if episode, err := db.GetEpisodeByID(mediaID); err == nil {
+				items = append(items, episode)
+			}
+		case MediaTypeExtra:
+			if extra, err := db.GetExtraByID(mediaID); err == nil {
+				items = append(items, extra)
+			}
+		}
+	}
+
+	return items, total, nil
 }

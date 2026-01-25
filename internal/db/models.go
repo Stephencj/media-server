@@ -102,6 +102,14 @@ type TVShow struct {
 	// Computed fields (populated by queries with JOINs, not stored in DB)
 	SeasonCount  int `json:"season_count,omitempty"`
 	EpisodeCount int `json:"episode_count,omitempty"`
+
+	// Aggregated technical metadata from episodes
+	CommonResolution  string `json:"common_resolution,omitempty"`
+	CommonVideoCodec  string `json:"common_video_codec,omitempty"`
+	CommonAudioCodec  string `json:"common_audio_codec,omitempty"`
+	TotalDuration     int    `json:"total_duration,omitempty"`      // Sum of all episodes
+	AvgEpisodeLength  int    `json:"avg_episode_length,omitempty"`   // Average episode duration
+	MaxResolution     string `json:"max_resolution,omitempty"`       // Highest resolution available
 }
 
 // Season represents a TV season
@@ -226,4 +234,66 @@ type Extra struct {
 
 	// Populated by joins (not stored in DB)
 	ParentTitle string `json:"parent_title,omitempty"`
+}
+
+// Section types
+const (
+	SectionTypeStandard = "standard" // Manual assignment
+	SectionTypeSmart    = "smart"    // Rule-based automatic assignment
+	SectionTypeFolder   = "folder"   // Source-based assignment
+)
+
+// Rule operators
+const (
+	OperatorEquals      = "equals"
+	OperatorContains    = "contains"
+	OperatorGreaterThan = "greater_than"
+	OperatorLessThan    = "less_than"
+	OperatorInRange     = "in_range"
+	OperatorRegex       = "regex"
+)
+
+// Section represents a library section (Movies, TV Shows, or custom sections)
+type Section struct {
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	Slug         string    `json:"slug"`
+	Icon         string    `json:"icon,omitempty"`
+	Description  string    `json:"description,omitempty"`
+	SectionType  string    `json:"section_type"` // 'standard', 'smart', 'folder'
+	DisplayOrder int       `json:"display_order"`
+	IsVisible    bool      `json:"is_visible"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+
+	// Populated when fetching with rules
+	Rules []SectionRule `json:"rules,omitempty"`
+
+	// Populated when fetching with counts
+	MediaCount int `json:"media_count,omitempty"`
+}
+
+// SectionRule defines a rule for smart sections
+type SectionRule struct {
+	ID        int64     `json:"id"`
+	SectionID int64     `json:"section_id"`
+	Field     string    `json:"field"`    // 'type', 'genre', 'year', 'resolution', 'rating', etc.
+	Operator  string    `json:"operator"` // 'equals', 'contains', 'greater_than', 'less_than', 'in_range', 'regex'
+	Value     string    `json:"value"`    // JSON-encoded value
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// MediaSection links media items to sections (many-to-many)
+type MediaSection struct {
+	ID        int64     `json:"id"`
+	MediaID   int64     `json:"media_id"`
+	MediaType MediaType `json:"media_type"`
+	SectionID int64     `json:"section_id"`
+	AddedAt   time.Time `json:"added_at"`
+}
+
+// SectionWithMedia contains a section and its media items
+type SectionWithMedia struct {
+	Section
+	Media []interface{} `json:"media"` // Can be Media, Episode, Extra, or TVShow
 }

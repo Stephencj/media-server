@@ -24,6 +24,8 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	sourceHandler := handlers.NewSourceHandler(database)
 	watchlistHandler := handlers.NewWatchlistHandler(database)
 	playlistHandler := handlers.NewPlaylistHandler(database)
+	sectionHandler := handlers.NewSectionHandler(database)
+	templateHandler := handlers.NewSectionTemplateHandler(database)
 	showsHandler := handlers.NewShowsHandler(database)
 	extrasHandler := handlers.NewExtrasHandler(database)
 	metadataHandler := handlers.NewMetadataHandler(database, cfg)
@@ -129,6 +131,38 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 				playlists.POST("/:playlistId/items/:mediaId", playlistHandler.AddToPlaylist)
 				playlists.DELETE("/:playlistId/items/:mediaId", playlistHandler.RemoveFromPlaylist)
 				playlists.PUT("/:playlistId/reorder", playlistHandler.ReorderPlaylist)
+			}
+
+			// Sections
+			sections := protected.Group("/sections")
+			{
+				// Section CRUD
+				sections.GET("", sectionHandler.ListSections)
+				sections.POST("", sectionHandler.CreateSection)
+				sections.PUT("/reorder", sectionHandler.ReorderSections)
+
+				// Section templates
+				sections.GET("/templates", templateHandler.GetTemplates)
+				sections.POST("/from-template", templateHandler.CreateFromTemplate)
+
+				// Section by slug (must come before :id routes)
+				sections.GET("/slug/:slug", sectionHandler.GetSectionBySlug)
+				sections.GET("/slug/:slug/media", sectionHandler.GetSectionMediaBySlug)
+
+				// Section by ID
+				sections.GET("/:id", sectionHandler.GetSection)
+				sections.PUT("/:id", sectionHandler.UpdateSection)
+				sections.DELETE("/:id", sectionHandler.DeleteSection)
+
+				// Section media
+				sections.GET("/:id/media", sectionHandler.GetSectionMedia)
+				sections.POST("/:id/media", sectionHandler.AddMediaToSection)
+				sections.DELETE("/:id/media/:mediaId", sectionHandler.RemoveMediaFromSection)
+
+				// Section rules
+				sections.GET("/:id/rules", sectionHandler.GetSectionRules)
+				sections.POST("/:id/rules", sectionHandler.AddSectionRule)
+				sections.DELETE("/:id/rules/:ruleId", sectionHandler.DeleteSectionRule)
 			}
 
 			// TV Shows (hierarchical)

@@ -226,6 +226,40 @@ func (db *DB) Migrate() error {
 			FOREIGN KEY (source_id) REFERENCES media_sources(id)
 		)`,
 
+		// Customizable sections
+		`CREATE TABLE IF NOT EXISTS sections (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			slug TEXT UNIQUE NOT NULL,
+			icon TEXT,
+			description TEXT,
+			section_type TEXT NOT NULL DEFAULT 'standard',
+			display_order INTEGER DEFAULT 0,
+			is_visible BOOLEAN DEFAULT 1,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS section_rules (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			section_id INTEGER NOT NULL,
+			field TEXT NOT NULL,
+			operator TEXT NOT NULL,
+			value TEXT NOT NULL,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (section_id) REFERENCES sections(id) ON DELETE CASCADE
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS media_sections (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			media_id INTEGER NOT NULL,
+			media_type TEXT NOT NULL,
+			section_id INTEGER NOT NULL,
+			added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (section_id) REFERENCES sections(id) ON DELETE CASCADE,
+			UNIQUE(media_id, media_type, section_id)
+		)`,
+
 		// Indexes for common queries
 		`CREATE INDEX IF NOT EXISTS idx_media_type ON media(type)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_title ON media(title)`,
@@ -240,6 +274,46 @@ func (db *DB) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_extras_tv_show ON extras(tv_show_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_extras_episode ON extras(episode_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_extras_category ON extras(category)`,
+		`CREATE INDEX IF NOT EXISTS idx_sections_slug ON sections(slug)`,
+		`CREATE INDEX IF NOT EXISTS idx_sections_visible ON sections(is_visible)`,
+		`CREATE INDEX IF NOT EXISTS idx_sections_order ON sections(display_order)`,
+		`CREATE INDEX IF NOT EXISTS idx_section_rules_section ON section_rules(section_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_media_sections_section ON media_sections(section_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_media_sections_media ON media_sections(media_id, media_type)`,
+
+		// Insert default sections (only if sections table is empty)
+		`INSERT INTO sections (name, slug, icon, section_type, display_order, is_visible)
+		SELECT 'Movies', 'movies', 'film', 'smart', 1, 1
+		WHERE NOT EXISTS (SELECT 1 FROM sections WHERE slug = 'movies')`,
+
+		`INSERT INTO sections (name, slug, icon, section_type, display_order, is_visible)
+		SELECT 'TV Shows', 'tv-shows', 'tv', 'smart', 2, 1
+		WHERE NOT EXISTS (SELECT 1 FROM sections WHERE slug = 'tv-shows')`,
+
+		`INSERT INTO sections (name, slug, icon, section_type, display_order, is_visible)
+		SELECT 'Extras', 'extras', 'star', 'smart', 3, 1
+		WHERE NOT EXISTS (SELECT 1 FROM sections WHERE slug = 'extras')`,
+
+		// Add default rules for Movies section
+		`INSERT INTO section_rules (section_id, field, operator, value)
+		SELECT id, 'type', 'equals', '"movie"'
+		FROM sections WHERE slug = 'movies' AND NOT EXISTS (
+			SELECT 1 FROM section_rules WHERE section_id = (SELECT id FROM sections WHERE slug = 'movies')
+		)`,
+
+		// Add default rules for TV Shows section
+		`INSERT INTO section_rules (section_id, field, operator, value)
+		SELECT id, 'type', 'equals', '"tvshow"'
+		FROM sections WHERE slug = 'tv-shows' AND NOT EXISTS (
+			SELECT 1 FROM section_rules WHERE section_id = (SELECT id FROM sections WHERE slug = 'tv-shows')
+		)`,
+
+		// Add default rules for Extras section
+		`INSERT INTO section_rules (section_id, field, operator, value)
+		SELECT id, 'type', 'equals', '"extra"'
+		FROM sections WHERE slug = 'extras' AND NOT EXISTS (
+			SELECT 1 FROM section_rules WHERE section_id = (SELECT id FROM sections WHERE slug = 'extras')
+		)`,
 	}
 
 	for _, migration := range migrations {
