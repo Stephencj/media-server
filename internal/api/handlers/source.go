@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stephencjuliano/media-server/internal/db"
@@ -43,9 +46,45 @@ func (h *SourceHandler) CreateSource(c *gin.Context) {
 		return
 	}
 
+	// Clean and validate the path
+	cleanPath := filepath.Clean(req.Path)
+
+	// Security: Ensure path is under /media (the container's media mount point)
+	if !strings.HasPrefix(cleanPath, "/media") {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Path must be under /media. Use the file browser to select a valid path.",
+		})
+		return
+	}
+
+	// Prevent path traversal
+	if strings.Contains(req.Path, "..") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid path"})
+		return
+	}
+
+	// Verify the path exists and is a directory
+	info, err := os.Stat(cleanPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Path does not exist: " + cleanPath,
+				"hint":  "Use GET /api/files to browse available directories",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to access path"})
+		return
+	}
+
+	if !info.IsDir() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Path must be a directory"})
+		return
+	}
+
 	source := &db.MediaSource{
 		Name:     req.Name,
-		Path:     req.Path,
+		Path:     cleanPath, // Use cleaned path
 		Type:     req.Type,
 		Username: req.Username,
 		Password: req.Password,

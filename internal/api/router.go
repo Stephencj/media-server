@@ -30,6 +30,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	extrasHandler := handlers.NewExtrasHandler(database)
 	metadataHandler := handlers.NewMetadataHandler(database, cfg)
 	deployHandler := handlers.NewDeployHandler()
+	filesHandler := handlers.NewFilesHandler("/media")
 
 	// Serve web admin interface
 	router.StaticFile("/", "./web/index.html")
@@ -106,6 +107,13 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 				sources.GET("", sourceHandler.GetSources)
 				sources.POST("", sourceHandler.CreateSource)
 				sources.DELETE("/:id", sourceHandler.DeleteSource)
+			}
+
+			// File Browser (for configuring sources)
+			files := protected.Group("/files")
+			{
+				files.GET("", filesHandler.ListDirectory)
+				files.GET("/roots", filesHandler.GetRoots)
 			}
 
 			// Watchlist
