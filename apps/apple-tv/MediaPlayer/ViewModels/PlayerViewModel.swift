@@ -26,10 +26,10 @@ class PlayerViewModel: ObservableObject {
 
         // Create player with stream URL
         let streamURL: URL?
-        if let directURL = api.getDirectPlayURL(mediaId: media.id) {
+        if let directURL = api.getDirectPlayURL(mediaId: media.id, mediaType: media.type) {
             streamURL = directURL
         } else {
-            streamURL = api.getStreamURL(mediaId: media.id)
+            streamURL = api.getStreamURL(mediaId: media.id, mediaType: media.type)
         }
 
         if let url = streamURL {

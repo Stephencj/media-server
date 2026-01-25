@@ -25,18 +25,19 @@ struct PlaylistView: View {
                             GridItem(.adaptive(minimum: 300), spacing: 40)
                         ], spacing: 40) {
                             ForEach(viewModel.playlists) { playlist in
-                                PlaylistCard(playlist: playlist)
-                                    .focusable()
-                                    .onTapGesture {
-                                        selectedPlaylist = playlist
+                                Button {
+                                    selectedPlaylist = playlist
+                                } label: {
+                                    PlaylistCard(playlist: playlist)
+                                }
+                                .buttonStyle(.card)
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        Task { await viewModel.deletePlaylist(playlist) }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
                                     }
-                                    .contextMenu {
-                                        Button(role: .destructive) {
-                                            Task { await viewModel.deletePlaylist(playlist) }
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                    }
+                                }
                             }
                         }
                         .padding(40)

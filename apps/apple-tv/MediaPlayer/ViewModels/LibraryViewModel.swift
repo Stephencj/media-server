@@ -57,16 +57,17 @@ class LibraryViewModel: ObservableObject {
         hasMoreItems = true
 
         do {
-            let response: PaginatedResponse<Media>
             if mediaType == .movie {
-                response = try await api.getMovies(limit: pageSize, offset: 0)
+                let response = try await api.getMovies(limit: pageSize, offset: 0)
+                items = response.items
+                currentOffset = response.items.count
+                hasMoreItems = response.items.count >= pageSize
             } else {
-                response = try await api.getShows(limit: pageSize, offset: 0)
+                let response = try await api.getShows(limit: pageSize, offset: 0)
+                items = response.items.map { $0.toMedia() }
+                currentOffset = response.items.count
+                hasMoreItems = response.items.count >= pageSize
             }
-
-            items = response.items
-            currentOffset = response.items.count
-            hasMoreItems = response.items.count >= pageSize
         } catch {
             errorMessage = error.localizedDescription
             let title = mediaType == .movie ? "Failed to Load Movies" : "Failed to Load TV Shows"
@@ -92,16 +93,17 @@ class LibraryViewModel: ObservableObject {
         isLoading = true
 
         do {
-            let response: PaginatedResponse<Media>
             if mediaType == .movie {
-                response = try await api.getMovies(limit: pageSize, offset: currentOffset)
+                let response = try await api.getMovies(limit: pageSize, offset: currentOffset)
+                items.append(contentsOf: response.items)
+                currentOffset += response.items.count
+                hasMoreItems = response.items.count >= pageSize
             } else {
-                response = try await api.getShows(limit: pageSize, offset: currentOffset)
+                let response = try await api.getShows(limit: pageSize, offset: currentOffset)
+                items.append(contentsOf: response.items.map { $0.toMedia() })
+                currentOffset += response.items.count
+                hasMoreItems = response.items.count >= pageSize
             }
-
-            items.append(contentsOf: response.items)
-            currentOffset += response.items.count
-            hasMoreItems = response.items.count >= pageSize
         } catch {
             // Silent fail for pagination
         }

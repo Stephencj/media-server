@@ -204,3 +204,36 @@ struct RandomEpisodeResponse: Codable {
         case showTitle = "show_title"
     }
 }
+
+extension TVShow {
+    func toMedia() -> Media {
+        Media(
+            id: id,
+            title: title,
+            originalTitle: originalTitle,
+            type: .tvshow,
+            year: year,
+            overview: overview,
+            posterPath: posterPath,
+            backdropPath: backdropPath,
+            rating: rating,
+            runtime: nil,
+            genres: genres,
+            tmdbId: tmdbId,
+            imdbId: imdbId,
+            seasonCount: nil,
+            episodeCount: nil,
+            sourceId: nil,
+            filePath: nil,
+            fileSize: nil,
+            duration: nil,
+            videoCodec: nil,
+            audioCodec: nil,
+            resolution: nil,
+            audioTracks: nil,
+            subtitleTracks: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+    }
+}

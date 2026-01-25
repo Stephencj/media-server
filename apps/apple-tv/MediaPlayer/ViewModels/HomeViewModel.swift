@@ -56,7 +56,7 @@ class HomeViewModel: ObservableObject {
     private func loadTVShows() async {
         do {
             let response = try await api.getShows(limit: 15, offset: 0)
-            tvShows = response.items
+            tvShows = response.items.map { $0.toMedia() }
         } catch {
             AppState.shared.showError("Failed to Load TV Shows", message: error.localizedDescription)
         }

@@ -175,9 +175,12 @@ struct TVShowDetailView: View {
                         } else {
                             LazyVStack(spacing: 20) {
                                 ForEach(viewModel.currentEpisodes) { episode in
-                                    EpisodeRow(episode: episode) {
+                                    Button {
                                         selectedEpisode = episode
+                                    } label: {
+                                        EpisodeRowContent(episode: episode)
                                     }
+                                    .buttonStyle(.card)
                                 }
                             }
                         }
@@ -261,9 +264,8 @@ struct TVShowDetailView: View {
     }
 }
 
-struct EpisodeRow: View {
+struct EpisodeRowContent: View {
     let episode: Episode
-    let onPlay: () -> Void
 
     var body: some View {
         HStack(spacing: 20) {
@@ -317,15 +319,13 @@ struct EpisodeRow: View {
 
             Spacer()
 
-            // Play button
-            Button(action: onPlay) {
-                Label("Play", systemImage: "play.fill")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .frame(minWidth: 150)
-            }
+            // Play indicator
+            Image(systemName: "play.fill")
+                .font(.title2)
+                .foregroundColor(.secondary)
         }
         .padding(.vertical, 10)
+        .padding(.horizontal, 20)
     }
 
     private var thumbnailPlaceholder: some View {

@@ -134,7 +134,7 @@ class APIClient: ObservableObject {
                 async let shows = getShows(limit: 1000, offset: 0)
 
                 let (moviesResponse, showsResponse) = try await (movies, shows)
-                mediaCache = moviesResponse.items + showsResponse.items
+                mediaCache = moviesResponse.items + showsResponse.items.map { $0.toMedia() }
                 lastCacheUpdate = Date()
             } catch {
                 // Return existing cache on error
@@ -150,8 +150,8 @@ class APIClient: ObservableObject {
         try await get("/api/library/movies?limit=\(limit)&offset=\(offset)")
     }
 
-    func getShows(limit: Int = 50, offset: Int = 0) async throws -> PaginatedResponse<Media> {
-        try await get("/api/library/shows?limit=\(limit)&offset=\(offset)")
+    func getShows(limit: Int = 50, offset: Int = 0) async throws -> PaginatedResponse<TVShow> {
+        try await get("/api/shows?limit=\(limit)&offset=\(offset)")
     }
 
     func getRecent(limit: Int = 20) async throws -> ItemsResponse<Media> {
@@ -168,14 +168,16 @@ class APIClient: ObservableObject {
 
     // MARK: - Streaming Endpoints
 
-    func getStreamURL(mediaId: Int64) -> URL? {
+    func getStreamURL(mediaId: Int64, mediaType: MediaType = .movie) -> URL? {
         guard let token = authToken else { return nil }
-        return URL(string: "\(baseURL)/api/stream/\(mediaId)/manifest.m3u8?token=\(token)")
+        let typeParam = mediaType == .episode ? "&type=episode" : ""
+        return URL(string: "\(baseURL)/api/stream/\(mediaId)/manifest.m3u8?token=\(token)\(typeParam)")
     }
 
-    func getDirectPlayURL(mediaId: Int64) -> URL? {
+    func getDirectPlayURL(mediaId: Int64, mediaType: MediaType = .movie) -> URL? {
         guard let token = authToken else { return nil }
-        return URL(string: "\(baseURL)/api/stream/\(mediaId)/direct?token=\(token)")
+        let typeParam = mediaType == .episode ? "&type=episode" : ""
+        return URL(string: "\(baseURL)/api/stream/\(mediaId)/direct?token=\(token)\(typeParam)")
     }
 
     func getSubtitleURL(mediaId: Int64, language: String) -> URL? {
