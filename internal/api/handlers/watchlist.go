@@ -117,7 +117,7 @@ func (h *WatchlistHandler) CheckWatchlist(c *gin.Context) {
 // MarkAsWatched marks a media item as watched (completed)
 func (h *WatchlistHandler) MarkAsWatched(c *gin.Context) {
 	userID, _ := c.Get("user_id")
-	mediaIDStr := c.Param("mediaId")
+	mediaIDStr := c.Param("id")
 
 	mediaID, err := strconv.ParseInt(mediaIDStr, 10, 64)
 	if err != nil {

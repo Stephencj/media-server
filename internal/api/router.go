@@ -118,7 +118,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 			}
 
 			// Mark as watched
-			protected.POST("/media/:mediaId/watched", watchlistHandler.MarkAsWatched)
+			protected.POST("/media/:id/watched", watchlistHandler.MarkAsWatched)
 
 			// Playlists
 			playlists := protected.Group("/playlists")
