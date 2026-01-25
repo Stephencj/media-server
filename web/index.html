@@ -1000,11 +1000,13 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>Type</label>
+                <label>Source Type</label>
                 <select id="source-type">
-                    <option value="movies">Movies</option>
-                    <option value="shows">TV Shows</option>
+                    <option value="local">Local / Mounted Drive</option>
+                    <option value="smb">SMB Share</option>
+                    <option value="nfs">NFS Mount</option>
                 </select>
+                <small style="color: #888; margin-top: 5px; display: block;">The scanner auto-detects Movies vs TV Shows</small>
             </div>
             <div id="add-source-error" class="error"></div>
             <div class="modal-actions">
