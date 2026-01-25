@@ -1796,3 +1796,38 @@ func (db *DB) getManualSectionMedia(sectionID int64, limit, offset int) ([]inter
 
 	return items, total, nil
 }
+
+// ============ Library Statistics ============
+
+// LibraryStats contains aggregate library statistics
+type LibraryStats struct {
+	MovieCount   int `json:"movie_count"`
+	ShowCount    int `json:"show_count"`
+	EpisodeCount int `json:"episode_count"`
+	ExtraCount   int `json:"extra_count"`
+	SourceCount  int `json:"source_count"`
+}
+
+// GetLibraryStats returns aggregate statistics for the media library
+func (db *DB) GetLibraryStats() (*LibraryStats, error) {
+	stats := &LibraryStats{}
+
+	query := `
+		SELECT
+			(SELECT COUNT(*) FROM media WHERE type = 'movie') as movies,
+			(SELECT COUNT(*) FROM tv_shows) as shows,
+			(SELECT COUNT(*) FROM episodes) as episodes,
+			(SELECT COUNT(*) FROM extras) as extras,
+			(SELECT COUNT(*) FROM media_sources WHERE enabled = 1) as sources
+	`
+
+	err := db.conn.QueryRow(query).Scan(
+		&stats.MovieCount, &stats.ShowCount, &stats.EpisodeCount,
+		&stats.ExtraCount, &stats.SourceCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return stats, nil
+}

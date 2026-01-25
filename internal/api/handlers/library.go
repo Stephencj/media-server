@@ -137,3 +137,14 @@ func (h *LibraryHandler) TriggerScan(c *gin.Context) {
 		"status":  "scanning",
 	})
 }
+
+// GetStats returns library statistics
+func (h *LibraryHandler) GetStats(c *gin.Context) {
+	stats, err := h.db.GetLibraryStats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch stats"})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}

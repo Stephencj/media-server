@@ -70,6 +70,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 				library.GET("/movies", libraryHandler.GetMovies)
 				library.GET("/shows", libraryHandler.GetShows)
 				library.GET("/recent", libraryHandler.GetRecent)
+				library.GET("/stats", libraryHandler.GetStats)
 				library.POST("/scan", libraryHandler.TriggerScan)
 			}
 

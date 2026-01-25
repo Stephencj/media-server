@@ -103,6 +103,14 @@
         .modal h2 { margin-bottom: 20px; }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 
+        /* File Browser */
+        .file-browser-item {
+            display: flex; align-items: center; padding: 12px; cursor: pointer;
+            border-radius: 6px; transition: background 0.2s;
+        }
+        .file-browser-item:hover { background: #16213e; }
+        .file-browser-icon { margin-right: 12px; font-size: 1.2rem; }
+
         /* Inline form */
         .inline-form { display: flex; gap: 10px; }
         .inline-form input { flex: 1; }
@@ -894,6 +902,14 @@
                             <div class="stat-label">TV Shows</div>
                         </div>
                         <div class="stat">
+                            <div class="stat-value" id="stat-episodes">-</div>
+                            <div class="stat-label">Episodes</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" id="stat-extras">-</div>
+                            <div class="stat-label">Extras</div>
+                        </div>
+                        <div class="stat">
                             <div class="stat-value" id="stat-sources">-</div>
                             <div class="stat-label">Sources</div>
                         </div>
@@ -978,7 +994,10 @@
             </div>
             <div class="form-group">
                 <label>Path</label>
-                <input type="text" id="source-path" placeholder="e.g., /mnt/media/movies">
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="source-path" placeholder="/media/movies" style="flex: 1;">
+                    <button type="button" class="btn-secondary" onclick="showFileBrowser()">Browse</button>
+                </div>
             </div>
             <div class="form-group">
                 <label>Type</label>
@@ -991,6 +1010,20 @@
             <div class="modal-actions">
                 <button class="btn-secondary" onclick="hideAddSource()">Cancel</button>
                 <button onclick="addSource()">Add Source</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Browser Modal -->
+    <div class="modal-overlay" id="file-browser-modal">
+        <div class="modal" style="max-width: 600px;">
+            <h2>Select Directory</h2>
+            <div id="file-browser-path" style="padding: 10px; background: #1a1a2e; border-radius: 6px; margin-bottom: 15px; font-family: monospace;">/media</div>
+            <div id="file-browser-list" style="max-height: 400px; overflow-y: auto; background: #1a1a2e; border-radius: 8px; padding: 10px;"></div>
+            <div id="file-browser-error" class="error"></div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="hideFileBrowser()">Cancel</button>
+                <button onclick="selectCurrentDirectory()">Select This Directory</button>
             </div>
         </div>
     </div>
@@ -2260,14 +2293,13 @@
 
         async function loadStats() {
             try {
-                const [moviesRes, showsRes] = await Promise.all([
-                    api('/api/library/movies?limit=1'),
-                    api('/api/library/shows?limit=1')
-                ]);
-                const movies = await moviesRes.json();
-                const shows = await showsRes.json();
-                document.getElementById('stat-movies').textContent = movies.total || 0;
-                document.getElementById('stat-shows').textContent = shows.total || 0;
+                const res = await api('/api/library/stats');
+                const stats = await res.json();
+                document.getElementById('stat-movies').textContent = stats.movie_count || 0;
+                document.getElementById('stat-shows').textContent = stats.show_count || 0;
+                document.getElementById('stat-episodes').textContent = stats.episode_count || 0;
+                document.getElementById('stat-extras').textContent = stats.extra_count || 0;
+                document.getElementById('stat-sources').textContent = stats.source_count || 0;
             } catch (err) {
                 console.error('Failed to load stats:', err);
             }
@@ -2283,6 +2315,62 @@
 
         function hideAddSource() {
             document.getElementById('add-source-modal').classList.remove('active');
+        }
+
+        // File Browser
+        let currentBrowserPath = '/media';
+
+        function showFileBrowser() {
+            currentBrowserPath = '/media';
+            document.getElementById('file-browser-modal').classList.add('active');
+            document.getElementById('file-browser-error').textContent = '';
+            loadFileBrowserDirectory('/media');
+        }
+
+        function hideFileBrowser() {
+            document.getElementById('file-browser-modal').classList.remove('active');
+        }
+
+        async function loadFileBrowserDirectory(path) {
+            try {
+                const res = await api('/api/files?path=' + encodeURIComponent(path));
+                const data = await res.json();
+
+                currentBrowserPath = data.path;
+                document.getElementById('file-browser-path').textContent = data.path;
+
+                let html = '';
+
+                // Add parent directory option (if not at root)
+                if (data.parent && data.path !== '/media') {
+                    html += `<div class="file-browser-item" onclick="loadFileBrowserDirectory('${data.parent}')">
+                        <span class="file-browser-icon">📁</span><span>..</span>
+                    </div>`;
+                }
+
+                // Add directories only
+                const dirs = data.entries.filter(e => e.is_dir);
+                if (dirs.length === 0 && !html) {
+                    html = '<div style="padding: 20px; text-align: center; color: #888;">No subdirectories</div>';
+                } else {
+                    dirs.forEach(entry => {
+                        html += `<div class="file-browser-item" onclick="loadFileBrowserDirectory('${entry.path}')">
+                            <span class="file-browser-icon">📁</span><span>${entry.name}</span>
+                        </div>`;
+                    });
+                }
+
+                document.getElementById('file-browser-list').innerHTML = html;
+                document.getElementById('file-browser-error').textContent = '';
+            } catch (err) {
+                console.error('Failed to load directory:', err);
+                document.getElementById('file-browser-error').textContent = 'Failed to load directory';
+            }
+        }
+
+        function selectCurrentDirectory() {
+            document.getElementById('source-path').value = currentBrowserPath;
+            hideFileBrowser();
         }
 
         async function addSource() {
