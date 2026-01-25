@@ -98,6 +98,7 @@
         .modal {
             background: #16213e; border-radius: 12px; padding: 25px;
             width: 90%; max-width: 500px;
+            max-height: 90vh; overflow-y: auto; margin: 20px 0;
         }
         .modal h2 { margin-bottom: 20px; }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
@@ -230,6 +231,15 @@
         .up-next-label { font-size: 0.8rem; color: #888; margin-bottom: 8px; }
         .up-next-title { font-weight: 600; margin-bottom: 10px; }
         .up-next-actions { display: flex; gap: 10px; }
+
+        /* Player Loading */
+        .player-loading {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: rgba(0, 0, 0, 0.8); z-index: 5;
+        }
+        .player-loading.hidden { display: none; }
+        .player-loading-text { margin-top: 15px; color: #888; font-size: 0.9rem; }
 
         /* Navigation Tabs */
         .nav-tabs {
@@ -1149,6 +1159,10 @@
             <button class="player-close" onclick="closePlayer()">&times;</button>
         </div>
         <video id="player-video" class="player-video" controls></video>
+        <div class="player-loading" id="player-loading">
+            <div class="spinner" style="width: 40px; height: 40px; border-width: 3px;"></div>
+            <div class="player-loading-text">Loading...</div>
+        </div>
         <div class="up-next hidden" id="up-next">
             <div class="up-next-label">Up Next</div>
             <div class="up-next-title" id="up-next-title"></div>
@@ -2085,6 +2099,44 @@
             document.getElementById('player-modal').classList.add('active');
 
             const video = document.getElementById('player-video');
+            const loadingEl = document.getElementById('player-loading');
+            const loadingText = loadingEl.querySelector('.player-loading-text');
+            const PLAYBACK_TIMEOUT = 15000; // 15 seconds
+
+            // Show loading indicator
+            loadingEl.classList.remove('hidden');
+            loadingText.textContent = 'Loading...';
+
+            let playbackTimeout = null;
+            let hlsInstance = null;
+
+            // Cleanup function
+            const cleanup = () => {
+                if (playbackTimeout) clearTimeout(playbackTimeout);
+                if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+            };
+
+            // Show error and close player
+            const showPlaybackError = (message) => {
+                cleanup();
+                loadingEl.classList.add('hidden');
+                showToast(message, 'error');
+                closePlayer();
+            };
+
+            // Start timeout
+            playbackTimeout = setTimeout(() => {
+                if (video.readyState < 3) { // HAVE_FUTURE_DATA
+                    showPlaybackError('Playback timed out. The server may be unavailable.');
+                }
+            }, PLAYBACK_TIMEOUT);
+
+            // When video can play, hide loading
+            video.oncanplay = () => {
+                clearTimeout(playbackTimeout);
+                loadingEl.classList.add('hidden');
+            };
+
             const streamUrl = `/api/stream/${mediaId}/direct?token=${token}&type=${mediaType}`;
 
             video.src = streamUrl;
@@ -2101,6 +2153,7 @@
             };
 
             video.onended = () => {
+                cleanup();
                 saveProgress(mediaId, mediaType, video.duration, video.duration, true);
                 // For playlist playback, check for next item
                 if (playlistQueue.length > 0 && currentPlaylistIndex >= 0) {
@@ -2112,20 +2165,46 @@
 
             // HLS fallback on error
             video.onerror = () => {
-                console.log('Direct play failed, trying HLS...');
+                console.log('Direct play failed, trying HLS fallback...');
+                loadingText.textContent = 'Trying alternate format...';
+
                 const hlsUrl = `/api/stream/${mediaId}/manifest.m3u8?token=${token}&type=${mediaType}`;
                 if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-                    const hls = new Hls();
-                    hls.loadSource(hlsUrl);
-                    hls.attachMedia(video);
-                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                        video.currentTime = startPosition;
-                        video.play();
+                    hlsInstance = new Hls();
+
+                    hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) {
+                            let message = 'Playback failed';
+                            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                if (data.response && data.response.code === 401) {
+                                    message = 'Session expired - please log in again';
+                                } else if (data.response && data.response.code === 404) {
+                                    message = 'Media file not found';
+                                } else {
+                                    message = 'Network error - check your connection';
+                                }
+                            }
+                            showPlaybackError(message);
+                        }
                     });
+
+                    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                        clearTimeout(playbackTimeout);
+                        loadingEl.classList.add('hidden');
+                        video.currentTime = startPosition;
+                        video.play().catch(() => {});
+                    });
+
+                    hlsInstance.loadSource(hlsUrl);
+                    hlsInstance.attachMedia(video);
                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                     video.src = hlsUrl;
                     video.currentTime = startPosition;
-                    video.play();
+                    video.play().catch(() => {
+                        showPlaybackError('Playback failed');
+                    });
+                } else {
+                    showPlaybackError('Video format not supported');
                 }
             };
         }
@@ -2647,6 +2726,7 @@
             const video = document.getElementById('player-video');
             video.pause();
             video.src = '';
+            document.getElementById('player-loading').classList.add('hidden');
             document.getElementById('player-modal').classList.remove('active');
             playlistQueue = [];
             currentPlaylistIndex = -1;
