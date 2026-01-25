@@ -54,3 +54,10 @@ apps/apple-tv/DerivedData/
 apps/fire-tv/.gradle/
 apps/fire-tv/app/build/
 apps/fire-tv/local.properties
+
+# Deploy app (Electron)
+tools/deploy-app/node_modules/
+tools/deploy-app/dist/
+tools/deploy-app/release/
+tools/deploy-app/*.dmg
+tools/deploy-app/*.zip

@@ -26,6 +26,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	playlistHandler := handlers.NewPlaylistHandler(database)
 	showsHandler := handlers.NewShowsHandler(database)
 	extrasHandler := handlers.NewExtrasHandler(database)
+	deployHandler := handlers.NewDeployHandler()
 
 	// Serve web admin interface
 	router.StaticFile("/", "./web/index.html")
@@ -46,6 +47,13 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.RefreshToken)
+		}
+
+		// Deployment status (public - for deploy app monitoring)
+		deploy := api.Group("/deploy")
+		{
+			deploy.GET("/status", deployHandler.GetStatus)
+			deploy.GET("/logs", deployHandler.GetLogs)
 		}
 
 		// Protected routes

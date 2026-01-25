@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>Media Server Deploy</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Titlebar drag region -->
+    <div class="titlebar">
+      <span class="titlebar-title">Media Server Deploy</span>
+    </div>
+
+    <!-- Settings Panel (initially hidden if configured) -->
+    <div id="settings-panel" class="panel settings-panel hidden">
+      <h2>Settings</h2>
+      <div class="form-group">
+        <label for="repo-path">Repository Path</label>
+        <input type="text" id="repo-path" placeholder="/path/to/media-server">
+        <small>Path to your local media-server repository</small>
+      </div>
+      <div class="form-group">
+        <label for="server-url">Server URL</label>
+        <input type="text" id="server-url" placeholder="https://your-server.com">
+        <small>URL of your media server (for status checking)</small>
+      </div>
+      <div class="form-group">
+        <label for="server-api-key">API Key (optional)</label>
+        <input type="password" id="server-api-key" placeholder="Enter API key">
+        <small>Authentication key for server status endpoint</small>
+      </div>
+      <div class="button-row">
+        <button id="save-settings" class="btn btn-primary">Save Settings</button>
+        <button id="cancel-settings" class="btn btn-secondary">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-content">
+      <!-- Git Status -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Git Status</h2>
+          <div class="panel-actions">
+            <button id="refresh-git" class="btn btn-icon" title="Refresh">
+              <span class="icon">&#x21bb;</span>
+            </button>
+            <button id="open-settings" class="btn btn-icon" title="Settings">
+              <span class="icon">&#x2699;</span>
+            </button>
+          </div>
+        </div>
+        <div id="git-status" class="git-status">
+          <div class="status-row">
+            <span class="label">Branch:</span>
+            <span id="git-branch" class="value">--</span>
+            <span id="git-sync-status" class="sync-status"></span>
+          </div>
+          <div class="status-row">
+            <span class="label">Last Commit:</span>
+            <span id="git-last-commit" class="value mono">--</span>
+          </div>
+          <div class="status-row">
+            <span class="label">Message:</span>
+            <span id="git-commit-message" class="value truncate">--</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Changed Files -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Changed Files</h2>
+          <div class="panel-actions">
+            <button id="stage-all" class="btn btn-small">Stage All</button>
+            <button id="unstage-all" class="btn btn-small">Unstage All</button>
+          </div>
+        </div>
+        <div id="file-list" class="file-list">
+          <div class="empty-state">No changes detected</div>
+        </div>
+      </div>
+
+      <!-- Commit Form -->
+      <div class="panel">
+        <h2>Commit</h2>
+        <div class="commit-form">
+          <textarea id="commit-message" placeholder="Enter commit message..." rows="3"></textarea>
+          <div class="button-row">
+            <button id="btn-commit" class="btn btn-secondary" disabled>Commit</button>
+            <button id="btn-commit-push" class="btn btn-primary" disabled>Commit & Push</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Server Status -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Server Status</h2>
+          <div class="panel-actions">
+            <button id="refresh-server" class="btn btn-icon" title="Refresh">
+              <span class="icon">&#x21bb;</span>
+            </button>
+          </div>
+        </div>
+        <div id="server-status" class="server-status">
+          <div class="status-indicator">
+            <span id="server-online-indicator" class="indicator offline"></span>
+            <span id="server-online-text">Checking...</span>
+          </div>
+          <div class="status-details">
+            <div class="status-row">
+              <span class="label">Version:</span>
+              <span id="server-version" class="value mono">--</span>
+            </div>
+            <div class="status-row">
+              <span class="label">Uptime:</span>
+              <span id="server-uptime" class="value">--</span>
+            </div>
+            <div class="status-row">
+              <span class="label">Last Deploy:</span>
+              <span id="server-last-deploy" class="value">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading/Status overlay -->
+    <div id="overlay" class="overlay hidden">
+      <div class="overlay-content">
+        <div class="spinner"></div>
+        <span id="overlay-message">Loading...</span>
+      </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toast-container" class="toast-container"></div>
+  </div>
+
+  <script type="module" src="./app.ts"></script>
+</body>
+</html>

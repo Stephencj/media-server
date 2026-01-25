@@ -13,8 +13,14 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build with CGO enabled for SQLite
-RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags '-linkmode external -extldflags "-static"' -o media-server ./cmd/server
+# Get git commit hash for version
+ARG VERSION=dev
+ARG GIT_COMMIT=unknown
+
+# Build with CGO enabled for SQLite, including version info
+RUN CGO_ENABLED=1 GOOS=linux go build -a \
+    -ldflags "-linkmode external -extldflags '-static' -X 'github.com/stephencjuliano/media-server/internal/api/handlers.Version=${GIT_COMMIT}'" \
+    -o media-server ./cmd/server
 
 # Runtime stage
 FROM alpine:3.19

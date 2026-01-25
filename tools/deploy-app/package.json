@@ -1,0 +1,26 @@
+{
+  "name": "media-server-deploy",
+  "version": "1.0.0",
+  "description": "Deployment tool for Media Server",
+  "main": "dist/main/index.js",
+  "author": "Stephen Juliano",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "package": "electron-builder --mac --config electron-builder.json5",
+    "package:dir": "electron-builder --mac --dir --config electron-builder.json5"
+  },
+  "dependencies": {
+    "simple-git": "^3.22.0",
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "electron-vite": "^2.0.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.10"
+  }
+}
