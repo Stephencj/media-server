@@ -1449,7 +1449,7 @@ func scanExtraRows(rows *sql.Rows) ([]*Extra, error) {
 // GetAllSections returns all sections ordered by display_order
 func (db *DB) GetAllSections() ([]Section, error) {
 	query := `
-        SELECT id, name, slug, icon, description, section_type,
+        SELECT id, name, slug, COALESCE(icon, ''), COALESCE(description, ''), section_type,
                display_order, is_visible, created_at, updated_at
         FROM sections
         ORDER BY display_order ASC
@@ -1481,7 +1481,7 @@ func (db *DB) GetAllSections() ([]Section, error) {
 // GetVisibleSections returns only visible sections
 func (db *DB) GetVisibleSections() ([]Section, error) {
 	query := `
-        SELECT id, name, slug, icon, description, section_type,
+        SELECT id, name, slug, COALESCE(icon, ''), COALESCE(description, ''), section_type,
                display_order, is_visible, created_at, updated_at
         FROM sections
         WHERE is_visible = 1
@@ -1514,7 +1514,7 @@ func (db *DB) GetVisibleSections() ([]Section, error) {
 // GetSectionByID retrieves a section by ID
 func (db *DB) GetSectionByID(id int64) (*Section, error) {
 	query := `
-        SELECT id, name, slug, icon, description, section_type,
+        SELECT id, name, slug, COALESCE(icon, ''), COALESCE(description, ''), section_type,
                display_order, is_visible, created_at, updated_at
         FROM sections
         WHERE id = ?
@@ -1540,7 +1540,7 @@ func (db *DB) GetSectionByID(id int64) (*Section, error) {
 // GetSectionBySlug retrieves a section by slug
 func (db *DB) GetSectionBySlug(slug string) (*Section, error) {
 	query := `
-        SELECT id, name, slug, icon, description, section_type,
+        SELECT id, name, slug, COALESCE(icon, ''), COALESCE(description, ''), section_type,
                display_order, is_visible, created_at, updated_at
         FROM sections
         WHERE slug = ?

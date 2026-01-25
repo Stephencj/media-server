@@ -21,7 +21,25 @@ func (db *DB) evaluateSmartSection(section *Section, limit, offset int) ([]inter
 		return []interface{}{}, 0, nil
 	}
 
-	// Build query based on rules
+	// Check if this is a TV show section (type = tvshow rule)
+	isTVShowSection := false
+	for _, rule := range rules {
+		if rule.Field == "type" && rule.Operator == OperatorEquals {
+			var value string
+			json.Unmarshal([]byte(rule.Value), &value)
+			if value == "tvshow" {
+				isTVShowSection = true
+				break
+			}
+		}
+	}
+
+	// If it's a TV show section, query the tv_shows table
+	if isTVShowSection {
+		return db.evaluateTVShowSection(rules, limit, offset)
+	}
+
+	// Build query based on rules for regular media
 	query, params := buildQueryFromRules(rules, limit, offset)
 
 	// Execute query to get total count
@@ -62,6 +80,105 @@ func (db *DB) evaluateSmartSection(section *Section, limit, offset int) ([]inter
 	}
 
 	return items, total, rows.Err()
+}
+
+// evaluateTVShowSection queries the tv_shows table for smart TV show sections
+func (db *DB) evaluateTVShowSection(rules []SectionRule, limit, offset int) ([]interface{}, int, error) {
+	// Build WHERE clause for rules
+	whereClause := "WHERE 1=1"
+	params := []interface{}{}
+
+	// Apply non-type rules (type rule is already used to select this path)
+	for _, rule := range rules {
+		if rule.Field == "type" {
+			continue // Skip type rule, we already know it's tvshow
+		}
+		condition, ruleParams := buildTVShowCondition(rule)
+		if condition != "" {
+			whereClause += " AND " + condition
+			params = append(params, ruleParams...)
+		}
+	}
+
+	// Get total count
+	countQuery := "SELECT COUNT(*) FROM tv_shows " + whereClause
+
+	var total int
+	err := db.conn.QueryRow(countQuery, params...).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Build main query with pagination
+	query := "SELECT id, title, original_title, year, overview, poster_path, backdrop_path, rating, genres, tmdb_id, imdb_id, status, created_at, updated_at FROM tv_shows " + whereClause + " ORDER BY title ASC LIMIT ? OFFSET ?"
+	params = append(params, limit, offset)
+
+	// Execute main query
+	rows, err := db.conn.Query(query, params...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	// Scan results
+	var items []interface{}
+	for rows.Next() {
+		var show TVShow
+		err := rows.Scan(
+			&show.ID, &show.Title, &show.OriginalTitle, &show.Year,
+			&show.Overview, &show.PosterPath, &show.BackdropPath,
+			&show.Rating, &show.Genres, &show.TMDbID, &show.IMDbID,
+			&show.Status, &show.CreatedAt, &show.UpdatedAt,
+		)
+		if err != nil {
+			continue
+		}
+		items = append(items, &show)
+	}
+
+	return items, total, rows.Err()
+}
+
+// buildTVShowCondition builds a SQL condition for TV show rules
+func buildTVShowCondition(rule SectionRule) (string, []interface{}) {
+	var condition string
+	var params []interface{}
+
+	switch rule.Operator {
+	case OperatorEquals:
+		var value string
+		json.Unmarshal([]byte(rule.Value), &value)
+		condition = fmt.Sprintf("%s = ?", rule.Field)
+		params = append(params, value)
+
+	case OperatorContains:
+		var value string
+		json.Unmarshal([]byte(rule.Value), &value)
+		condition = fmt.Sprintf("%s LIKE ?", rule.Field)
+		params = append(params, "%"+value+"%")
+
+	case OperatorGreaterThan:
+		var value float64
+		json.Unmarshal([]byte(rule.Value), &value)
+		condition = fmt.Sprintf("%s > ?", rule.Field)
+		params = append(params, value)
+
+	case OperatorLessThan:
+		var value float64
+		json.Unmarshal([]byte(rule.Value), &value)
+		condition = fmt.Sprintf("%s < ?", rule.Field)
+		params = append(params, value)
+
+	case OperatorInRange:
+		var values []int
+		json.Unmarshal([]byte(rule.Value), &values)
+		if len(values) == 2 {
+			condition = fmt.Sprintf("%s BETWEEN ? AND ?", rule.Field)
+			params = append(params, values[0], values[1])
+		}
+	}
+
+	return condition, params
 }
 
 // buildQueryFromRules builds a SQL query from section rules
