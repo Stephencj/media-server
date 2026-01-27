@@ -577,42 +577,96 @@
         }
 
         /* TV Show Seasons */
-        .seasons-container { margin-top: 20px; }
+        .seasons-container {
+            margin-top: 30px;
+            background: rgba(26, 26, 46, 0.5);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #333;
+        }
         .season-selector {
             display: flex;
             gap: 10px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             flex-wrap: wrap;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            scrollbar-width: thin;
+            scrollbar-color: #444 transparent;
         }
+        .season-selector::-webkit-scrollbar { height: 6px; }
+        .season-selector::-webkit-scrollbar-track { background: transparent; }
+        .season-selector::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
         .season-btn {
             padding: 12px 18px; /* Increased from 8px for touch targets */
             background: #1a1a2e;
-            border: 1px solid #333;
+            border: 2px solid #333;
             color: #888;
             border-radius: 20px;
             cursor: pointer;
+            font-weight: 500;
             transition: all 0.2s;
             min-height: 44px; /* Touch target minimum */
+            white-space: nowrap;
+            flex-shrink: 0;
         }
-        .season-btn.active, .season-btn:hover {
+        .season-btn:hover {
+            background: #252542;
+            border-color: #444;
+            transform: translateY(-2px);
+        }
+        .season-btn.active {
             background: #1e88e5;
             border-color: #1e88e5;
             color: white;
+            box-shadow: 0 4px 12px rgba(30, 136, 229, 0.3);
         }
         .episodes-list {
-            max-height: 250px;
+            max-height: 600px;
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
         .episode-item {
             display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px;
+            align-items: flex-start;
+            gap: 15px;
+            padding: 12px;
             border-radius: 8px;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.2s, transform 0.2s;
+            background: #1a1a2e;
         }
-        .episode-item:hover { background: #1a1a2e; }
+        .episode-item:hover {
+            background: #252542;
+            transform: translateX(4px);
+        }
+        .episode-thumbnail {
+            width: 160px;
+            height: 90px;
+            flex-shrink: 0;
+            border-radius: 6px;
+            background: #333;
+            object-fit: cover;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 2rem;
+        }
+        .episode-thumbnail-placeholder {
+            width: 160px;
+            height: 90px;
+            flex-shrink: 0;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #555;
+            font-size: 1.5rem;
+        }
         .episode-number {
             min-width: 44px; /* Touch target minimum */
             min-height: 44px; /* Touch target minimum */
@@ -625,10 +679,47 @@
             justify-content: center;
             font-weight: 600;
             color: #888;
+            flex-shrink: 0;
         }
-        .episode-info { flex: 1; }
-        .episode-title { font-weight: 600; margin-bottom: 2px; }
-        .episode-meta { font-size: 0.85rem; color: #888; }
+        .episode-details {
+            flex: 1;
+            min-width: 0;
+        }
+        .episode-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        .episode-code {
+            font-size: 0.75rem;
+            color: #888;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .episode-title {
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 1rem;
+            line-height: 1.3;
+        }
+        .episode-overview {
+            font-size: 0.85rem;
+            color: #aaa;
+            line-height: 1.5;
+            margin-bottom: 6px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .episode-meta {
+            font-size: 0.8rem;
+            color: #666;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
 
         /* Search bar */
         .search-container {
@@ -846,20 +937,28 @@
                 flex-shrink: 0;
             }
             .episodes-list {
-                max-height: 350px;
-            }
-            .episode-number {
-                min-width: 44px;
-                min-height: 44px;
-                width: 44px;
-                height: 44px;
-                font-size: 0.9rem;
+                max-height: none;
             }
             .episode-item {
-                padding: 12px 8px;
+                flex-direction: column;
+                gap: 12px;
+                padding: 12px;
+            }
+            .episode-thumbnail,
+            .episode-thumbnail-placeholder {
+                width: 100%;
+                height: auto;
+                aspect-ratio: 16 / 9;
+            }
+            .episode-details {
+                width: 100%;
             }
             .episode-title {
-                font-size: 0.9rem;
+                font-size: 0.95rem;
+            }
+            .episode-overview {
+                font-size: 0.85rem;
+                -webkit-line-clamp: 3;
             }
 
             /* Section Cards - Stack header content */
@@ -911,24 +1010,42 @@
             }
 
             .detail-backdrop {
-                height: 250px;
+                height: 220px;
             }
 
             .detail-content {
                 flex-direction: column;
                 align-items: center;
-                padding: 0 16px 16px;
-                margin-top: -80px;
+                padding: 0 16px 20px;
+                margin-top: -60px;
                 gap: 20px;
             }
 
             .detail-poster {
-                width: 140px;
+                width: 120px;
+                border-radius: 8px;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.6);
             }
 
             .detail-info {
                 text-align: center;
                 width: 100%;
+            }
+
+            .detail-title {
+                font-size: 1.5rem;
+            }
+
+            .detail-overview {
+                max-height: 150px;
+            }
+
+            /* TV Show sections on mobile */
+            .seasons-container {
+                text-align: left;
+                padding: 16px;
+                width: 100%;
+                margin-top: 20px;
             }
 
             .detail-title {
@@ -2876,13 +2993,24 @@
 
             // Render season selector with random button
             const seasons = currentShowSeasons;
+            const totalEpisodes = seasons.reduce((sum, s) => sum + (s.episode_count || 0), 0);
             document.getElementById('season-selector').innerHTML = `
-                <button class="season-btn" style="background: #ff9800; border-color: #ff9800; color: white;" onclick="playRandomEpisode(${currentShowId})">🎲 Random</button>
-                ${seasons.map(s =>
-                    `<button class="season-btn ${s.season_number === currentSeason ? 'active' : ''}" onclick="selectSeason(${s.season_number})">
-                        Season ${s.season_number} (${s.episode_count || '?'})
-                    </button>`
-                ).join('')}
+                <div style="margin-bottom: 15px;">
+                    <h3 style="color: #fff; margin: 0 0 8px 0; font-size: 1.1rem;">
+                        ${seasons.length} Season${seasons.length !== 1 ? 's' : ''} • ${totalEpisodes} Episode${totalEpisodes !== 1 ? 's' : ''}
+                    </h3>
+                    <p style="color: #aaa; margin: 0; font-size: 0.9rem;">Select a season to browse episodes</p>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+                    <button class="season-btn" style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); border-color: #ff9800; color: white; font-weight: 600;" onclick="playRandomEpisode(${currentShowId})">
+                        🎲 Random Episode
+                    </button>
+                    ${seasons.map(s =>
+                        `<button class="season-btn ${s.season_number === currentSeason ? 'active' : ''}" onclick="selectSeason(${s.season_number})">
+                            Season ${s.season_number} ${s.episode_count ? `(${s.episode_count})` : ''}
+                        </button>`
+                    ).join('')}
+                </div>
             `;
 
             // Load extras for this TV show
@@ -3004,23 +3132,51 @@
                 return;
             }
 
+            const seasonInfo = currentShowSeasons.find(s => s.season_number === seasonNum);
+            const seasonName = seasonInfo?.name || `Season ${seasonNum}`;
+
             document.getElementById('episodes-list').innerHTML = `
-                <div class="episode-item" style="background: #1a3a5c; margin-bottom: 10px;" onclick="playRandomEpisodeFromSeason(${showId}, ${seasonNum})">
-                    <div class="episode-number" style="background: #ff9800; color: white;">🎲</div>
-                    <div class="episode-info">
-                        <div class="episode-title">Random Episode from Season ${seasonNum}</div>
-                        <div class="episode-meta">Play a random episode</div>
-                    </div>
+                <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #333;">
+                    <h3 style="color: #fff; margin: 0 0 4px 0; font-size: 1.1rem;">${seasonName}</h3>
+                    <p style="color: #888; margin: 0; font-size: 0.85rem;">${episodes.length} episode${episodes.length !== 1 ? 's' : ''}</p>
                 </div>
-                ${episodes.map(ep => `
-                    <div class="episode-item" onclick="playEpisode(${ep.id})">
-                        <div class="episode-number">${ep.episode_number}</div>
-                        <div class="episode-info">
-                            <div class="episode-title">${escapeHtml(ep.title || `Episode ${ep.episode_number}`)}</div>
-                            <div class="episode-meta">${ep.air_date || ''} ${ep.duration ? '• ' + formatDuration(ep.duration) : ''}</div>
+                <div class="episode-item" style="background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); border: 2px solid #ff9800;" onclick="playRandomEpisodeFromSeason(${showId}, ${seasonNum})">
+                    <div style="display: flex; align-items: center; gap: 15px; width: 100%;">
+                        <div class="episode-number" style="background: rgba(255,255,255,0.2); color: white; font-size: 1.5rem;">🎲</div>
+                        <div style="flex: 1;">
+                            <div class="episode-title" style="color: white;">Random Episode</div>
+                            <div class="episode-meta" style="color: rgba(255,255,255,0.9);">Shuffle and play a random episode from this season</div>
                         </div>
                     </div>
-                `).join('')}
+                </div>
+                ${episodes.map(ep => {
+                    const stillUrl = ep.still_path ? `https://image.tmdb.org/t/p/w300${ep.still_path}` : null;
+                    const episodeCode = `S${String(seasonNum).padStart(2, '0')}E${String(ep.episode_number).padStart(2, '0')}`;
+                    const metaParts = [];
+                    if (ep.air_date) metaParts.push(ep.air_date);
+                    if (ep.runtime) metaParts.push(`${ep.runtime} min`);
+                    if (ep.duration) metaParts.push(formatDuration(ep.duration));
+
+                    return `
+                    <div class="episode-item" onclick="playEpisode(${ep.id})">
+                        ${stillUrl
+                            ? `<img src="${stillUrl}" alt="${escapeHtml(ep.title)}" class="episode-thumbnail" loading="lazy">`
+                            : `<div class="episode-thumbnail-placeholder">📺</div>`
+                        }
+                        <div class="episode-details">
+                            <div class="episode-header">
+                                <span class="episode-code">${episodeCode}</span>
+                                ${ep.rating ? `<span style="color: #ffc107; font-size: 0.85rem;">★ ${ep.rating.toFixed(1)}</span>` : ''}
+                            </div>
+                            <div class="episode-title">${escapeHtml(ep.title || `Episode ${ep.episode_number}`)}</div>
+                            ${ep.overview ? `<div class="episode-overview">${escapeHtml(ep.overview)}</div>` : ''}
+                            <div class="episode-meta">
+                                ${metaParts.join(' • ')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                }).join('')}
             `;
         }
 
