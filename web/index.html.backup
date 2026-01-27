@@ -106,18 +106,9 @@
         .modal {
             background: #16213e; border-radius: 12px; padding: 25px;
             width: 90%; max-width: 500px;
-            max-height: 90vh; overflow-y: auto; margin: 20px 0;
         }
         .modal h2 { margin-bottom: 20px; }
         .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-
-        /* File Browser */
-        .file-browser-item {
-            display: flex; align-items: center; padding: 12px; cursor: pointer;
-            border-radius: 6px; transition: background 0.2s;
-        }
-        .file-browser-item:hover { background: #16213e; }
-        .file-browser-icon { margin-right: 12px; font-size: 1.2rem; }
 
         /* Inline form */
         .inline-form { display: flex; gap: 10px; }
@@ -258,15 +249,6 @@
         .up-next-label { font-size: 0.8rem; color: #888; margin-bottom: 8px; }
         .up-next-title { font-weight: 600; margin-bottom: 10px; }
         .up-next-actions { display: flex; gap: 10px; }
-
-        /* Player Loading */
-        .player-loading {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: rgba(0, 0, 0, 0.8); z-index: 5;
-        }
-        .player-loading.hidden { display: none; }
-        .player-loading-text { margin-top: 15px; color: #888; font-size: 0.9rem; }
 
         /* Navigation Tabs */
         .nav-tabs {
@@ -1449,84 +1431,6 @@
             }
         }
 
-        /* Pull to Refresh */
-        .pull-refresh-indicator {
-            position: fixed;
-            top: -80px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-            transition: top 0.3s;
-            z-index: 100;
-            color: #1e88e5;
-            font-size: 0.9rem;
-        }
-
-        .pull-refresh-indicator.pulling {
-            top: 20px;
-        }
-
-        .pull-refresh-indicator.refreshing {
-            top: 20px;
-        }
-
-        .pull-refresh-spinner {
-            width: 24px;
-            height: 24px;
-            border: 3px solid #333;
-            border-top-color: #1e88e5;
-            border-radius: 50%;
-        }
-
-        .pull-refresh-indicator.refreshing .pull-refresh-spinner {
-            animation: spin 1s linear infinite;
-        }
-
-        /* Video Gesture Indicators */
-        .skip-indicator,
-        .volume-indicator {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.8);
-            padding: 20px 40px;
-            border-radius: 12px;
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: white;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-            z-index: 4000;
-        }
-
-        .player-header,
-        .up-next {
-            transition: opacity 0.3s;
-        }
-
-        /* Player Control Buttons */
-        .player-control-btn {
-            background: rgba(0, 0, 0, 0.6);
-            border: none;
-            color: white;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            font-size: 1.2rem;
-            cursor: pointer;
-            margin-right: 8px;
-            transition: background 0.2s;
-        }
-
-        .player-control-btn:active {
-            background: rgba(0, 0, 0, 0.8);
-        }
-
         /* Touch Device Enhancements */
         @media (hover: none) and (pointer: coarse) {
             /* Always show overlay on touch devices */
@@ -1559,153 +1463,9 @@
             pointer-events: none;
             transition: all 0.2s ease;
         }
-
-        /* ============ LOADING STATES & PERFORMANCE ============ */
-
-        /* Skeleton loading states */
-        .skeleton {
-            background: linear-gradient(90deg, #1a1a2e 25%, #252540 50%, #1a1a2e 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 8px;
-        }
-
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
-        .skeleton-card {
-            width: 100%;
-            aspect-ratio: 2/3;
-            margin-bottom: 12px;
-        }
-
-        .skeleton-text {
-            height: 16px;
-            margin-bottom: 8px;
-            width: 100%;
-        }
-
-        .skeleton-text.short {
-            width: 60%;
-        }
-
-        .skeleton-header {
-            height: 32px;
-            width: 40%;
-            margin-bottom: 20px;
-        }
-
-        /* Lazy loading images */
-        .lazy-image {
-            opacity: 0;
-            transition: opacity 0.3s;
-            background: #1a1a2e;
-        }
-
-        .lazy-image.loaded {
-            opacity: 1;
-        }
-
-        .lazy-image.error {
-            opacity: 0.5;
-        }
-
-        /* Button loading state */
-        .btn-loading {
-            position: relative;
-            color: transparent !important;
-            pointer-events: none;
-        }
-
-        .btn-loading::after {
-            content: '';
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            top: 50%;
-            left: 50%;
-            margin-left: -8px;
-            margin-top: -8px;
-            border: 2px solid #fff;
-            border-radius: 50%;
-            border-top-color: transparent;
-            animation: spin 0.6s linear infinite;
-        }
-
-        /* Offline indicator */
-        .offline-indicator {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #c62828;
-            color: white;
-            padding: 8px;
-            text-align: center;
-            transform: translateY(-100%);
-            transition: transform 0.3s;
-            z-index: 3000;
-            font-size: 0.9rem;
-        }
-
-        .offline-indicator.show {
-            transform: translateY(0);
-        }
-
-        /* Aspect ratio containers for images (reduce layout shift) */
-        .media-poster-container {
-            position: relative;
-            width: 100%;
-            padding-bottom: 150%; /* 2:3 aspect ratio */
-            background: #1a1a2e;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .media-poster-container img {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        /* Performance optimizations - will-change for animated elements */
-        .modal-overlay.active .modal {
-            will-change: transform, opacity;
-        }
-
-        .drawer.active .drawer-content {
-            will-change: transform;
-        }
-
-        .media-card:hover {
-            will-change: transform;
-        }
-
-        /* Reset will-change after animation */
-        .modal-overlay:not(.active) .modal,
-        .drawer:not(.active) .drawer-content,
-        .media-card:not(:hover):not(:active) {
-            will-change: auto;
-        }
     </style>
 </head>
 <body>
-    <!-- Offline Indicator -->
-    <div class="offline-indicator" id="offline-indicator">
-        <span>⚠️</span> No connection
-    </div>
-
-    <!-- Pull to Refresh Indicator -->
-    <div class="pull-refresh-indicator" id="pull-refresh-indicator">
-        <div class="pull-refresh-spinner"></div>
-        <div class="pull-refresh-text">Pull to refresh</div>
-    </div>
-
     <!-- Auth Section -->
     <div id="auth-section">
         <h1>Media Server</h1>
@@ -1891,14 +1651,6 @@
                             <div class="stat-label">TV Shows</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-value" id="stat-episodes">-</div>
-                            <div class="stat-label">Episodes</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" id="stat-extras">-</div>
-                            <div class="stat-label">Extras</div>
-                        </div>
-                        <div class="stat">
                             <div class="stat-value" id="stat-sources">-</div>
                             <div class="stat-label">Sources</div>
                         </div>
@@ -1983,38 +1735,19 @@
             </div>
             <div class="form-group">
                 <label>Path</label>
-                <div style="display: flex; gap: 10px;">
-                    <input type="text" id="source-path" placeholder="/media/movies" style="flex: 1;">
-                    <button type="button" class="btn-secondary" onclick="showFileBrowser()">Browse</button>
-                </div>
+                <input type="text" id="source-path" placeholder="e.g., /mnt/media/movies">
             </div>
             <div class="form-group">
-                <label>Source Type</label>
+                <label>Type</label>
                 <select id="source-type">
-                    <option value="local">Local / Mounted Drive</option>
-                    <option value="smb">SMB Share</option>
-                    <option value="nfs">NFS Mount</option>
+                    <option value="movies">Movies</option>
+                    <option value="shows">TV Shows</option>
                 </select>
-                <small style="color: #888; margin-top: 5px; display: block;">The scanner auto-detects Movies vs TV Shows</small>
             </div>
             <div id="add-source-error" class="error"></div>
             <div class="modal-actions">
                 <button class="btn-secondary" onclick="hideAddSource()">Cancel</button>
                 <button onclick="addSource()">Add Source</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- File Browser Modal -->
-    <div class="modal-overlay" id="file-browser-modal">
-        <div class="modal" style="max-width: 600px;">
-            <h2>Select Directory</h2>
-            <div id="file-browser-path" style="padding: 10px; background: #1a1a2e; border-radius: 6px; margin-bottom: 15px; font-family: monospace;">/media</div>
-            <div id="file-browser-list" style="max-height: 400px; overflow-y: auto; background: #1a1a2e; border-radius: 8px; padding: 10px;"></div>
-            <div id="file-browser-error" class="error"></div>
-            <div class="modal-actions">
-                <button class="btn-secondary" onclick="hideFileBrowser()">Cancel</button>
-                <button onclick="selectCurrentDirectory()">Select This Directory</button>
             </div>
         </div>
     </div>
@@ -2183,10 +1916,6 @@
             <button class="player-close" onclick="closePlayer()">&times;</button>
         </div>
         <video id="player-video" class="player-video" controls></video>
-        <div class="player-loading" id="player-loading">
-            <div class="spinner" style="width: 40px; height: 40px; border-width: 3px;"></div>
-            <div class="player-loading-text">Loading...</div>
-        </div>
         <div class="up-next hidden" id="up-next">
             <div class="up-next-label">Up Next</div>
             <div class="up-next-title" id="up-next-title"></div>
@@ -2285,7 +2014,6 @@
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
             document.getElementById('current-user').textContent = currentUser.username;
-            initPullToRefresh();
             loadData();
         }
 
@@ -2371,9 +2099,6 @@
                         </div>
                     `;
                 }).join('');
-
-                // Initialize lazy loading for new images
-                observeNewImages();
             } catch (err) {
                 console.error('Failed to load continue watching:', err);
                 document.getElementById('continue-watching-section').style.display = 'none';
@@ -2393,9 +2118,6 @@
                 }
 
                 grid.innerHTML = items.map(m => renderMediaCard(m)).join('');
-
-                // Initialize lazy loading for new images
-                observeNewImages();
             } catch (err) {
                 console.error('Failed to load recent:', err);
             }
@@ -2453,9 +2175,6 @@
             empty.style.display = 'none';
             grid.innerHTML = moviesData.map(m => renderMediaCard(m)).join('');
             loadMore.style.display = moviesOffset < moviesTotal ? 'block' : 'none';
-
-            // Initialize lazy loading for new images
-            observeNewImages();
         }
 
         function loadMoreMovies() {
@@ -2519,9 +2238,6 @@
             empty.style.display = 'none';
             grid.innerHTML = showsData.map(show => renderShowCard(show)).join('');
             loadMore.style.display = showsOffset < showsTotal ? 'block' : 'none';
-
-            // Initialize lazy loading for new images
-            observeNewImages();
         }
 
         function renderShowCard(show) {
@@ -2535,7 +2251,7 @@
             return `
                 <div class="media-card" onclick="showTVShowDetail(${show.id})">
                     ${posterUrl
-                        ? `<img class="media-poster lazy-image" data-src="${posterUrl}" alt="${escapeHtml(show.title)}">`
+                        ? `<img class="media-poster" src="${posterUrl}" alt="${escapeHtml(show.title)}" loading="lazy">`
                         : `<div class="media-poster" style="display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #444;">📺</div>`
                     }
                     <div class="media-card-overlay">
@@ -2704,9 +2420,6 @@
             empty.style.display = 'none';
             grid.innerHTML = filtered.map(e => renderExtraCard(e)).join('');
             loadMore.style.display = extrasOffset < extrasTotal ? 'block' : 'none';
-
-            // Initialize lazy loading for new images
-            observeNewImages();
         }
 
         function renderExtraCard(extra) {
@@ -2758,7 +2471,7 @@
             return `
                 <div class="media-card" onclick="showMediaDetail(${media.id}, '${mediaType}')">
                     ${posterUrl
-                        ? `<img class="media-poster lazy-image" data-src="${posterUrl}" alt="${escapeHtml(media.title)}">`
+                        ? `<img class="media-poster" src="${posterUrl}" alt="${escapeHtml(media.title)}" loading="lazy">`
                         : `<div class="media-poster" style="display: flex; align-items: center; justify-content: center; font-size: 3rem; color: #444;">${mediaType === 'tvshow' ? '📺' : '🎬'}</div>`
                     }
                     <div class="media-card-overlay">
@@ -3139,44 +2852,6 @@
             document.getElementById('player-modal').classList.add('active');
 
             const video = document.getElementById('player-video');
-            const loadingEl = document.getElementById('player-loading');
-            const loadingText = loadingEl.querySelector('.player-loading-text');
-            const PLAYBACK_TIMEOUT = 15000; // 15 seconds
-
-            // Show loading indicator
-            loadingEl.classList.remove('hidden');
-            loadingText.textContent = 'Loading...';
-
-            let playbackTimeout = null;
-            let hlsInstance = null;
-
-            // Cleanup function
-            const cleanup = () => {
-                if (playbackTimeout) clearTimeout(playbackTimeout);
-                if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-            };
-
-            // Show error and close player
-            const showPlaybackError = (message) => {
-                cleanup();
-                loadingEl.classList.add('hidden');
-                showToast(message, 'error');
-                closePlayer();
-            };
-
-            // Start timeout
-            playbackTimeout = setTimeout(() => {
-                if (video.readyState < 3) { // HAVE_FUTURE_DATA
-                    showPlaybackError('Playback timed out. The server may be unavailable.');
-                }
-            }, PLAYBACK_TIMEOUT);
-
-            // When video can play, hide loading
-            video.oncanplay = () => {
-                clearTimeout(playbackTimeout);
-                loadingEl.classList.add('hidden');
-            };
-
             const streamUrl = `/api/stream/${mediaId}/direct?token=${token}&type=${mediaType}`;
 
             video.src = streamUrl;
@@ -3193,7 +2868,6 @@
             };
 
             video.onended = () => {
-                cleanup();
                 saveProgress(mediaId, mediaType, video.duration, video.duration, true);
                 // For playlist playback, check for next item
                 if (playlistQueue.length > 0 && currentPlaylistIndex >= 0) {
@@ -3205,54 +2879,21 @@
 
             // HLS fallback on error
             video.onerror = () => {
-                console.log('Direct play failed, trying HLS fallback...');
-                loadingText.textContent = 'Trying alternate format...';
-
+                console.log('Direct play failed, trying HLS...');
                 const hlsUrl = `/api/stream/${mediaId}/manifest.m3u8?token=${token}&type=${mediaType}`;
                 if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-                    hlsInstance = new Hls();
-
-                    hlsInstance.on(Hls.Events.ERROR, (event, data) => {
-                        if (data.fatal) {
-                            let message = 'Playback failed';
-                            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                                if (data.response && data.response.code === 401) {
-                                    message = 'Session expired - please log in again';
-                                } else if (data.response && data.response.code === 404) {
-                                    message = 'Media file not found';
-                                } else {
-                                    message = 'Network error - check your connection';
-                                }
-                            }
-                            showPlaybackError(message);
-                        }
-                    });
-
-                    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
-                        clearTimeout(playbackTimeout);
-                        loadingEl.classList.add('hidden');
+                    const hls = new Hls();
+                    hls.loadSource(hlsUrl);
+                    hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
                         video.currentTime = startPosition;
-                        video.play().catch(() => {});
+                        video.play();
                     });
-
-                    hlsInstance.loadSource(hlsUrl);
-                    hlsInstance.attachMedia(video);
                 } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                     video.src = hlsUrl;
                     video.currentTime = startPosition;
-                    video.play().catch(() => {
-                        showPlaybackError('Playback failed');
-                    });
-                } else {
-                    showPlaybackError('Video format not supported');
+                    video.play();
                 }
-
-            // Initialize video gestures and controls
-            setTimeout(() => {
-                initVideoGestures();
-                addPlayerControls();
-                autoHideControls();
-            }, 100);
             };
         }
 
@@ -3307,13 +2948,14 @@
 
         async function loadStats() {
             try {
-                const res = await api('/api/library/stats');
-                const stats = await res.json();
-                document.getElementById('stat-movies').textContent = stats.movie_count || 0;
-                document.getElementById('stat-shows').textContent = stats.show_count || 0;
-                document.getElementById('stat-episodes').textContent = stats.episode_count || 0;
-                document.getElementById('stat-extras').textContent = stats.extra_count || 0;
-                document.getElementById('stat-sources').textContent = stats.source_count || 0;
+                const [moviesRes, showsRes] = await Promise.all([
+                    api('/api/library/movies?limit=1'),
+                    api('/api/library/shows?limit=1')
+                ]);
+                const movies = await moviesRes.json();
+                const shows = await showsRes.json();
+                document.getElementById('stat-movies').textContent = movies.total || 0;
+                document.getElementById('stat-shows').textContent = shows.total || 0;
             } catch (err) {
                 console.error('Failed to load stats:', err);
             }
@@ -3329,62 +2971,6 @@
 
         function hideAddSource() {
             document.getElementById('add-source-modal').classList.remove('active');
-        }
-
-        // File Browser
-        let currentBrowserPath = '/media';
-
-        function showFileBrowser() {
-            currentBrowserPath = '/media';
-            document.getElementById('file-browser-modal').classList.add('active');
-            document.getElementById('file-browser-error').textContent = '';
-            loadFileBrowserDirectory('/media');
-        }
-
-        function hideFileBrowser() {
-            document.getElementById('file-browser-modal').classList.remove('active');
-        }
-
-        async function loadFileBrowserDirectory(path) {
-            try {
-                const res = await api('/api/files?path=' + encodeURIComponent(path));
-                const data = await res.json();
-
-                currentBrowserPath = data.path;
-                document.getElementById('file-browser-path').textContent = data.path;
-
-                let html = '';
-
-                // Add parent directory option (if not at root)
-                if (data.parent && data.path !== '/media') {
-                    html += `<div class="file-browser-item" onclick="loadFileBrowserDirectory('${data.parent}')">
-                        <span class="file-browser-icon">📁</span><span>..</span>
-                    </div>`;
-                }
-
-                // Add directories only
-                const dirs = data.entries.filter(e => e.is_dir);
-                if (dirs.length === 0 && !html) {
-                    html = '<div style="padding: 20px; text-align: center; color: #888;">No subdirectories</div>';
-                } else {
-                    dirs.forEach(entry => {
-                        html += `<div class="file-browser-item" onclick="loadFileBrowserDirectory('${entry.path}')">
-                            <span class="file-browser-icon">📁</span><span>${entry.name}</span>
-                        </div>`;
-                    });
-                }
-
-                document.getElementById('file-browser-list').innerHTML = html;
-                document.getElementById('file-browser-error').textContent = '';
-            } catch (err) {
-                console.error('Failed to load directory:', err);
-                document.getElementById('file-browser-error').textContent = 'Failed to load directory';
-            }
-        }
-
-        function selectCurrentDirectory() {
-            document.getElementById('source-path').value = currentBrowserPath;
-            hideFileBrowser();
         }
 
         async function addSource() {
@@ -3604,7 +3190,7 @@
             list.innerHTML = currentPlaylistItems.map((item, index) => `
                 <div class="playlist-item-row" data-index="${index}" data-id="${item.id}">
                     <span class="drag-handle">&#9776;</span>
-                    ${item.poster_path ? `<img data-src="https://image.tmdb.org/t/p/w92${item.poster_path}" class="playlist-item-poster lazy-image" alt="">` : '<div class="playlist-item-poster"></div>'}
+                    ${item.poster_path ? `<img src="https://image.tmdb.org/t/p/w92${item.poster_path}" class="playlist-item-poster" alt="">` : '<div class="playlist-item-poster"></div>'}
                     <div class="playlist-item-info" onclick="playPlaylistItem(${index})">
                         <div class="playlist-item-title">${escapeHtml(item.title)}</div>
                         <div class="playlist-item-meta">${item.year || ''} ${item.resolution || ''}</div>
@@ -3616,9 +3202,6 @@
 
             // Initialize touch-friendly reordering
             initPlaylistReordering();
-
-            // Initialize lazy loading for new images
-            observeNewImages();
         }
 
         function editCurrentPlaylist() {
@@ -3643,179 +3226,51 @@
             }
         }
 
-        // Touch-friendly drag and drop for playlist reordering
-        function initPlaylistReordering() {
-            const container = document.querySelector('#playlist-items-list');
-            if (!container) return;
-
-            container.querySelectorAll('.playlist-item-row').forEach((item, index) => {
-                item.setAttribute('data-index', index);
-
-                // Mouse events
-                item.addEventListener('mousedown', handleDragStart);
-
-                // Touch events
-                item.addEventListener('touchstart', handleTouchStart, { passive: false });
-            });
-
-            // Global event listeners (remove old ones first)
-            document.removeEventListener('mousemove', handleDragMove);
-            document.removeEventListener('mouseup', handleDragEnd);
-            document.removeEventListener('touchmove', handleTouchMove);
-            document.removeEventListener('touchend', handleTouchEnd);
-
-            document.addEventListener('mousemove', handleDragMove);
-            document.addEventListener('mouseup', handleDragEnd);
-            document.addEventListener('touchmove', handleTouchMove, { passive: false });
-            document.addEventListener('touchend', handleTouchEnd);
-        }
-
+        // Drag and Drop
         function handleDragStart(e) {
-            if (e.target.closest('.playlist-item-actions') || e.target.closest('button')) return; // Don't drag when clicking buttons
-
-            draggedElement = e.currentTarget;
-            draggedIndex = parseInt(draggedElement.getAttribute('data-index'));
-            isDragging = true;
-            startY = e.clientY;
-
-            draggedElement.style.opacity = '0.5';
-            draggedElement.style.cursor = 'grabbing';
-
-            createPlaceholder();
+            draggedItem = e.target;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
         }
 
-        function handleTouchStart(e) {
-            if (e.target.closest('.playlist-item-actions') || e.target.closest('button')) return;
-
-            const touch = e.touches[0];
-            const element = e.currentTarget;
-            startY = touch.clientY;
-            startX = touch.clientX;
-
-            // Long press to activate drag
-            longPressTimer = setTimeout(() => {
-                if (element && Math.abs(touch.clientY - startY) < 10) {
-                    draggedElement = element;
-                    draggedIndex = parseInt(draggedElement.getAttribute('data-index'));
-                    isDragging = true;
-                    draggedElement.style.opacity = '0.5';
-                    createPlaceholder();
-
-                    // Haptic feedback if available
-                    if (navigator.vibrate) {
-                        navigator.vibrate(50);
-                    }
-                }
-            }, 500);
-        }
-
-        function createPlaceholder() {
-            placeholder = document.createElement('div');
-            placeholder.className = 'playlist-item-placeholder';
-            placeholder.style.height = draggedElement.offsetHeight + 'px';
-            placeholder.style.background = 'rgba(30, 136, 229, 0.2)';
-            placeholder.style.border = '2px dashed #1e88e5';
-            placeholder.style.borderRadius = '8px';
-            placeholder.style.margin = '8px 0';
-
-            draggedElement.parentNode.insertBefore(placeholder, draggedElement);
-        }
-
-        function handleDragMove(e) {
-            if (!isDragging) return;
+        function handleDragOver(e) {
             e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
 
-            const container = document.querySelector('#playlist-items-list');
-            const afterElement = getDragAfterElement(container, e.clientY);
-
-            if (afterElement == null) {
-                container.appendChild(placeholder);
-            } else {
-                container.insertBefore(placeholder, afterElement);
+        function handleDragEnter(e) {
+            e.preventDefault();
+            const row = e.target.closest('.playlist-item-row');
+            if (row && row !== draggedItem) {
+                row.classList.add('drag-over');
             }
         }
 
-        function handleTouchMove(e) {
-            if (!isDragging) return;
+        function handleDragLeave(e) {
+            const row = e.target.closest('.playlist-item-row');
+            if (row) {
+                row.classList.remove('drag-over');
+            }
+        }
+
+        function handleDrop(e) {
             e.preventDefault();
-
-            // Clear long press timer if moving
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
+            const row = e.target.closest('.playlist-item-row');
+            if (row && draggedItem && row !== draggedItem) {
+                const fromIndex = parseInt(draggedItem.dataset.index);
+                const toIndex = parseInt(row.dataset.index);
+                reorderPlaylistItems(fromIndex, toIndex);
             }
-
-            const touch = e.touches[0];
-            const container = document.querySelector('#playlist-items-list');
-            const afterElement = getDragAfterElement(container, touch.clientY);
-
-            if (afterElement == null) {
-                container.appendChild(placeholder);
-            } else {
-                container.insertBefore(placeholder, afterElement);
-            }
+            if (row) row.classList.remove('drag-over');
         }
 
         function handleDragEnd(e) {
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
-
-            if (!isDragging) return;
-
-            finishDrag();
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.playlist-item-row').forEach(r => r.classList.remove('drag-over'));
+            draggedItem = null;
         }
 
-        function handleTouchEnd(e) {
-            if (longPressTimer) {
-                clearTimeout(longPressTimer);
-                longPressTimer = null;
-            }
-
-            if (!isDragging) return;
-
-            finishDrag();
-        }
-
-        function finishDrag() {
-            if (!draggedElement || !placeholder) return;
-
-            // Insert dragged element at placeholder position
-            placeholder.parentNode.insertBefore(draggedElement, placeholder);
-            placeholder.remove();
-
-            draggedElement.style.opacity = '';
-            draggedElement.style.cursor = '';
-
-            // Update order in backend
-            const newIndex = Array.from(draggedElement.parentNode.children).indexOf(draggedElement);
-            if (newIndex !== draggedIndex) {
-                reorderPlaylistItemsToPosition(draggedIndex, newIndex);
-            }
-
-            draggedElement = null;
-            placeholder = null;
-            isDragging = false;
-            draggedIndex = null;
-        }
-
-        function getDragAfterElement(container, y) {
-            const draggableElements = [...container.querySelectorAll('.playlist-item-row:not([style*="opacity: 0.5"])')];
-
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                const offset = y - box.top - box.height / 2;
-
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                } else {
-                    return closest;
-                }
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
-        }
-
-        async function reorderPlaylistItemsToPosition(fromIndex, toIndex) {
+        async function reorderPlaylistItems(fromIndex, toIndex) {
             if (!currentPlaylist) return;
 
             // Reorder locally
@@ -3967,7 +3422,6 @@
             const video = document.getElementById('player-video');
             video.pause();
             video.src = '';
-            document.getElementById('player-loading').classList.add('hidden');
             document.getElementById('player-modal').classList.remove('active');
             playlistQueue = [];
             currentPlaylistIndex = -1;
@@ -4098,275 +3552,6 @@
         }
 
         document.getElementById('section-form').addEventListener('submit', async (e) => {
-
-        // ============ PULL TO REFRESH ============
-        let pullStartY = 0;
-        let pullCurrentY = 0;
-        let isPulling = false;
-        let isRefreshing = false;
-
-        function initPullToRefresh() {
-            const mainSection = document.getElementById('main-section');
-            const indicator = document.getElementById('pull-refresh-indicator');
-
-            if (!mainSection || !indicator) return;
-
-            mainSection.addEventListener('touchstart', (e) => {
-                if (window.scrollY === 0 && !isRefreshing) {
-                    pullStartY = e.touches[0].pageY;
-                    isPulling = true;
-                }
-            }, { passive: true });
-
-            mainSection.addEventListener('touchmove', (e) => {
-                if (!isPulling) return;
-
-                pullCurrentY = e.touches[0].pageY;
-                const pullDistance = pullCurrentY - pullStartY;
-
-                if (pullDistance > 0 && pullDistance < 150) {
-                    indicator.classList.add('pulling');
-                    indicator.style.top = `${Math.min(pullDistance - 60, 20)}px`;
-                    indicator.querySelector('.pull-refresh-text').textContent =
-                        pullDistance > 80 ? 'Release to refresh' : 'Pull to refresh';
-                }
-            }, { passive: true });
-
-            mainSection.addEventListener('touchend', () => {
-                if (!isPulling) return;
-
-                const pullDistance = pullCurrentY - pullStartY;
-
-                if (pullDistance > 80 && !isRefreshing) {
-                    triggerRefresh();
-                } else {
-                    indicator.classList.remove('pulling');
-                    indicator.style.top = '';
-                }
-
-                isPulling = false;
-                pullStartY = 0;
-                pullCurrentY = 0;
-            }, { passive: true });
-        }
-
-        function triggerRefresh() {
-            const indicator = document.getElementById('pull-refresh-indicator');
-            isRefreshing = true;
-            indicator.classList.remove('pulling');
-            indicator.classList.add('refreshing');
-            indicator.querySelector('.pull-refresh-text').textContent = 'Refreshing...';
-
-            // Refresh current view
-            const currentView = document.querySelector('.view.active');
-            if (!currentView) return;
-
-            setTimeout(() => {
-                if (currentView.id === 'home-view') loadHome();
-                else if (currentView.id === 'movies-view') loadMovies(true);
-                else if (currentView.id === 'shows-view') loadShows(true);
-                else if (currentView.id === 'extras-view') loadExtras(true);
-
-                // Reset indicator
-                setTimeout(() => {
-                    indicator.classList.remove('refreshing');
-                    indicator.style.top = '';
-                    isRefreshing = false;
-                }, 500);
-            }, 1000);
-        }
-
-        // ============ VIDEO PLAYER GESTURES ============
-        let skipIndicatorTimeout;
-
-        function initVideoGestures() {
-            const playerVideo = document.getElementById('player-video');
-            if (!playerVideo) return;
-
-            let lastTap = 0;
-            let tapTimeout;
-
-            // Double tap to skip
-            playerVideo.addEventListener('touchend', (e) => {
-                const currentTime = new Date().getTime();
-                const tapLength = currentTime - lastTap;
-
-                clearTimeout(tapTimeout);
-
-                if (tapLength < 300 && tapLength > 0) {
-                    e.preventDefault();
-
-                    const rect = playerVideo.getBoundingClientRect();
-                    const x = e.changedTouches[0].clientX - rect.left;
-                    const width = rect.width;
-
-                    if (x < width / 2) {
-                        // Double tap left - rewind 10s
-                        playerVideo.currentTime = Math.max(0, playerVideo.currentTime - 10);
-                        showSkipIndicator('← 10s');
-                    } else {
-                        // Double tap right - forward 10s
-                        playerVideo.currentTime = Math.min(playerVideo.duration, playerVideo.currentTime + 10);
-                        showSkipIndicator('10s →');
-                    }
-                } else {
-                    // Single tap - toggle controls
-                    tapTimeout = setTimeout(() => {
-                        togglePlayerControls();
-                    }, 300);
-                }
-
-                lastTap = currentTime;
-            });
-
-            // Volume gesture (swipe up/down on right side)
-            let gestureStartY = 0;
-            let gestureStartValue = 0;
-
-            playerVideo.addEventListener('touchstart', (e) => {
-                gestureStartY = e.touches[0].clientY;
-                gestureStartValue = playerVideo.volume;
-            }, { passive: true });
-
-            playerVideo.addEventListener('touchmove', (e) => {
-                const rect = playerVideo.getBoundingClientRect();
-                const x = e.touches[0].clientX - rect.left;
-                const y = e.touches[0].clientY;
-                const deltaY = gestureStartY - y;
-
-                // Right side - volume control
-                if (x > rect.width * 0.7) {
-                    const volumeChange = deltaY / rect.height;
-                    playerVideo.volume = Math.max(0, Math.min(1, gestureStartValue + volumeChange));
-                    showVolumeIndicator(Math.round(playerVideo.volume * 100));
-                }
-            }, { passive: true });
-        }
-
-        function showSkipIndicator(text) {
-            let indicator = document.getElementById('skip-indicator');
-
-            if (!indicator) {
-                indicator = document.createElement('div');
-                indicator.id = 'skip-indicator';
-                indicator.className = 'skip-indicator';
-                document.getElementById('player-modal').appendChild(indicator);
-            }
-
-            indicator.textContent = text;
-            indicator.style.opacity = '1';
-
-            clearTimeout(skipIndicatorTimeout);
-            skipIndicatorTimeout = setTimeout(() => {
-                indicator.style.opacity = '0';
-            }, 1000);
-        }
-
-        function showVolumeIndicator(volume) {
-            let indicator = document.getElementById('volume-indicator');
-
-            if (!indicator) {
-                indicator = document.createElement('div');
-                indicator.id = 'volume-indicator';
-                indicator.className = 'volume-indicator';
-                document.getElementById('player-modal').appendChild(indicator);
-            }
-
-            indicator.innerHTML = `🔊 ${volume}%`;
-            indicator.style.opacity = '1';
-
-            clearTimeout(skipIndicatorTimeout);
-            skipIndicatorTimeout = setTimeout(() => {
-                indicator.style.opacity = '0';
-            }, 800);
-        }
-
-        let playerControlsTimeout;
-        let playerControlsVisible = true;
-
-        function togglePlayerControls() {
-            const header = document.querySelector('.player-header');
-            const upNext = document.querySelector('.up-next');
-
-            playerControlsVisible = !playerControlsVisible;
-
-            if (playerControlsVisible) {
-                header.style.opacity = '1';
-                if (upNext) upNext.style.opacity = '1';
-                autoHideControls();
-            } else {
-                header.style.opacity = '0';
-                if (upNext) upNext.style.opacity = '0';
-            }
-        }
-
-        function autoHideControls() {
-            clearTimeout(playerControlsTimeout);
-            playerControlsTimeout = setTimeout(() => {
-                const header = document.querySelector('.player-header');
-                const upNext = document.querySelector('.up-next');
-                header.style.opacity = '0';
-                if (upNext) upNext.style.opacity = '0';
-                playerControlsVisible = false;
-            }, 3000);
-        }
-
-        // ============ FULLSCREEN AND PICTURE-IN-PICTURE ============
-        function toggleFullscreen() {
-            const playerModal = document.getElementById('player-modal');
-
-            if (!document.fullscreenElement) {
-                if (playerModal.requestFullscreen) {
-                    playerModal.requestFullscreen();
-                } else if (playerModal.webkitRequestFullscreen) {
-                    playerModal.webkitRequestFullscreen();
-                } else if (playerModal.msRequestFullscreen) {
-                    playerModal.msRequestFullscreen();
-                }
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
-            }
-        }
-
-        function togglePiP() {
-            const video = document.getElementById('player-video');
-
-            if (!document.pictureInPictureElement) {
-                video.requestPictureInPicture()
-                    .catch(error => {
-                        console.log('PiP not supported:', error);
-                    });
-            } else {
-                document.exitPictureInPicture();
-            }
-        }
-
-        function addPlayerControls() {
-            const playerHeader = document.querySelector('.player-header');
-            const closeBtn = playerHeader.querySelector('.player-close');
-
-            // Check if controls already added
-            if (playerHeader.querySelector('.player-control-btn')) return;
-
-            // Fullscreen button
-            const fullscreenBtn = document.createElement('button');
-            fullscreenBtn.className = 'player-control-btn';
-            fullscreenBtn.innerHTML = '⛶';
-            fullscreenBtn.title = 'Fullscreen';
-            fullscreenBtn.onclick = toggleFullscreen;
-
-            // PiP button
-            const pipBtn = document.createElement('button');
-            pipBtn.className = 'player-control-btn';
-            pipBtn.innerHTML = '⧉';
-            pipBtn.title = 'Picture-in-Picture';
-            pipBtn.onclick = togglePiP;
-
-            playerHeader.insertBefore(pipBtn, closeBtn);
-            playerHeader.insertBefore(fullscreenBtn, closeBtn);
-        }
             e.preventDefault();
 
             const errorEl = document.getElementById('section-form-error');
@@ -4493,183 +3678,6 @@
 
                 drawerContent.style.transform = '';
             }, { passive: true });
-        });
-
-        // Swipe to dismiss modals
-        function initModalSwipeGestures() {
-            document.querySelectorAll('.modal').forEach(modal => {
-                let modalStartY = 0;
-                let modalCurrentY = 0;
-                let modalIsDragging = false;
-
-                modal.addEventListener('touchstart', (e) => {
-                    // Only allow swipe from top area
-                    const rect = modal.getBoundingClientRect();
-                    if (e.touches[0].clientY - rect.top < 50) {
-                        modalStartY = e.touches[0].pageY;
-                        modalIsDragging = true;
-                    }
-                }, { passive: true });
-
-                modal.addEventListener('touchmove', (e) => {
-                    if (!modalIsDragging) return;
-
-                    modalCurrentY = e.touches[0].pageY;
-                    const diff = modalCurrentY - modalStartY;
-
-                    if (diff > 0) {
-                        modal.style.transform = `translateY(${diff}px)`;
-                        modal.style.opacity = 1 - (diff / 300);
-                    }
-                }, { passive: true });
-
-                modal.addEventListener('touchend', () => {
-                    if (!modalIsDragging) return;
-
-                    const diff = modalCurrentY - modalStartY;
-
-                    if (diff > 100) {
-                        // Close modal
-                        const overlay = modal.closest('.modal-overlay');
-                        if (overlay) {
-                            overlay.classList.remove('active');
-                        }
-                    }
-
-                    // Reset
-                    modal.style.transform = '';
-                    modal.style.opacity = '';
-                    modalIsDragging = false;
-                }, { passive: true });
-            });
-        }
-
-        // Initialize when modals are shown
-        document.querySelectorAll('.modal-overlay').forEach(overlay => {
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.attributeName === 'class' && overlay.classList.contains('active')) {
-                        initModalSwipeGestures();
-                    }
-                });
-            });
-
-            observer.observe(overlay, { attributes: true });
-        });
-
-        // ============ PERFORMANCE OPTIMIZATIONS ============
-
-        // Lazy Loading Images with Intersection Observer
-        let imageObserver;
-
-        function initLazyLoading() {
-            const imageObserverConfig = {
-                rootMargin: '50px 0px',
-                threshold: 0.01
-            };
-
-            imageObserver = new IntersectionObserver((entries, observer) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const img = entry.target;
-                        const src = img.getAttribute('data-src');
-
-                        if (src) {
-                            // Create a temporary image to load
-                            const tempImg = new Image();
-                            tempImg.onload = () => {
-                                img.src = src;
-                                img.classList.add('loaded');
-                                img.classList.remove('lazy-image');
-                            };
-                            tempImg.onerror = () => {
-                                img.src = '/placeholder.png'; // Fallback image
-                                img.classList.add('error');
-                            };
-                            tempImg.src = src;
-
-                            observer.unobserve(img);
-                        }
-                    }
-                });
-            }, imageObserverConfig);
-
-            // Observe all lazy images
-            document.querySelectorAll('.lazy-image').forEach(img => {
-                imageObserver.observe(img);
-            });
-        }
-
-        // Call after rendering media grids
-        function observeNewImages() {
-            if (imageObserver) {
-                document.querySelectorAll('.lazy-image').forEach(img => {
-                    imageObserver.observe(img);
-                });
-            }
-        }
-
-        // Skeleton Screen Functions
-        function createSkeletonGrid(count = 12) {
-            const skeletons = [];
-            for (let i = 0; i < count; i++) {
-                skeletons.push(`
-                    <div class="skeleton-card skeleton"></div>
-                `);
-            }
-            return `
-                <div class="skeleton-header skeleton"></div>
-                <div class="media-grid">
-                    ${skeletons.join('')}
-                </div>
-            `;
-        }
-
-        // Use when loading
-        function showLoadingState(containerId) {
-            const container = document.getElementById(containerId);
-            if (container) {
-                container.innerHTML = createSkeletonGrid();
-            }
-        }
-
-        // Button Loading States
-        function setButtonLoading(button, loading) {
-            if (loading) {
-                button.classList.add('btn-loading');
-                button.disabled = true;
-            } else {
-                button.classList.remove('btn-loading');
-                button.disabled = false;
-            }
-        }
-
-        // Debounce utility function
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
-        }
-
-        // Connection Status Monitoring
-        window.addEventListener('online', () => {
-            document.getElementById('offline-indicator').classList.remove('show');
-            showToast('Connection restored', 'success');
-        });
-
-        window.addEventListener('offline', () => {
-            document.getElementById('offline-indicator').classList.add('show');
-        });
-
-        // Initialize lazy loading on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            initLazyLoading();
         });
 
     </script>
