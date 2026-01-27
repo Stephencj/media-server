@@ -32,6 +32,24 @@ fi
 
 cd "$PROJECT_DIR"
 
+# Create backup directory if it doesn't exist
+mkdir -p "${PROJECT_DIR}/backups"
+
+# Create pre-deployment backup
+echo "Creating pre-deployment backup..."
+if docker ps --format '{{.Names}}' | grep -q "media-server"; then
+    docker exec media-server /bin/sh -c 'sqlite3 /data/media-server.db ".backup /data/backups/media-server_pre-deploy_$(date +%Y%m%d_%H%M%S).db"' 2>/dev/null || \
+    echo "Warning: Could not create backup inside container, trying local backup..."
+fi
+
+# Also create a local backup if database exists
+if [ -f "${PROJECT_DIR}/data/media-server.db" ]; then
+    BACKUP_FILE="${PROJECT_DIR}/backups/media-server_pre-deploy_$(date +%Y%m%d_%H%M%S).db"
+    sqlite3 "${PROJECT_DIR}/data/media-server.db" ".backup '$BACKUP_FILE'" 2>/dev/null && \
+    echo "Local backup created: $BACKUP_FILE" || \
+    echo "Warning: Local backup failed (database may be locked)"
+fi
+
 echo "Pulling latest image..."
 docker compose -f docker-compose.prod.yml pull
 
