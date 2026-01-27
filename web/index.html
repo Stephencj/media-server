@@ -4628,17 +4628,17 @@
         }
 
         // Close drawer on swipe down (bonus feature)
-        let startY = 0;
-        let currentY = 0;
+        let drawerStartY = 0;
+        let drawerCurrentY = 0;
 
         document.querySelectorAll('.drawer-content').forEach(drawerContent => {
             drawerContent.addEventListener('touchstart', (e) => {
-                startY = e.touches[0].pageY;
+                drawerStartY = e.touches[0].pageY;
             }, { passive: true });
 
             drawerContent.addEventListener('touchmove', (e) => {
-                currentY = e.touches[0].pageY;
-                const diff = currentY - startY;
+                drawerCurrentY = e.touches[0].pageY;
+                const diff = drawerCurrentY - drawerStartY;
 
                 if (diff > 0 && drawerContent.scrollTop === 0) {
                     drawerContent.style.transform = `translateY(${diff}px)`;
