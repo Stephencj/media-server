@@ -9,7 +9,7 @@ services:
     volumes:
       - ./data:/data
       - ./backups:/data/backups
-      - /mnt/media:/media:ro
+      - /media/stephencjuliano/Media3/Videos:/media/Videos:ro
     environment:
       - MEDIA_SERVER_DB_PATH=/data/media-server.db
       - MEDIA_SERVER_JWT_SECRET=${JWT_SECRET}
