@@ -2335,10 +2335,12 @@
         }
 
         async function login() {
-            const username = document.getElementById('login-username').value;
+            const username = document.getElementById('login-username').value.trim();
             const password = document.getElementById('login-password').value;
             const errorEl = document.getElementById('login-error');
             errorEl.textContent = '';
+
+            console.log('Login attempt:', { username, passwordLength: password.length });
 
             try {
                 const res = await fetch('/api/auth/login', {
@@ -2347,18 +2349,23 @@
                     body: JSON.stringify({ username, password })
                 });
 
+                console.log('Login response status:', res.status);
+
                 if (!res.ok) {
                     const data = await res.json();
+                    console.error('Login failed:', data);
                     throw new Error(data.error || 'Login failed');
                 }
 
                 const data = await res.json();
+                console.log('Login success:', data.user);
                 token = data.token;
                 currentUser = data.user;
                 localStorage.setItem('token', token);
                 localStorage.setItem('user', JSON.stringify(currentUser));
                 showDashboard();
             } catch (err) {
+                console.error('Login error:', err);
                 errorEl.textContent = err.message;
             }
         }
@@ -2461,7 +2468,7 @@
 
         async function loadContinueWatching() {
             try {
-                const res = await api('/api/progress?limit=10');
+                const res = await api('/api/continue-watching?limit=10');
                 const data = await res.json();
                 const items = data.items || [];
 
@@ -2504,18 +2511,26 @@
         }
 
         async function loadHomeRecent() {
+            console.log('loadHomeRecent called');
             try {
                 const res = await api('/api/library/recent?limit=20');
+                console.log('Recent response status:', res.status);
                 const data = await res.json();
                 const items = data.items || [];
+                console.log('Recent items count:', items.length);
 
                 const grid = document.getElementById('home-recent-list');
+                console.log('Grid element found:', !!grid);
+
                 if (items.length === 0) {
                     grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div><p>No media in your library yet.</p><p>Add sources in the Admin tab and scan your library.</p></div>';
                     return;
                 }
 
-                grid.innerHTML = items.map(m => renderMediaCard(m)).join('');
+                const html = items.map(m => renderMediaCard(m)).join('');
+                console.log('Generated HTML length:', html.length);
+                grid.innerHTML = html;
+                console.log('Grid innerHTML set, children:', grid.children.length);
 
                 // Initialize lazy loading for new images
                 observeNewImages();

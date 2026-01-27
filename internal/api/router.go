@@ -32,9 +32,15 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	deployHandler := handlers.NewDeployHandler()
 	filesHandler := handlers.NewFilesHandler("/media")
 
-	// Serve web admin interface
-	router.StaticFile("/", "./web/index.html")
-	router.StaticFile("/index.html", "./web/index.html")
+	// Serve web admin interface with no-cache headers
+	serveIndex := func(c *gin.Context) {
+		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+		c.Header("Pragma", "no-cache")
+		c.Header("Expires", "0")
+		c.File("./web/index.html")
+	}
+	router.GET("/", serveIndex)
+	router.GET("/index.html", serveIndex)
 	router.Static("/assets", "./web/assets")
 
 	// Health check
