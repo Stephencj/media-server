@@ -1150,18 +1150,19 @@
                 width: 100%;
             }
 
-            /* Auth Section - Bottom Sheet Style on Mobile */
+            /* Auth Section - Centered on Mobile */
             #auth-section {
-                margin: 0;
+                margin: 40px auto;
                 max-width: 100%;
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                background: #16213e;
                 padding: 20px;
-                border-radius: 20px 20px 0 0;
-                box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+                background: #16213e;
+                border-radius: 12px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            }
+
+            #auth-section h1 {
+                font-size: 1.5rem;
+                margin-bottom: 20px;
             }
 
             /* Responsive Text Sizes */
@@ -1430,7 +1431,7 @@
             right: 0;
             background: #16213e;
             border-top: 1px solid #333;
-            display: none; /* Hidden on desktop */
+            display: none; /* Hidden on desktop and when not logged in */
             justify-content: space-around;
             padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
             z-index: 1000;
@@ -2321,6 +2322,9 @@
         // Check auth on load
         if (token && currentUser) {
             showDashboard();
+        } else {
+            // Hide bottom nav if not logged in
+            document.getElementById('bottom-nav').style.display = 'none';
         }
 
         function showAuthTab(tab) {
@@ -2396,11 +2400,13 @@
             localStorage.removeItem('user');
             document.getElementById('auth-section').classList.remove('hidden');
             document.getElementById('main-section').classList.add('hidden');
+            document.getElementById('bottom-nav').style.display = 'none'; // Hide bottom nav on logout
         }
 
         function showDashboard() {
             document.getElementById('auth-section').classList.add('hidden');
             document.getElementById('main-section').classList.remove('hidden');
+            document.getElementById('bottom-nav').style.display = ''; // Show bottom nav
             document.getElementById('current-user').textContent = currentUser.username;
             initPullToRefresh();
             loadData();
