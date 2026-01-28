@@ -1963,6 +1963,168 @@
         .media-card:not(:hover):not(:active) {
             will-change: auto;
         }
+
+        /* TV Guide - Desktop Timeline */
+        .guide-grid { display: none; }
+
+        .guide-row {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+            align-items: stretch;
+            min-height: 80px;
+        }
+
+        .guide-channel-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #16213e;
+            padding: 12px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .guide-channel-info:hover { background: #1e88e5; }
+
+        .guide-channel-icon { font-size: 1.8rem; }
+
+        .guide-channel-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .guide-timeline {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+        }
+
+        .guide-program {
+            flex-shrink: 0;
+            min-width: 180px;
+            max-width: 300px;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 8px;
+            padding: 12px 16px;
+            border-left: 3px solid #1e88e5;
+        }
+
+        .guide-program.now-playing {
+            border-left-color: #43a047;
+            background: linear-gradient(135deg, #1a2e1a 0%, #163e1e 100%);
+        }
+
+        .guide-program-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .guide-program-time { font-size: 0.8rem; color: #888; }
+
+        .guide-program-badge {
+            display: inline-block;
+            background: #43a047;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        /* TV Guide - Mobile Cards */
+        .guide-cards { display: none; }
+
+        .guide-card {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid #333;
+        }
+
+        .guide-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+
+        .guide-card-icon {
+            font-size: 2rem;
+            background: rgba(255,255,255,0.05);
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+        }
+
+        .guide-card-channel-name { font-weight: 600; font-size: 1.1rem; }
+
+        .guide-card-now {
+            background: rgba(67, 160, 71, 0.15);
+            border-left: 3px solid #43a047;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .guide-card-now-label {
+            font-size: 0.75rem;
+            color: #43a047;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 4px;
+        }
+
+        .guide-card-now-title { font-weight: 600; font-size: 1rem; }
+
+        .guide-card-up-next {
+            padding-top: 10px;
+            border-top: 1px solid #333;
+        }
+
+        .guide-card-up-next-label {
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .guide-card-up-next-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .guide-current-time { color: #888; font-size: 0.9rem; }
+
+        /* Guide Responsive */
+        @media (min-width: 768px) {
+            .guide-grid { display: block; }
+            .guide-cards { display: none; }
+        }
+
+        @media (max-width: 767px) {
+            .guide-grid { display: none; }
+            .guide-cards { display: block; }
+        }
     </style>
 </head>
 <body>
@@ -2037,6 +2199,7 @@
             <button class="nav-tab" data-view="extras" onclick="showView('extras')">Extras</button>
             <button class="nav-tab" data-view="playlists" onclick="showView('playlists')">Playlists</button>
             <button class="nav-tab" data-view="channels" onclick="showView('channels')">Channels</button>
+            <button class="nav-tab" data-view="guide" onclick="showView('guide')">Guide</button>
             <button class="nav-tab" data-view="sections" onclick="showView('sections')">Sections</button>
             <button class="nav-tab" data-view="admin" onclick="showView('admin')">Admin</button>
         </nav>
@@ -2247,6 +2410,22 @@
                     <p style="color: #888; font-size: 0.9rem;">Create virtual "live TV" channels that play content from your library.</p>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- GUIDE VIEW -->
+    <div id="guide-view" class="view">
+        <div class="wide-container">
+            <div class="section-header">
+                <h2 class="section-title">TV Guide</h2>
+                <span id="guide-time" class="guide-current-time"></span>
+            </div>
+
+            <!-- Desktop: Timeline Grid -->
+            <div id="guide-grid" class="guide-grid"></div>
+
+            <!-- Mobile: Card Layout -->
+            <div id="guide-cards" class="guide-cards"></div>
         </div>
     </div>
 
@@ -2742,8 +2921,15 @@
 
         // ============ NAVIGATION ============
         let currentView = 'browse';
+        let guideRefreshInterval = null;
 
         function showView(viewName) {
+            // Clean up guide refresh if leaving guide view
+            if (currentView === 'guide' && guideRefreshInterval) {
+                clearInterval(guideRefreshInterval);
+                guideRefreshInterval = null;
+            }
+
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
             document.getElementById(`${viewName}-view`).classList.add('active');
@@ -2766,6 +2952,7 @@
             else if (viewName === 'playlists') loadPlaylists();
             else if (viewName === 'sections') loadSections();
             else if (viewName === 'channels') loadChannels();
+            else if (viewName === 'guide') loadGuide();
             else if (viewName === 'admin') loadSources();
         }
 
@@ -3360,7 +3547,7 @@
                         <span class="source-type">${getSourceTypeIcon(source.source_type)}</span>
                         <span class="source-name">${escapeHtml(source.source_name || 'Unknown')}</span>
                         <span class="source-weight">×${source.weight}</span>
-                        ${!source.shuffle ? '<span style="color: #888; font-size: 0.8rem; margin-left: 4px;" title="Playing in order">In Order</span>' : ''}
+                        ${source.shuffle ? '<span style="color: #66bb6a; font-size: 0.8rem; margin-left: 4px;" title="Shuffled">Shuffled</span>' : '<span style="color: #888; font-size: 0.8rem; margin-left: 4px;" title="Playing in order">In Order</span>'}
                         <button class="btn-icon btn-sm" onclick="removeChannelSource(${source.id})">🗑️</button>
                     </div>
                 `).join('');
@@ -3539,13 +3726,9 @@
 
                 if (!res.ok) throw new Error('Failed to add source');
 
-                showToast('Source added', 'success');
+                showToast('Source added - click "Regenerate Queue" when done adding sources', 'success');
                 closeAddSourceModal();
                 loadChannelSources(editingChannelId);
-
-                // Regenerate schedule
-                await api(`/api/channels/${editingChannelId}/regenerate`, { method: 'POST' });
-                loadChannels();
             } catch (err) {
                 showToast('Failed to add source', 'error');
             }
@@ -3561,12 +3744,8 @@
 
                 if (!res.ok) throw new Error('Failed to remove source');
 
-                showToast('Source removed', 'success');
+                showToast('Source removed - click "Regenerate Queue" to update', 'success');
                 loadChannelSources(editingChannelId);
-
-                // Regenerate schedule
-                await api(`/api/channels/${editingChannelId}/regenerate`, { method: 'POST' });
-                loadChannels();
             } catch (err) {
                 showToast('Failed to remove source', 'error');
             }
@@ -3712,6 +3891,152 @@
             video.src = '';
             modal.classList.remove('active');
             window.currentChannel = null;
+        }
+
+        // ============ TV GUIDE ============
+        async function loadGuide() {
+            if (guideRefreshInterval) clearInterval(guideRefreshInterval);
+            updateGuideTime();
+
+            try {
+                const channelsRes = await api('/api/channels');
+                if (!channelsRes.ok) throw new Error('Failed to fetch channels');
+                const channelsData = await channelsRes.json();
+                const channels = channelsData.items || [];
+
+                if (channels.length === 0) {
+                    renderEmptyGuide();
+                    return;
+                }
+
+                // Fetch now playing for each channel in parallel
+                const nowPlayingPromises = channels.map(channel =>
+                    api(`/api/channels/${channel.id}/now`)
+                        .then(res => res.ok ? res.json() : null)
+                        .catch(() => null)
+                );
+
+                const nowPlayingData = await Promise.all(nowPlayingPromises);
+                const guideData = channels.map((channel, index) => ({
+                    channel,
+                    nowPlaying: nowPlayingData[index]
+                }));
+
+                renderGuideDesktop(guideData);
+                renderGuideMobile(guideData);
+
+                guideRefreshInterval = setInterval(() => {
+                    updateGuideTime();
+                    loadGuide();
+                }, 60000);
+            } catch (err) {
+                showToast('Failed to load TV Guide', 'error');
+            }
+        }
+
+        function updateGuideTime() {
+            const timeEl = document.getElementById('guide-time');
+            if (timeEl) {
+                timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+        }
+
+        function renderEmptyGuide() {
+            const emptyHtml = `
+                <div class="empty-state" style="padding: 60px 20px;">
+                    <div class="empty-state-icon">📺</div>
+                    <p>No channels available</p>
+                    <p style="color: #888;">Create some channels to see them in the guide.</p>
+                    <button class="btn" onclick="showView('channels')" style="margin-top: 1rem;">Go to Channels</button>
+                </div>
+            `;
+            document.getElementById('guide-grid').innerHTML = emptyHtml;
+            document.getElementById('guide-cards').innerHTML = emptyHtml;
+        }
+
+        function renderGuideDesktop(guideData) {
+            const grid = document.getElementById('guide-grid');
+            grid.innerHTML = guideData.map(({ channel, nowPlaying }) => {
+                const np = nowPlaying?.now_playing;
+                const upNext = nowPlaying?.up_next || [];
+                const elapsed = nowPlaying?.elapsed || 0;
+
+                let timelineHtml = '';
+                if (np) {
+                    const remaining = np.duration - elapsed;
+                    timelineHtml += `
+                        <div class="guide-program now-playing">
+                            <div class="guide-program-badge">Now</div>
+                            <div class="guide-program-title">${escapeHtml(np.title || 'Unknown')}</div>
+                            <div class="guide-program-time">${formatDuration(remaining)} remaining</div>
+                        </div>
+                    `;
+                }
+                upNext.slice(0, 3).forEach(item => {
+                    timelineHtml += `
+                        <div class="guide-program">
+                            <div class="guide-program-title">${escapeHtml(item.title || 'Unknown')}</div>
+                            <div class="guide-program-time">${formatDuration(item.duration)}</div>
+                        </div>
+                    `;
+                });
+                if (!np && upNext.length === 0) {
+                    timelineHtml = '<div class="guide-program"><div class="guide-program-title" style="color: #666;">No content scheduled</div></div>';
+                }
+
+                return `
+                    <div class="guide-row">
+                        <div class="guide-channel-info" onclick="watchChannel(${channel.id})">
+                            <span class="guide-channel-icon">${channel.icon || '📺'}</span>
+                            <span class="guide-channel-name">${escapeHtml(channel.name)}</span>
+                        </div>
+                        <div class="guide-timeline">${timelineHtml}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderGuideMobile(guideData) {
+            const cards = document.getElementById('guide-cards');
+            cards.innerHTML = guideData.map(({ channel, nowPlaying }) => {
+                const np = nowPlaying?.now_playing;
+                const upNext = nowPlaying?.up_next || [];
+                const elapsed = nowPlaying?.elapsed || 0;
+                const progressPercent = np && np.duration > 0 ? Math.round((elapsed / np.duration) * 100) : 0;
+
+                let nowPlayingHtml = np ? `
+                    <div class="guide-card-now">
+                        <div class="guide-card-now-label">Now Playing</div>
+                        <div class="guide-card-now-title">${escapeHtml(np.title || 'Unknown')}</div>
+                        <div class="guide-card-now-progress">
+                            <div class="progress-bar"><div class="progress-bar-fill" style="width: ${progressPercent}%"></div></div>
+                        </div>
+                    </div>
+                ` : '<div style="color: #666; padding: 12px 0;">No content scheduled</div>';
+
+                let upNextHtml = upNext.length > 0 ? `
+                    <div class="guide-card-up-next">
+                        <div class="guide-card-up-next-label">Up Next</div>
+                        ${upNext.slice(0, 3).map(item => `
+                            <div class="guide-card-up-next-item">
+                                <span>${escapeHtml(item.title || 'Unknown')}</span>
+                                <span>${formatDuration(item.duration)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : '';
+
+                return `
+                    <div class="guide-card">
+                        <div class="guide-card-header" onclick="watchChannel(${channel.id})">
+                            <div class="guide-card-icon">${channel.icon || '📺'}</div>
+                            <div class="guide-card-channel-name">${escapeHtml(channel.name)}</div>
+                        </div>
+                        ${nowPlayingHtml}
+                        ${upNextHtml}
+                    </div>
+                `;
+            }).join('');
         }
 
         // ============ MEDIA CARD RENDERER ============
@@ -5775,6 +6100,10 @@
         <div class="drawer-content">
             <div class="drawer-handle"></div>
             <h3 style="margin-bottom: 20px;">More</h3>
+            <div class="drawer-item" onclick="showView('guide'); closeDrawer('more-drawer');">
+                <span class="drawer-icon">📅</span>
+                <span>TV Guide</span>
+            </div>
             <div class="drawer-item" onclick="showView('sections'); closeDrawer('more-drawer');">
                 <span class="drawer-icon">📁</span>
                 <span>Sections</span>

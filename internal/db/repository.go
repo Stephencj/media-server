@@ -1988,7 +1988,7 @@ func (db *DB) AddChannelSource(channelID int64, sourceType string, sourceID *int
 func (db *DB) GetChannelSourceByID(id int64) (*ChannelSource, error) {
 	source := &ChannelSource{}
 	err := db.conn.QueryRow(
-		`SELECT id, channel_id, source_type, source_id, source_value, weight, shuffle FROM channel_sources WHERE id = ?`,
+		`SELECT id, channel_id, source_type, source_id, source_value, weight, (shuffle > 0) as shuffle FROM channel_sources WHERE id = ?`,
 		id,
 	).Scan(&source.ID, &source.ChannelID, &source.SourceType, &source.SourceID, &source.SourceValue, &source.Weight, &source.Shuffle)
 	if err == sql.ErrNoRows {
@@ -2000,7 +2000,7 @@ func (db *DB) GetChannelSourceByID(id int64) (*ChannelSource, error) {
 // GetChannelSources retrieves all sources for a channel
 func (db *DB) GetChannelSources(channelID int64) ([]ChannelSource, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, channel_id, source_type, source_id, source_value, weight, shuffle FROM channel_sources WHERE channel_id = ?`,
+		`SELECT id, channel_id, source_type, source_id, source_value, weight, (shuffle > 0) as shuffle FROM channel_sources WHERE channel_id = ?`,
 		channelID,
 	)
 	if err != nil {
@@ -2142,18 +2142,20 @@ func (db *DB) GenerateChannelSchedule(channelID int64) error {
 
 		// Repeat for weight * maxItems rounds to ensure full coverage
 		totalRounds := weight * maxItems
+
+		// Build source order indices
 		sourceOrder := make([]int, len(sourcesWithItems))
 		for i := range sourceOrder {
 			sourceOrder[i] = i
 		}
 
-		for round := 0; round < totalRounds; round++ {
-			// Shuffle source order each round for variety
-			rng.Shuffle(len(sourceOrder), func(i, j int) {
-				sourceOrder[i], sourceOrder[j] = sourceOrder[j], sourceOrder[i]
-			})
+		// Shuffle source order ONCE at the start for variety
+		rng.Shuffle(len(sourceOrder), func(i, j int) {
+			sourceOrder[i], sourceOrder[j] = sourceOrder[j], sourceOrder[i]
+		})
 
-			// Pick one item from each source (wrapping around if needed)
+		// Round-robin through sources with consistent order
+		for round := 0; round < totalRounds; round++ {
 			for _, srcIdx := range sourceOrder {
 				sw := sourcesWithItems[srcIdx]
 				itemIdx := round % len(sw.items)
