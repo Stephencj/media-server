@@ -2022,18 +2022,50 @@
 
         /* TV Guide - Unified Time-Based Layout */
         .guide-container {
+            position: relative;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 12px;
+            padding: 16px;
+        }
+
+        /* Single scrollbar at top */
+        .guide-scroll-area {
+            position: sticky;
+            top: 0;
+            z-index: 15;
+            background: #0f0f1a;
+            padding: 8px 0;
+            margin-left: 140px;
+        }
+        .guide-scroll-content {
+            position: relative;
+            height: 24px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+        }
+        .guide-scroll-content::-webkit-scrollbar {
+            height: 8px;
+        }
+        .guide-scroll-content::-webkit-scrollbar-track {
+            background: #1a1a2e;
+            border-radius: 4px;
+        }
+        .guide-scroll-content::-webkit-scrollbar-thumb {
+            background: #37474f;
+            border-radius: 4px;
+        }
+        .guide-scroll-content::-webkit-scrollbar-thumb:hover {
+            background: #455a64;
         }
 
         .guide-time-header {
             display: grid;
-            grid-template-columns: 120px 1fr;
-            gap: 8px;
-            margin-bottom: 8px;
+            grid-template-columns: 140px 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
             position: sticky;
-            top: 0;
+            top: 40px;
             background: #0f0f1a;
             z-index: 10;
             padding: 8px 0;
@@ -2051,14 +2083,15 @@
             font-size: 0.75rem;
             color: #888;
             transform: translateX(-50%);
+            white-space: nowrap;
         }
 
         .guide-row {
             display: grid;
-            grid-template-columns: 120px 1fr;
-            gap: 8px;
-            margin-bottom: 8px;
-            min-height: 70px;
+            grid-template-columns: 140px 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+            min-height: 80px;
         }
 
         .guide-channel-info {
@@ -2089,22 +2122,25 @@
             position: relative;
             overflow: visible;
             min-width: max-content;
-            height: 70px;
+            height: 80px;
+            will-change: transform;
         }
 
         .guide-program {
             position: absolute;
-            top: 0;
-            bottom: 0;
+            top: 4px;
+            bottom: 4px;
             min-width: 0;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border-radius: 6px;
-            padding: 8px 10px;
+            border-radius: 8px;
+            padding: 10px 14px;
             border-left: 3px solid #1e88e5;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             justify-content: center;
+            box-sizing: border-box;
+            transition: background 0.15s;
         }
         .guide-program.now-playing {
             border-left-color: #43a047;
@@ -2152,26 +2188,34 @@
 
         .guide-scroll-wrapper {
             position: relative;
-            overflow-x: auto;
-            overflow-y: visible;
-            -webkit-overflow-scrolling: touch;
+            overflow: hidden;
         }
 
-        .guide-now-indicator {
+        /* Full-height playhead layer */
+        .guide-playhead-layer {
+            position: absolute;
+            top: 0;
+            left: 172px;  /* 16px padding + 140px channel + 16px gap */
+            right: 16px;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 25;
+            overflow: hidden;
+        }
+
+        .guide-playhead {
             position: absolute;
             top: 0;
             bottom: 0;
             width: 2px;
             background: #e53935;
-            z-index: 20;
             pointer-events: none;
-            transition: left 1s linear;
         }
 
-        .guide-now-indicator::before {
+        .guide-playhead::before {
             content: '';
             position: absolute;
-            top: -4px;
+            top: 0;
             left: -4px;
             width: 10px;
             height: 10px;
@@ -2198,9 +2242,33 @@
         }
         .guide-jump-now.visible { display: flex; }
 
+        /* Guide Zoom Controls */
+        .guide-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+        }
+        .guide-zoom-btn {
+            background: #37474f;
+            color: white;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .guide-zoom-btn:hover { background: #455a64; }
+        .guide-zoom-btn:disabled { background: #222; color: #555; cursor: not-allowed; }
+        .guide-zoom-label { font-size: 0.8rem; color: #888; min-width: 32px; text-align: center; }
+
         /* Guide Responsive */
         @media (max-width: 767px) {
-            .guide-row, .guide-time-header { grid-template-columns: 80px 1fr; }
+            .guide-row, .guide-time-header { grid-template-columns: 100px 1fr; }
+            .guide-scroll-area { margin-left: 100px; }
+            .guide-playhead-layer { left: 132px; }  /* 16px + 100px + 16px */
             .guide-channel-icon { font-size: 1.2rem; }
             .guide-channel-name { font-size: 0.65rem; }
             .guide-program { padding: 6px 8px; }
@@ -2209,7 +2277,9 @@
         }
 
         @media (max-width: 480px) {
-            .guide-row, .guide-time-header { grid-template-columns: 60px 1fr; }
+            .guide-row, .guide-time-header { grid-template-columns: 70px 1fr; }
+            .guide-scroll-area { margin-left: 70px; }
+            .guide-playhead-layer { left: 102px; }  /* 16px + 70px + 16px */
             .guide-channel-icon { font-size: 1rem; }
             .guide-channel-name { display: none; }
         }
@@ -2507,6 +2577,11 @@
             <div class="section-header">
                 <h2 class="section-title">TV Guide</h2>
                 <span id="guide-time" class="guide-current-time"></span>
+                <div class="guide-controls">
+                    <button id="guide-zoom-out" class="guide-zoom-btn" onclick="changeGuideZoom(1)" title="Show more time">−</button>
+                    <span id="guide-zoom-label" class="guide-zoom-label">2hr</span>
+                    <button id="guide-zoom-in" class="guide-zoom-btn" onclick="changeGuideZoom(-1)" title="Show less time">+</button>
+                </div>
             </div>
 
             <div id="guide-container" class="guide-container"></div>
@@ -4367,6 +4442,57 @@
         }
 
         // ============ TV GUIDE ============
+        let guideTimeWindowHours = 2;  // Default 2-hour window
+        const GUIDE_ZOOM_LEVELS = [1, 2, 4, 6];
+        let guideLoadedChannels = [];
+
+        function calculatePixelsPerMinute() {
+            const scrollContent = document.getElementById('guide-scroll-content');
+            const containerWidth = scrollContent ? scrollContent.clientWidth : (window.innerWidth - 160);
+            const totalMinutes = guideTimeWindowHours * 60;
+            return Math.max(2, containerWidth / totalMinutes);
+        }
+
+        function changeGuideZoom(direction) {
+            const currentIndex = GUIDE_ZOOM_LEVELS.indexOf(guideTimeWindowHours);
+            const newIndex = Math.max(0, Math.min(GUIDE_ZOOM_LEVELS.length - 1, currentIndex + direction));
+            if (GUIDE_ZOOM_LEVELS[newIndex] !== guideTimeWindowHours) {
+                guideTimeWindowHours = GUIDE_ZOOM_LEVELS[newIndex];
+                updateZoomControls();
+                reRenderGuide();
+            }
+        }
+
+        function updateZoomControls() {
+            const label = document.getElementById('guide-zoom-label');
+            const zoomIn = document.getElementById('guide-zoom-in');
+            const zoomOut = document.getElementById('guide-zoom-out');
+            if (label) label.textContent = guideTimeWindowHours + 'hr';
+            const idx = GUIDE_ZOOM_LEVELS.indexOf(guideTimeWindowHours);
+            if (zoomIn) zoomIn.disabled = idx === 0;
+            if (zoomOut) zoomOut.disabled = idx === GUIDE_ZOOM_LEVELS.length - 1;
+        }
+
+        function reRenderGuide() {
+            if (guideLoadedChannels.length > 0) {
+                const guideData = guideLoadedChannels.map(ch => ({
+                    channel: ch,
+                    cacheEntry: guideScheduleCache[ch.id]
+                }));
+                renderGuide(guideData);
+            }
+        }
+
+        let guideResizeTimeout = null;
+        window.addEventListener('resize', () => {
+            clearTimeout(guideResizeTimeout);
+            guideResizeTimeout = setTimeout(() => {
+                if (document.getElementById('guide-view')?.classList.contains('active')) {
+                    reRenderGuide();
+                }
+            }, 200);
+        });
+
         async function loadGuide() {
             if (guideRefreshInterval) clearInterval(guideRefreshInterval);
             stopPlayheadAnimation();
@@ -4386,6 +4512,9 @@
                 // Fetch schedules for each channel in parallel
                 const schedulePromises = channels.map(channel => fetchChannelSchedule(channel.id));
                 const scheduleData = await Promise.all(schedulePromises);
+
+                guideLoadedChannels = channels;
+                updateZoomControls();
 
                 const guideData = channels.map((channel, index) => ({
                     channel,
@@ -4474,16 +4603,17 @@
 
         function getGuideTimeWindow() {
             const now = new Date();
-            // 5-hour window: 1 hour past + 4 hours future
-            const windowStart = new Date(now.getTime() - (60 * 60 * 1000)); // 1 hour ago
+            const pastMinutes = Math.round(guideTimeWindowHours * 60 * 0.2);  // 20% past
+            const windowStart = new Date(now.getTime() - (pastMinutes * 60 * 1000));
             // Round start to nearest 30 minutes for clean markers
             windowStart.setMinutes(Math.floor(windowStart.getMinutes() / 30) * 30, 0, 0);
-            const windowEnd = new Date(windowStart.getTime() + (5 * 60 * 60 * 1000)); // 5-hour window
+            const totalMinutes = guideTimeWindowHours * 60;
+            const windowEnd = new Date(windowStart.getTime() + (totalMinutes * 60 * 1000));
 
             // Calculate offset to "now" from window start
             const nowOffset = (now.getTime() - windowStart.getTime()) / (1000 * 60); // in minutes
 
-            return { windowStart, windowEnd, totalMinutes: 300, nowOffset };
+            return { windowStart, windowEnd, totalMinutes, nowOffset };
         }
 
         // Calculate extended program times from cached schedule
@@ -4647,29 +4777,44 @@
             };
         }
 
-        // Sync scroll position across all timeline rows and header
+        // Single scrollbar syncs all timelines via transform
+        function updatePlayheadPosition(scrollLeft) {
+            const playhead = document.getElementById('guide-playhead');
+            if (!playhead) return;
+
+            const { windowStart } = getGuideTimeWindow();
+            const now = new Date();
+            const pixelsPerMinute = calculatePixelsPerMinute();
+
+            const elapsedMinutes = (now.getTime() - windowStart.getTime()) / (1000 * 60);
+            const absoluteNowPosition = elapsedMinutes * pixelsPerMinute;
+            const visiblePosition = absoluteNowPosition - scrollLeft;
+
+            playhead.style.left = visiblePosition + 'px';
+        }
+
         function setupGuideScrollSync() {
-            const scrollWrappers = document.querySelectorAll('.guide-scroll-wrapper');
-            let isScrolling = false;
+            const scrollContent = document.getElementById('guide-scroll-content');
+            const timeMarkers = document.getElementById('guide-time-markers');
+            const timelines = document.querySelectorAll('.guide-timeline');
 
-            scrollWrappers.forEach(wrapper => {
-                wrapper.addEventListener('scroll', function() {
-                    if (isScrolling) return;
-                    isScrolling = true;
+            if (!scrollContent) return;
 
-                    const scrollLeft = this.scrollLeft;
-                    scrollWrappers.forEach(other => {
-                        if (other !== this) {
-                            other.scrollLeft = scrollLeft;
-                        }
-                    });
+            scrollContent.addEventListener('scroll', function() {
+                const scrollLeft = this.scrollLeft;
 
-                    updateJumpToNowButton();
+                // Move time markers
+                if (timeMarkers) {
+                    timeMarkers.style.transform = `translateX(-${scrollLeft}px)`;
+                }
 
-                    requestAnimationFrame(() => {
-                        isScrolling = false;
-                    });
+                // Move all program timelines
+                timelines.forEach(timeline => {
+                    timeline.style.transform = `translateX(-${scrollLeft}px)`;
                 });
+
+                updatePlayheadPosition(scrollLeft);
+                updateJumpToNowButton();
             });
         }
 
@@ -4678,43 +4823,33 @@
             if (!jumpBtn) return;
 
             const { nowOffset } = getGuideTimeWindow();
-            const pixelsPerMinute = 3;
+            const pixelsPerMinute = calculatePixelsPerMinute();
             const nowPosition = nowOffset * pixelsPerMinute;
 
-            const firstWrapper = document.querySelector('.guide-scroll-wrapper');
-            if (!firstWrapper) return;
+            const scrollContent = document.getElementById('guide-scroll-content');
+            if (!scrollContent) return;
 
-            const scrollLeft = firstWrapper.scrollLeft;
-            const viewportWidth = firstWrapper.clientWidth;
+            const scrollLeft = scrollContent.scrollLeft;
+            const viewportWidth = scrollContent.clientWidth;
 
             // Show button if "now" is not visible (with some margin)
             const nowVisible = nowPosition >= scrollLeft - 50 && nowPosition <= scrollLeft + viewportWidth + 50;
 
-            if (nowVisible) {
-                jumpBtn.classList.remove('visible');
-            } else {
-                jumpBtn.classList.add('visible');
-            }
+            jumpBtn.classList.toggle('visible', !nowVisible);
         }
 
         function scrollGuideToNow() {
             const { nowOffset } = getGuideTimeWindow();
-            const pixelsPerMinute = 3;
+            const pixelsPerMinute = calculatePixelsPerMinute();
             const nowPosition = nowOffset * pixelsPerMinute;
 
-            const scrollWrappers = document.querySelectorAll('.guide-scroll-wrapper');
-            const firstWrapper = scrollWrappers[0];
-            if (!firstWrapper) return;
+            const scrollContent = document.getElementById('guide-scroll-content');
+            if (!scrollContent) return;
 
-            // Center "now" in the viewport
-            const viewportWidth = firstWrapper.clientWidth;
+            const viewportWidth = scrollContent.clientWidth;
             const targetScroll = Math.max(0, nowPosition - viewportWidth / 3);
 
-            scrollWrappers.forEach(wrapper => {
-                wrapper.scrollTo({ left: targetScroll, behavior: 'smooth' });
-            });
-
-            // Hide button
+            scrollContent.scrollTo({ left: targetScroll, behavior: 'smooth' });
             document.getElementById('guide-jump-now')?.classList.remove('visible');
         }
 
@@ -4722,21 +4857,9 @@
             stopPlayheadAnimation();
 
             function updatePlayhead() {
-                const indicator = document.getElementById('guide-now-indicator');
-                if (!indicator) {
-                    guideAnimationFrame = requestAnimationFrame(updatePlayhead);
-                    return;
-                }
-
-                const { windowStart, totalMinutes } = getGuideTimeWindow();
-                const now = new Date();
-                const pixelsPerMinute = 3;
-
-                const elapsedMinutes = (now.getTime() - windowStart.getTime()) / (1000 * 60);
-                const leftPx = elapsedMinutes * pixelsPerMinute;
-
-                indicator.style.left = leftPx + 'px';
-
+                const scrollContent = document.getElementById('guide-scroll-content');
+                const scrollLeft = scrollContent ? scrollContent.scrollLeft : 0;
+                updatePlayheadPosition(scrollLeft);
                 guideAnimationFrame = requestAnimationFrame(updatePlayhead);
             }
 
@@ -4754,8 +4877,8 @@
             const container = document.getElementById('guide-container');
             const { windowStart, windowEnd, totalMinutes, nowOffset } = getGuideTimeWindow();
 
-            const pixelsPerMinute = 3; // 3px per minute = 180px per hour
-            const totalWidth = totalMinutes * pixelsPerMinute; // 900px for 5 hours
+            const pixelsPerMinute = calculatePixelsPerMinute();
+            const totalWidth = totalMinutes * pixelsPerMinute;
 
             // Time markers every 30 min
             let timeMarkersHtml = '';
@@ -4814,21 +4937,35 @@
                 `;
             }).join('');
 
-            // Now indicator position
-            const nowIndicatorLeft = nowOffset * pixelsPerMinute;
+            // Scroll area at top with single scrollbar
+            const scrollAreaHtml = `
+                <div class="guide-scroll-area">
+                    <div id="guide-scroll-content" class="guide-scroll-content">
+                        <div style="width: ${totalWidth}px; height: 1px;"></div>
+                    </div>
+                </div>
+            `;
 
-            container.innerHTML = `
+            // Time header (no longer scrollable itself)
+            const timeHeaderHtml = `
                 <div class="guide-time-header">
                     <div></div>
                     <div class="guide-scroll-wrapper">
-                        <div class="guide-time-markers" style="width: ${totalWidth}px; height: 20px;">
+                        <div id="guide-time-markers" class="guide-time-markers" style="width: ${totalWidth}px; height: 20px;">
                             ${timeMarkersHtml}
-                            <div id="guide-now-indicator" class="guide-now-indicator" style="left: ${nowIndicatorLeft}px;"></div>
                         </div>
                     </div>
                 </div>
-                ${rowsHtml}
             `;
+
+            // Full-height playhead layer
+            const playheadLayerHtml = `
+                <div class="guide-playhead-layer">
+                    <div id="guide-playhead" class="guide-playhead"></div>
+                </div>
+            `;
+
+            container.innerHTML = scrollAreaHtml + timeHeaderHtml + rowsHtml + playheadLayerHtml;
 
             // Setup scroll sync and scroll to now
             setupGuideScrollSync();
