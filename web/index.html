@@ -305,6 +305,57 @@
         .up-next-title { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .up-next-duration { color: #888; font-size: 0.85rem; }
 
+        /* Channel Switcher Buttons */
+        .channel-nav-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 48px;
+            height: 48px;
+            background: rgba(0, 0, 0, 0.6);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s, background 0.2s;
+        }
+        .channel-nav-btn:hover { background: rgba(0, 0, 0, 0.8); }
+        .channel-nav-btn.prev { left: 20px; }
+        .channel-nav-btn.next { right: 80px; }
+        .channel-player:hover .channel-nav-btn { opacity: 1; }
+
+        @media (hover: none) and (pointer: coarse) {
+            .channel-nav-btn { opacity: 0.7; }
+        }
+
+        .channel-player.single-channel .channel-nav-btn { display: none; }
+
+        /* Channel Switch Indicator */
+        .channel-switch-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.85);
+            padding: 24px 32px;
+            border-radius: 16px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 25;
+        }
+        .channel-switch-indicator.visible { opacity: 1; }
+        .channel-switch-indicator-icon { font-size: 2.5rem; margin-bottom: 8px; }
+        .channel-switch-indicator-name { font-weight: 600; }
+
+        /* Swipe feedback */
+        .channel-video.swiping { transition: none; }
+        .channel-video:not(.swiping) { transition: transform 0.2s, opacity 0.2s; }
+
         /* Media Grid */
         .media-grid {
             display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px;
@@ -1992,6 +2043,7 @@
             display: flex;
             position: relative;
             height: 20px;
+            min-width: max-content;
         }
 
         .guide-time-marker {
@@ -2034,14 +2086,16 @@
         }
 
         .guide-timeline {
-            display: flex;
-            gap: 2px;
-            overflow: hidden;
+            position: relative;
+            overflow: visible;
+            min-width: max-content;
+            height: 70px;
         }
 
         .guide-program {
-            flex-shrink: 0;
-            flex-grow: 0;
+            position: absolute;
+            top: 0;
+            bottom: 0;
             min-width: 0;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             border-radius: 6px;
@@ -2095,6 +2149,54 @@
         }
 
         .guide-current-time { color: #888; font-size: 0.9rem; }
+
+        .guide-scroll-wrapper {
+            position: relative;
+            overflow-x: auto;
+            overflow-y: visible;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .guide-now-indicator {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e53935;
+            z-index: 20;
+            pointer-events: none;
+            transition: left 1s linear;
+        }
+
+        .guide-now-indicator::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: -4px;
+            width: 10px;
+            height: 10px;
+            background: #e53935;
+            border-radius: 50%;
+        }
+
+        .guide-jump-now {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            background: #e53935;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 24px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(229, 57, 53, 0.4);
+            z-index: 100;
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+        .guide-jump-now.visible { display: flex; }
 
         /* Guide Responsive */
         @media (max-width: 767px) {
@@ -2408,6 +2510,9 @@
             </div>
 
             <div id="guide-container" class="guide-container"></div>
+            <button id="guide-jump-now" class="guide-jump-now" onclick="scrollGuideToNow()">
+                &#9658; Now
+            </button>
         </div>
     </div>
 
@@ -2509,6 +2614,12 @@
     <div class="modal-overlay channel-player-modal" id="channel-player-modal">
         <div class="channel-player">
             <button class="channel-close" onclick="closeChannelPlayer()">&times;</button>
+            <button class="channel-nav-btn prev" onclick="switchToPrevChannel()" title="Previous Channel">&#8249;</button>
+            <button class="channel-nav-btn next" onclick="switchToNextChannel()" title="Next Channel">&#8250;</button>
+            <div class="channel-switch-indicator" id="channel-switch-indicator">
+                <div class="channel-switch-indicator-icon"></div>
+                <div class="channel-switch-indicator-name"></div>
+            </div>
             <video id="channel-video" class="channel-video" controls autoplay></video>
             <div class="channel-info-overlay">
                 <div class="channel-badge" id="channel-name-overlay">Channel</div>
@@ -2927,12 +3038,18 @@
         // ============ NAVIGATION ============
         let currentView = 'browse';
         let guideRefreshInterval = null;
+        let guideScheduleCache = {}; // { channelId: { schedule, cycleDuration, cycleStart, lastFetch } }
+        let guideAnimationFrame = null;
 
         function showView(viewName) {
-            // Clean up guide refresh if leaving guide view
-            if (currentView === 'guide' && guideRefreshInterval) {
-                clearInterval(guideRefreshInterval);
-                guideRefreshInterval = null;
+            // Clean up guide refresh and animation if leaving guide view
+            if (currentView === 'guide') {
+                if (guideRefreshInterval) {
+                    clearInterval(guideRefreshInterval);
+                    guideRefreshInterval = null;
+                }
+                stopPlayheadAnimation();
+                document.getElementById('guide-jump-now')?.classList.remove('visible');
             }
 
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -4004,6 +4121,14 @@
         function showChannelPlayer(channelData) {
             const modal = document.getElementById('channel-player-modal');
             const video = document.getElementById('channel-video');
+            const player = modal.querySelector('.channel-player');
+
+            // Toggle single-channel class based on available channels
+            if (channelsData.length <= 1) {
+                player.classList.add('single-channel');
+            } else {
+                player.classList.remove('single-channel');
+            }
 
             // Set up video source with seek position
             const np = channelData.now_playing;
@@ -4063,9 +4188,188 @@
             window.currentChannel = null;
         }
 
+        // ============ CHANNEL SWITCHING ============
+        function getNextChannelId() {
+            if (!window.currentChannel || channelsData.length <= 1) return null;
+            const currentId = window.currentChannel.channel.id;
+            const currentIndex = channelsData.findIndex(c => c.id === currentId);
+            if (currentIndex === -1) return channelsData[0]?.id || null;
+            const nextIndex = (currentIndex + 1) % channelsData.length;
+            return channelsData[nextIndex].id;
+        }
+
+        function getPrevChannelId() {
+            if (!window.currentChannel || channelsData.length <= 1) return null;
+            const currentId = window.currentChannel.channel.id;
+            const currentIndex = channelsData.findIndex(c => c.id === currentId);
+            if (currentIndex === -1) return channelsData[0]?.id || null;
+            const prevIndex = (currentIndex - 1 + channelsData.length) % channelsData.length;
+            return channelsData[prevIndex].id;
+        }
+
+        async function switchToChannel(channelId) {
+            if (!channelId) return;
+
+            // Show indicator for the target channel
+            const targetChannel = channelsData.find(c => c.id === channelId);
+            if (targetChannel) {
+                showChannelSwitchIndicator(targetChannel);
+            }
+
+            try {
+                const res = await api(`/api/channels/${channelId}/now`);
+                if (!res.ok) throw new Error('Failed to get channel');
+
+                const data = await res.json();
+                if (!data.now_playing) {
+                    hideChannelSwitchIndicator();
+                    showToast('No content on this channel', 'error');
+                    return;
+                }
+
+                window.currentChannel = data;
+                showChannelPlayer(data);
+
+                // Hide indicator after a short delay
+                setTimeout(hideChannelSwitchIndicator, 500);
+            } catch (err) {
+                hideChannelSwitchIndicator();
+                showToast('Failed to switch channel', 'error');
+            }
+        }
+
+        async function switchToNextChannel() {
+            // Ensure we have channels data
+            if (channelsData.length === 0) {
+                try {
+                    const res = await api('/api/channels');
+                    if (res.ok) {
+                        const data = await res.json();
+                        channelsData = data.items || [];
+                    }
+                } catch (err) {}
+            }
+            const nextId = getNextChannelId();
+            if (nextId) switchToChannel(nextId);
+        }
+
+        async function switchToPrevChannel() {
+            // Ensure we have channels data
+            if (channelsData.length === 0) {
+                try {
+                    const res = await api('/api/channels');
+                    if (res.ok) {
+                        const data = await res.json();
+                        channelsData = data.items || [];
+                    }
+                } catch (err) {}
+            }
+            const prevId = getPrevChannelId();
+            if (prevId) switchToChannel(prevId);
+        }
+
+        function showChannelSwitchIndicator(channel) {
+            const indicator = document.getElementById('channel-switch-indicator');
+            indicator.querySelector('.channel-switch-indicator-icon').textContent = channel.icon || '📺';
+            indicator.querySelector('.channel-switch-indicator-name').textContent = channel.name;
+            indicator.classList.add('visible');
+        }
+
+        function hideChannelSwitchIndicator() {
+            const indicator = document.getElementById('channel-switch-indicator');
+            indicator.classList.remove('visible');
+        }
+
+        function initChannelSwipeGestures() {
+            const video = document.getElementById('channel-video');
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let isSwiping = false;
+            const SWIPE_THRESHOLD = 80;
+
+            video.addEventListener('touchstart', (e) => {
+                if (channelsData.length <= 1) return;
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                isSwiping = false;
+            }, { passive: true });
+
+            video.addEventListener('touchmove', (e) => {
+                if (channelsData.length <= 1) return;
+                const touchX = e.touches[0].clientX;
+                const touchY = e.touches[0].clientY;
+                const deltaX = touchX - touchStartX;
+                const deltaY = touchY - touchStartY;
+
+                // Ignore vertical swipes
+                if (Math.abs(deltaY) > Math.abs(deltaX) && !isSwiping) return;
+
+                // Start tracking horizontal swipe
+                if (Math.abs(deltaX) > 10) {
+                    isSwiping = true;
+                    video.classList.add('swiping');
+                    // Visual feedback: translate and fade
+                    const maxTranslate = 100;
+                    const translate = Math.max(-maxTranslate, Math.min(maxTranslate, deltaX * 0.5));
+                    const opacity = 1 - Math.abs(deltaX) / 400;
+                    video.style.transform = `translateX(${translate}px)`;
+                    video.style.opacity = Math.max(0.5, opacity);
+                }
+            }, { passive: true });
+
+            video.addEventListener('touchend', (e) => {
+                if (!isSwiping) return;
+
+                const touchEndX = e.changedTouches[0].clientX;
+                const deltaX = touchEndX - touchStartX;
+
+                // Reset visual state
+                video.classList.remove('swiping');
+                video.style.transform = '';
+                video.style.opacity = '';
+
+                // Check if swipe was significant enough
+                if (Math.abs(deltaX) >= SWIPE_THRESHOLD) {
+                    if (deltaX < 0) {
+                        // Swipe left = next channel
+                        switchToNextChannel();
+                    } else {
+                        // Swipe right = prev channel
+                        switchToPrevChannel();
+                    }
+                }
+
+                isSwiping = false;
+            }, { passive: true });
+
+            video.addEventListener('touchcancel', () => {
+                video.classList.remove('swiping');
+                video.style.transform = '';
+                video.style.opacity = '';
+                isSwiping = false;
+            }, { passive: true });
+        }
+
+        function initChannelKeyboardNavigation() {
+            document.addEventListener('keydown', (e) => {
+                const modal = document.getElementById('channel-player-modal');
+                if (!modal.classList.contains('active')) return;
+                if (channelsData.length <= 1) return;
+
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    switchToNextChannel();
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    switchToPrevChannel();
+                }
+            });
+        }
+
         // ============ TV GUIDE ============
         async function loadGuide() {
             if (guideRefreshInterval) clearInterval(guideRefreshInterval);
+            stopPlayheadAnimation();
             updateGuideTime();
 
             try {
@@ -4079,24 +4383,26 @@
                     return;
                 }
 
-                // Fetch now playing for each channel in parallel
-                const nowPlayingPromises = channels.map(channel =>
-                    api(`/api/channels/${channel.id}/now`)
-                        .then(res => res.ok ? res.json() : null)
-                        .catch(() => null)
-                );
+                // Fetch schedules for each channel in parallel
+                const schedulePromises = channels.map(channel => fetchChannelSchedule(channel.id));
+                const scheduleData = await Promise.all(schedulePromises);
 
-                const nowPlayingData = await Promise.all(nowPlayingPromises);
                 const guideData = channels.map((channel, index) => ({
                     channel,
-                    nowPlaying: nowPlayingData[index]
+                    cacheEntry: scheduleData[index]
                 }));
 
                 renderGuide(guideData);
 
+                // Soft refresh every minute (re-render using cached data, playhead updates via animation)
                 guideRefreshInterval = setInterval(() => {
                     updateGuideTime();
-                    loadGuide();
+                    // Only re-render, cache will be used until TTL expires
+                    const cachedGuideData = channels.map(channel => ({
+                        channel,
+                        cacheEntry: guideScheduleCache[channel.id]
+                    }));
+                    renderGuide(cachedGuideData);
                 }, 60000);
             } catch (err) {
                 showToast('Failed to load TV Guide', 'error');
@@ -4122,86 +4428,368 @@
             document.getElementById('guide-container').innerHTML = emptyHtml;
         }
 
-        function getGuideTimeWindow() {
-            const now = new Date();
-            // Round down to nearest 30 minutes
-            const windowStart = new Date(now);
-            windowStart.setMinutes(Math.floor(now.getMinutes() / 30) * 30, 0, 0);
-            const windowEnd = new Date(windowStart.getTime() + (2 * 60 * 60 * 1000)); // 2-hour window
-            return { windowStart, windowEnd, totalMinutes: 120 };
+        // Fetch and cache channel schedule with 5-minute TTL
+        async function fetchChannelSchedule(channelId) {
+            const cached = guideScheduleCache[channelId];
+            const now = Date.now();
+            if (cached && (now - cached.lastFetch) < 5 * 60 * 1000) {
+                return cached;
+            }
+
+            try {
+                // Fetch full schedule and now-playing in parallel
+                const [scheduleRes, nowRes] = await Promise.all([
+                    api(`/api/channels/${channelId}/schedule?limit=100`),
+                    api(`/api/channels/${channelId}/now`)
+                ]);
+
+                if (!scheduleRes.ok || !nowRes.ok) return null;
+
+                const scheduleData = await scheduleRes.json();
+                const nowData = await nowRes.json();
+
+                // Calculate total cycle duration from schedule
+                const items = scheduleData.items || [];
+                let cycleDuration = 0;
+                items.forEach(item => {
+                    cycleDuration = Math.max(cycleDuration, item.cumulative_start + item.duration);
+                });
+
+                const cacheEntry = {
+                    schedule: items,
+                    cycleDuration: cycleDuration,
+                    cycleStart: new Date(nowData.cycle_start),
+                    elapsed: nowData.elapsed,
+                    nowPlaying: nowData.now_playing,
+                    lastFetch: now
+                };
+
+                guideScheduleCache[channelId] = cacheEntry;
+                return cacheEntry;
+            } catch (err) {
+                console.error('Failed to fetch schedule for channel', channelId, err);
+                return null;
+            }
         }
 
-        function calculateProgramTimes(nowPlaying) {
+        function getGuideTimeWindow() {
             const now = new Date();
-            const elapsed = nowPlaying?.elapsed || 0;
-            const np = nowPlaying?.now_playing;
-            if (!np) return { programs: [] };
+            // 5-hour window: 1 hour past + 4 hours future
+            const windowStart = new Date(now.getTime() - (60 * 60 * 1000)); // 1 hour ago
+            // Round start to nearest 30 minutes for clean markers
+            windowStart.setMinutes(Math.floor(windowStart.getMinutes() / 30) * 30, 0, 0);
+            const windowEnd = new Date(windowStart.getTime() + (5 * 60 * 60 * 1000)); // 5-hour window
 
-            // Current program started (elapsed seconds ago)
-            const currentStart = new Date(now.getTime() - (elapsed * 1000));
-            const currentEnd = new Date(currentStart.getTime() + (np.duration * 1000));
+            // Calculate offset to "now" from window start
+            const nowOffset = (now.getTime() - windowStart.getTime()) / (1000 * 60); // in minutes
 
-            const programs = [{ ...np, startTime: currentStart, endTime: currentEnd, isNowPlaying: true }];
+            return { windowStart, windowEnd, totalMinutes: 300, nowOffset };
+        }
 
-            let nextStart = currentEnd;
-            (nowPlaying?.up_next || []).forEach(item => {
-                const endTime = new Date(nextStart.getTime() + (item.duration * 1000));
-                programs.push({ ...item, startTime: nextStart, endTime: endTime, isNowPlaying: false });
-                nextStart = endTime;
-            });
+        // Calculate extended program times from cached schedule
+        function calculateExtendedProgramTimes(cacheEntry, windowStart, windowEnd) {
+            if (!cacheEntry || !cacheEntry.schedule || cacheEntry.schedule.length === 0) {
+                return { programs: [] };
+            }
+
+            const now = new Date();
+            const { schedule, cycleDuration, cycleStart } = cacheEntry;
+
+            if (cycleDuration <= 0) return { programs: [] };
+
+            // Calculate current position in cycle
+            const elapsedSinceCreation = (now.getTime() - cycleStart.getTime()) / 1000; // seconds
+            const positionInCycle = elapsedSinceCreation % cycleDuration;
+
+            // Find the current item
+            let currentItem = null;
+            let currentItemIndex = 0;
+            for (let i = 0; i < schedule.length; i++) {
+                const item = schedule[i];
+                if (item.cumulative_start <= positionInCycle &&
+                    item.cumulative_start + item.duration > positionInCycle) {
+                    currentItem = item;
+                    currentItemIndex = i;
+                    break;
+                }
+            }
+
+            if (!currentItem) {
+                // Fallback to first item
+                currentItem = schedule[0];
+                currentItemIndex = 0;
+            }
+
+            // Calculate when the current item started in real time
+            const elapsedInCurrent = positionInCycle - currentItem.cumulative_start;
+            const currentStartTime = new Date(now.getTime() - elapsedInCurrent * 1000);
+
+            const programs = [];
+            const windowStartMs = windowStart.getTime();
+            const windowEndMs = windowEnd.getTime();
+
+            // Build programs forward from current item
+            let programStart = currentStartTime;
+            for (let i = currentItemIndex; i < schedule.length; i++) {
+                const item = schedule[i];
+                const duration = item.duration * 1000;
+                const programEnd = new Date(programStart.getTime() + duration);
+
+                if (programStart.getTime() >= windowEndMs) break;
+
+                if (programEnd.getTime() > windowStartMs) {
+                    programs.push({
+                        ...item,
+                        startTime: new Date(programStart),
+                        endTime: programEnd,
+                        isNowPlaying: (i === currentItemIndex)
+                    });
+                }
+
+                programStart = programEnd;
+            }
+
+            // Wrap around to beginning of schedule if needed
+            let wrapStart = new Date(currentStartTime.getTime() +
+                (cycleDuration - currentItem.cumulative_start) * 1000);
+            let wraps = 0;
+            while (wrapStart.getTime() < windowEndMs && wraps < 2) {
+                for (let i = 0; i < schedule.length; i++) {
+                    const item = schedule[i];
+                    const duration = item.duration * 1000;
+                    const programEnd = new Date(wrapStart.getTime() + duration);
+
+                    if (wrapStart.getTime() >= windowEndMs) break;
+
+                    if (programEnd.getTime() > windowStartMs) {
+                        programs.push({
+                            ...item,
+                            startTime: new Date(wrapStart),
+                            endTime: programEnd,
+                            isNowPlaying: false
+                        });
+                    }
+
+                    wrapStart = programEnd;
+                }
+                wraps++;
+            }
+
+            // Build programs backward for past content
+            programStart = currentStartTime;
+            for (let i = currentItemIndex - 1; i >= 0; i--) {
+                const item = schedule[i];
+                const duration = item.duration * 1000;
+                const programStartNew = new Date(programStart.getTime() - duration);
+
+                if (programStartNew.getTime() < windowStartMs - cycleDuration * 1000) break;
+
+                if (programStart.getTime() > windowStartMs) {
+                    programs.unshift({
+                        ...item,
+                        startTime: programStartNew,
+                        endTime: new Date(programStart),
+                        isNowPlaying: false
+                    });
+                }
+
+                programStart = programStartNew;
+            }
+
+            // Wrap backward if needed
+            let wrapEnd = new Date(currentStartTime.getTime() - currentItem.cumulative_start * 1000);
+            wraps = 0;
+            while (wrapEnd.getTime() > windowStartMs && wraps < 2) {
+                for (let i = schedule.length - 1; i >= 0; i--) {
+                    const item = schedule[i];
+                    const duration = item.duration * 1000;
+                    const programStartNew = new Date(wrapEnd.getTime() - duration);
+
+                    if (programStartNew.getTime() < windowStartMs - cycleDuration * 1000) break;
+
+                    if (wrapEnd.getTime() > windowStartMs) {
+                        programs.unshift({
+                            ...item,
+                            startTime: programStartNew,
+                            endTime: new Date(wrapEnd),
+                            isNowPlaying: false
+                        });
+                    }
+
+                    wrapEnd = programStartNew;
+                }
+                wraps++;
+            }
+
+            // Sort programs by start time and remove duplicates
+            programs.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
 
             return { programs };
         }
 
-        function calculateProgramWidth(program, windowStart, windowEnd) {
-            const totalMs = windowEnd - windowStart;
-            const visibleStart = Math.max(program.startTime.getTime(), windowStart.getTime());
-            const visibleEnd = Math.min(program.endTime.getTime(), windowEnd.getTime());
-            if (visibleStart >= visibleEnd) return { percent: 0 };
+        function calculateProgramPosition(program, windowStart, totalMinutes, pixelsPerMinute) {
+            const windowStartMs = windowStart.getTime();
+            const windowEndMs = windowStartMs + totalMinutes * 60 * 1000;
+
+            const visibleStart = Math.max(program.startTime.getTime(), windowStartMs);
+            const visibleEnd = Math.min(program.endTime.getTime(), windowEndMs);
+
+            if (visibleStart >= visibleEnd) return null;
+
+            const leftMinutes = (visibleStart - windowStartMs) / (1000 * 60);
+            const widthMinutes = (visibleEnd - visibleStart) / (1000 * 60);
 
             return {
-                percent: ((visibleEnd - visibleStart) / totalMs) * 100,
-                clippedStart: program.startTime < windowStart,
-                clippedEnd: program.endTime > windowEnd
+                left: leftMinutes * pixelsPerMinute,
+                width: widthMinutes * pixelsPerMinute,
+                clippedStart: program.startTime.getTime() < windowStartMs,
+                clippedEnd: program.endTime.getTime() > windowEndMs
             };
+        }
+
+        // Sync scroll position across all timeline rows and header
+        function setupGuideScrollSync() {
+            const scrollWrappers = document.querySelectorAll('.guide-scroll-wrapper');
+            let isScrolling = false;
+
+            scrollWrappers.forEach(wrapper => {
+                wrapper.addEventListener('scroll', function() {
+                    if (isScrolling) return;
+                    isScrolling = true;
+
+                    const scrollLeft = this.scrollLeft;
+                    scrollWrappers.forEach(other => {
+                        if (other !== this) {
+                            other.scrollLeft = scrollLeft;
+                        }
+                    });
+
+                    updateJumpToNowButton();
+
+                    requestAnimationFrame(() => {
+                        isScrolling = false;
+                    });
+                });
+            });
+        }
+
+        function updateJumpToNowButton() {
+            const jumpBtn = document.getElementById('guide-jump-now');
+            if (!jumpBtn) return;
+
+            const { nowOffset } = getGuideTimeWindow();
+            const pixelsPerMinute = 3;
+            const nowPosition = nowOffset * pixelsPerMinute;
+
+            const firstWrapper = document.querySelector('.guide-scroll-wrapper');
+            if (!firstWrapper) return;
+
+            const scrollLeft = firstWrapper.scrollLeft;
+            const viewportWidth = firstWrapper.clientWidth;
+
+            // Show button if "now" is not visible (with some margin)
+            const nowVisible = nowPosition >= scrollLeft - 50 && nowPosition <= scrollLeft + viewportWidth + 50;
+
+            if (nowVisible) {
+                jumpBtn.classList.remove('visible');
+            } else {
+                jumpBtn.classList.add('visible');
+            }
+        }
+
+        function scrollGuideToNow() {
+            const { nowOffset } = getGuideTimeWindow();
+            const pixelsPerMinute = 3;
+            const nowPosition = nowOffset * pixelsPerMinute;
+
+            const scrollWrappers = document.querySelectorAll('.guide-scroll-wrapper');
+            const firstWrapper = scrollWrappers[0];
+            if (!firstWrapper) return;
+
+            // Center "now" in the viewport
+            const viewportWidth = firstWrapper.clientWidth;
+            const targetScroll = Math.max(0, nowPosition - viewportWidth / 3);
+
+            scrollWrappers.forEach(wrapper => {
+                wrapper.scrollTo({ left: targetScroll, behavior: 'smooth' });
+            });
+
+            // Hide button
+            document.getElementById('guide-jump-now')?.classList.remove('visible');
+        }
+
+        function startPlayheadAnimation() {
+            stopPlayheadAnimation();
+
+            function updatePlayhead() {
+                const indicator = document.getElementById('guide-now-indicator');
+                if (!indicator) {
+                    guideAnimationFrame = requestAnimationFrame(updatePlayhead);
+                    return;
+                }
+
+                const { windowStart, totalMinutes } = getGuideTimeWindow();
+                const now = new Date();
+                const pixelsPerMinute = 3;
+
+                const elapsedMinutes = (now.getTime() - windowStart.getTime()) / (1000 * 60);
+                const leftPx = elapsedMinutes * pixelsPerMinute;
+
+                indicator.style.left = leftPx + 'px';
+
+                guideAnimationFrame = requestAnimationFrame(updatePlayhead);
+            }
+
+            guideAnimationFrame = requestAnimationFrame(updatePlayhead);
+        }
+
+        function stopPlayheadAnimation() {
+            if (guideAnimationFrame) {
+                cancelAnimationFrame(guideAnimationFrame);
+                guideAnimationFrame = null;
+            }
         }
 
         function renderGuide(guideData) {
             const container = document.getElementById('guide-container');
-            const { windowStart, windowEnd, totalMinutes } = getGuideTimeWindow();
+            const { windowStart, windowEnd, totalMinutes, nowOffset } = getGuideTimeWindow();
+
+            const pixelsPerMinute = 3; // 3px per minute = 180px per hour
+            const totalWidth = totalMinutes * pixelsPerMinute; // 900px for 5 hours
 
             // Time markers every 30 min
             let timeMarkersHtml = '';
             for (let i = 0; i <= totalMinutes; i += 30) {
                 const markerTime = new Date(windowStart.getTime() + (i * 60 * 1000));
-                const percent = (i / totalMinutes) * 100;
+                const leftPx = i * pixelsPerMinute;
                 const timeStr = markerTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-                timeMarkersHtml += `<div class="guide-time-marker" style="left: ${percent}%">${timeStr}</div>`;
+                timeMarkersHtml += `<div class="guide-time-marker" style="left: ${leftPx}px">${timeStr}</div>`;
             }
 
-            const rowsHtml = guideData.map(({ channel, nowPlaying }) => {
-                const { programs } = calculateProgramTimes(nowPlaying);
+            const rowsHtml = guideData.map(({ channel, cacheEntry }) => {
+                const { programs } = calculateExtendedProgramTimes(cacheEntry, windowStart, windowEnd);
 
                 let timelineHtml = '';
                 if (programs.length === 0) {
-                    timelineHtml = '<div class="guide-program" style="flex: 1;"><div class="guide-program-show" style="color: #666;">No content scheduled</div></div>';
+                    timelineHtml = `<div class="guide-program" style="left: 0; width: ${totalWidth}px;">
+                        <div class="guide-program-show" style="color: #666;">No content scheduled</div>
+                    </div>`;
                 } else {
                     programs.forEach(program => {
-                        const sizing = calculateProgramWidth(program, windowStart, windowEnd);
-                        if (sizing.percent <= 0) return;
+                        const pos = calculateProgramPosition(program, windowStart, totalMinutes, pixelsPerMinute);
+                        if (!pos) return;
 
                         const classes = ['guide-program'];
                         if (program.isNowPlaying) classes.push('now-playing');
-                        if (sizing.clippedStart) classes.push('clipped-start');
-                        if (sizing.clippedEnd) classes.push('clipped-end');
+                        if (pos.clippedStart) classes.push('clipped-start');
+                        if (pos.clippedEnd) classes.push('clipped-end');
 
-                        // Stacked: show name on top, episode below
                         const showName = program.show_title || program.title || 'Unknown';
                         const episodeName = program.show_title ? program.title : '';
                         const startTime = program.startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
                         timelineHtml += `
-                            <div class="${classes.join(' ')}" style="width: ${sizing.percent}%;">
+                            <div class="${classes.join(' ')}" style="left: ${pos.left}px; width: ${Math.max(pos.width - 2, 30)}px;">
                                 ${program.isNowPlaying ? '<div class="guide-program-badge">Now</div>' : ''}
                                 <div class="guide-program-show">${escapeHtml(showName)}</div>
                                 ${episodeName ? `<div class="guide-program-episode">${escapeHtml(episodeName)}</div>` : ''}
@@ -4217,18 +4805,35 @@
                             <span class="guide-channel-icon">${channel.icon || '📺'}</span>
                             <span class="guide-channel-name">${escapeHtml(channel.name)}</span>
                         </div>
-                        <div class="guide-timeline">${timelineHtml}</div>
+                        <div class="guide-scroll-wrapper">
+                            <div class="guide-timeline" style="width: ${totalWidth}px; height: 100%;">
+                                ${timelineHtml}
+                            </div>
+                        </div>
                     </div>
                 `;
             }).join('');
 
+            // Now indicator position
+            const nowIndicatorLeft = nowOffset * pixelsPerMinute;
+
             container.innerHTML = `
                 <div class="guide-time-header">
                     <div></div>
-                    <div class="guide-time-markers">${timeMarkersHtml}</div>
+                    <div class="guide-scroll-wrapper">
+                        <div class="guide-time-markers" style="width: ${totalWidth}px; height: 20px;">
+                            ${timeMarkersHtml}
+                            <div id="guide-now-indicator" class="guide-now-indicator" style="left: ${nowIndicatorLeft}px;"></div>
+                        </div>
+                    </div>
                 </div>
                 ${rowsHtml}
             `;
+
+            // Setup scroll sync and scroll to now
+            setupGuideScrollSync();
+            setTimeout(() => scrollGuideToNow(), 100);
+            startPlayheadAnimation();
         }
 
         // ============ MEDIA CARD RENDERER ============
@@ -6257,6 +6862,8 @@
         // Initialize app on page load
         document.addEventListener('DOMContentLoaded', () => {
             initLazyLoading();
+            initChannelSwipeGestures();
+            initChannelKeyboardNavigation();
             initApp();  // Check auth and show dashboard if logged in
         });
 
