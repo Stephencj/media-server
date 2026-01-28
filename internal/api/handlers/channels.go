@@ -25,11 +25,12 @@ type CreateChannelRequest struct {
 
 // AddSourceRequest represents the request body for adding a source
 type AddSourceRequest struct {
-	SourceType  string `json:"source_type" binding:"required"`
-	SourceID    *int64 `json:"source_id"`
-	SourceValue string `json:"source_value"`
-	Weight      int    `json:"weight"`
-	Shuffle     *bool  `json:"shuffle"` // Defaults to true if not provided
+	SourceType  string                  `json:"source_type" binding:"required"`
+	SourceID    *int64                  `json:"source_id"`
+	SourceValue string                  `json:"source_value"`
+	Weight      int                     `json:"weight"`
+	Shuffle     *bool                   `json:"shuffle"` // Defaults to true if not provided
+	Options     *db.ChannelSourceOptions `json:"options"` // Filtering options for shows
 }
 
 // ListChannels returns all channels for the current user
@@ -216,7 +217,7 @@ func (h *ChannelHandler) AddSource(c *gin.Context) {
 		shuffle = *req.Shuffle
 	}
 
-	source, err := h.db.AddChannelSource(channelID, req.SourceType, req.SourceID, req.SourceValue, req.Weight, shuffle)
+	source, err := h.db.AddChannelSource(channelID, req.SourceType, req.SourceID, req.SourceValue, req.Weight, shuffle, req.Options)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add source"})
 		return
@@ -429,4 +430,42 @@ func (h *ChannelHandler) GetSchedule(c *gin.Context) {
 		"limit":  limit,
 		"offset": offset,
 	})
+}
+
+// GetShowOptions returns available options for a TV show source
+func (h *ChannelHandler) GetShowOptions(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
+		return
+	}
+	showID, err := strconv.ParseInt(c.Param("showId"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid show ID"})
+		return
+	}
+
+	// Verify channel ownership
+	existing, err := h.db.GetChannelByID(channelID)
+	if err == db.ErrNotFound {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channel"})
+		return
+	}
+	if existing.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
+	options, err := h.db.GetShowOptionsForChannel(showID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch show options"})
+		return
+	}
+
+	c.JSON(http.StatusOK, options)
 }

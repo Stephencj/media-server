@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"math/rand"
 	"time"
@@ -1967,14 +1968,24 @@ func (db *DB) DeleteChannel(id int64) error {
 // ============ Channel Sources ============
 
 // AddChannelSource adds a content source to a channel
-func (db *DB) AddChannelSource(channelID int64, sourceType string, sourceID *int64, sourceValue string, weight int, shuffle bool) (*ChannelSource, error) {
+func (db *DB) AddChannelSource(channelID int64, sourceType string, sourceID *int64, sourceValue string, weight int, shuffle bool, options *ChannelSourceOptions) (*ChannelSource, error) {
 	if weight < 1 {
 		weight = 1
 	}
 
+	var optionsJSON *string
+	if options != nil {
+		data, err := json.Marshal(options)
+		if err != nil {
+			return nil, err
+		}
+		s := string(data)
+		optionsJSON = &s
+	}
+
 	result, err := db.conn.Exec(
-		`INSERT INTO channel_sources (channel_id, source_type, source_id, source_value, weight, shuffle) VALUES (?, ?, ?, ?, ?, ?)`,
-		channelID, sourceType, sourceID, sourceValue, weight, shuffle,
+		`INSERT INTO channel_sources (channel_id, source_type, source_id, source_value, weight, shuffle, options) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		channelID, sourceType, sourceID, sourceValue, weight, shuffle, optionsJSON,
 	)
 	if err != nil {
 		return nil, err
@@ -1987,20 +1998,32 @@ func (db *DB) AddChannelSource(channelID int64, sourceType string, sourceID *int
 // GetChannelSourceByID retrieves a channel source by ID
 func (db *DB) GetChannelSourceByID(id int64) (*ChannelSource, error) {
 	source := &ChannelSource{}
+	var optionsJSON sql.NullString
 	err := db.conn.QueryRow(
-		`SELECT id, channel_id, source_type, source_id, source_value, weight, (shuffle > 0) as shuffle FROM channel_sources WHERE id = ?`,
+		`SELECT id, channel_id, source_type, source_id, source_value, weight, (shuffle > 0) as shuffle, options FROM channel_sources WHERE id = ?`,
 		id,
-	).Scan(&source.ID, &source.ChannelID, &source.SourceType, &source.SourceID, &source.SourceValue, &source.Weight, &source.Shuffle)
+	).Scan(&source.ID, &source.ChannelID, &source.SourceType, &source.SourceID, &source.SourceValue, &source.Weight, &source.Shuffle, &optionsJSON)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
-	return source, err
+	if err != nil {
+		return nil, err
+	}
+
+	if optionsJSON.Valid && optionsJSON.String != "" {
+		var opts ChannelSourceOptions
+		if json.Unmarshal([]byte(optionsJSON.String), &opts) == nil {
+			source.Options = &opts
+		}
+	}
+
+	return source, nil
 }
 
 // GetChannelSources retrieves all sources for a channel
 func (db *DB) GetChannelSources(channelID int64) ([]ChannelSource, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, channel_id, source_type, source_id, source_value, weight, (shuffle > 0) as shuffle FROM channel_sources WHERE channel_id = ?`,
+		`SELECT id, channel_id, source_type, source_id, source_value, weight, (shuffle > 0) as shuffle, options FROM channel_sources WHERE channel_id = ?`,
 		channelID,
 	)
 	if err != nil {
@@ -2012,8 +2035,15 @@ func (db *DB) GetChannelSources(channelID int64) ([]ChannelSource, error) {
 	var sources []ChannelSource
 	for rows.Next() {
 		var s ChannelSource
-		if err := rows.Scan(&s.ID, &s.ChannelID, &s.SourceType, &s.SourceID, &s.SourceValue, &s.Weight, &s.Shuffle); err != nil {
+		var optionsJSON sql.NullString
+		if err := rows.Scan(&s.ID, &s.ChannelID, &s.SourceType, &s.SourceID, &s.SourceValue, &s.Weight, &s.Shuffle, &optionsJSON); err != nil {
 			continue
+		}
+		if optionsJSON.Valid && optionsJSON.String != "" {
+			var opts ChannelSourceOptions
+			if json.Unmarshal([]byte(optionsJSON.String), &opts) == nil {
+				s.Options = &opts
+			}
 		}
 		sources = append(sources, s)
 	}
@@ -2210,16 +2240,30 @@ func (db *DB) getMediaFromSource(source ChannelSource) []channelScheduleInput {
 	switch source.SourceType {
 	case ChannelSourceShow:
 		if source.SourceID != nil {
-			rows, err := db.conn.Query(
-				`SELECT id, title, duration FROM episodes WHERE tv_show_id = ? AND duration > 0`,
-				*source.SourceID,
-			)
+			// Build query with optional season filtering
+			query := `SELECT id, title, duration, season_number FROM episodes WHERE tv_show_id = ? AND duration > 0`
+			rows, err := db.conn.Query(query, *source.SourceID)
 			if err == nil {
 				defer rows.Close()
+
+				// Build season filter set if options specify seasons
+				var seasonFilter map[int]bool
+				if source.Options != nil && len(source.Options.Seasons) > 0 {
+					seasonFilter = make(map[int]bool)
+					for _, s := range source.Options.Seasons {
+						seasonFilter[s] = true
+					}
+				}
+
 				for rows.Next() {
 					var i channelScheduleInput
 					var duration sql.NullInt64
-					if rows.Scan(&i.MediaID, &i.Title, &duration) == nil {
+					var seasonNum int
+					if rows.Scan(&i.MediaID, &i.Title, &duration, &seasonNum) == nil {
+						// Skip if season filtering is active and this season isn't selected
+						if seasonFilter != nil && !seasonFilter[seasonNum] {
+							continue
+						}
 						i.MediaType = MediaTypeEpisode
 						i.Duration = int(duration.Int64)
 						if i.Duration > 0 {
@@ -2227,6 +2271,18 @@ func (db *DB) getMediaFromSource(source ChannelSource) []channelScheduleInput {
 						}
 					}
 				}
+			}
+
+			// Add commentary extras if requested
+			if source.Options != nil && source.Options.IncludeCommentary {
+				extras := db.getShowExtrasForChannel(*source.SourceID, []string{string(ExtraCategoryCommentary)}, nil)
+				items = append(items, extras...)
+			}
+
+			// Add other extras by category if requested
+			if source.Options != nil && len(source.Options.ExtrasCategories) > 0 {
+				extras := db.getShowExtrasForChannel(*source.SourceID, source.Options.ExtrasCategories, nil)
+				items = append(items, extras...)
 			}
 		}
 
@@ -2305,6 +2361,135 @@ func (db *DB) getMediaFromSource(source ChannelSource) []channelScheduleInput {
 	}
 
 	return items
+}
+
+// getShowExtrasForChannel retrieves extras for a TV show filtered by categories
+func (db *DB) getShowExtrasForChannel(showID int64, categories []string, seasons []int) []channelScheduleInput {
+	var items []channelScheduleInput
+
+	if len(categories) == 0 {
+		return items
+	}
+
+	// Build the query with category filter
+	query := `SELECT id, title, duration, category, season_number FROM extras WHERE tv_show_id = ? AND duration > 0 AND category IN (`
+	args := []interface{}{showID}
+	for i, cat := range categories {
+		if i > 0 {
+			query += ","
+		}
+		query += "?"
+		args = append(args, cat)
+	}
+	query += ")"
+
+	rows, err := db.conn.Query(query, args...)
+	if err != nil {
+		return items
+	}
+	defer rows.Close()
+
+	// Build season filter if provided
+	var seasonFilter map[int]bool
+	if len(seasons) > 0 {
+		seasonFilter = make(map[int]bool)
+		for _, s := range seasons {
+			seasonFilter[s] = true
+		}
+	}
+
+	for rows.Next() {
+		var i channelScheduleInput
+		var duration sql.NullInt64
+		var category string
+		var seasonNum sql.NullInt64
+		if rows.Scan(&i.MediaID, &i.Title, &duration, &category, &seasonNum) == nil {
+			// Skip if season filtering is active and this extra has a season that isn't selected
+			if seasonFilter != nil && seasonNum.Valid && !seasonFilter[int(seasonNum.Int64)] {
+				continue
+			}
+			i.MediaType = MediaTypeExtra
+			i.Duration = int(duration.Int64)
+			if i.Duration > 0 {
+				items = append(items, i)
+			}
+		}
+	}
+
+	return items
+}
+
+// ShowOptionsInfo contains available options for a TV show source
+type ShowOptionsInfo struct {
+	Seasons          []SeasonInfo         `json:"seasons"`
+	HasCommentary    bool                 `json:"has_commentary"`
+	ExtrasCategories []ExtraCategoryInfo  `json:"extras_categories"`
+}
+
+// SeasonInfo contains season number and episode count
+type SeasonInfo struct {
+	Number       int `json:"number"`
+	EpisodeCount int `json:"episode_count"`
+}
+
+// ExtraCategoryInfo contains extras category name and count
+type ExtraCategoryInfo struct {
+	Category string `json:"category"`
+	Count    int    `json:"count"`
+}
+
+// GetShowOptionsForChannel retrieves available options for a TV show source
+func (db *DB) GetShowOptionsForChannel(showID int64) (*ShowOptionsInfo, error) {
+	info := &ShowOptionsInfo{
+		Seasons:          []SeasonInfo{},
+		ExtrasCategories: []ExtraCategoryInfo{},
+	}
+
+	// Get seasons with episode counts
+	rows, err := db.conn.Query(
+		`SELECT season_number, COUNT(*) as count FROM episodes
+		 WHERE tv_show_id = ? AND duration > 0
+		 GROUP BY season_number ORDER BY season_number`,
+		showID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var s SeasonInfo
+		if rows.Scan(&s.Number, &s.EpisodeCount) == nil {
+			info.Seasons = append(info.Seasons, s)
+		}
+	}
+
+	// Check for commentary extras
+	var commentaryCount int
+	db.conn.QueryRow(
+		`SELECT COUNT(*) FROM extras WHERE tv_show_id = ? AND category = 'commentary' AND duration > 0`,
+		showID,
+	).Scan(&commentaryCount)
+	info.HasCommentary = commentaryCount > 0
+
+	// Get extras categories with counts
+	extrasRows, err := db.conn.Query(
+		`SELECT category, COUNT(*) as count FROM extras
+		 WHERE tv_show_id = ? AND category != 'commentary' AND duration > 0
+		 GROUP BY category ORDER BY category`,
+		showID,
+	)
+	if err == nil {
+		defer extrasRows.Close()
+		for extrasRows.Next() {
+			var e ExtraCategoryInfo
+			if extrasRows.Scan(&e.Category, &e.Count) == nil {
+				info.ExtrasCategories = append(info.ExtrasCategories, e)
+			}
+		}
+	}
+
+	return info, nil
 }
 
 // ============ Channel Now Playing ============

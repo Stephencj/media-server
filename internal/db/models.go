@@ -325,15 +325,23 @@ type Channel struct {
 	ItemCount     int `json:"item_count,omitempty"`     // Total items in schedule
 }
 
+// ChannelSourceOptions contains filtering options for TV show sources
+type ChannelSourceOptions struct {
+	Seasons           []int    `json:"seasons,omitempty"`            // Specific seasons to include (nil = all)
+	IncludeCommentary bool     `json:"include_commentary,omitempty"` // Include commentary tracks
+	ExtrasCategories  []string `json:"extras_categories,omitempty"`  // Extra categories to include
+}
+
 // ChannelSource defines a content source for a channel
 type ChannelSource struct {
-	ID          int64  `json:"id"`
-	ChannelID   int64  `json:"channel_id"`
-	SourceType  string `json:"source_type"` // 'section', 'playlist', 'show', 'movie', 'extra_category'
-	SourceID    *int64 `json:"source_id,omitempty"`
-	SourceValue string `json:"source_value,omitempty"` // For extra_category: category name
-	Weight      int    `json:"weight"`                 // Higher = more frequent
-	Shuffle     bool   `json:"shuffle"`                // true=randomize items, false=play in order
+	ID          int64                 `json:"id"`
+	ChannelID   int64                 `json:"channel_id"`
+	SourceType  string                `json:"source_type"` // 'section', 'playlist', 'show', 'movie', 'extra_category'
+	SourceID    *int64                `json:"source_id,omitempty"`
+	SourceValue string                `json:"source_value,omitempty"` // For extra_category: category name
+	Weight      int                   `json:"weight"`                 // Higher = more frequent
+	Shuffle     bool                  `json:"shuffle"`                // true=randomize items, false=play in order
+	Options     *ChannelSourceOptions `json:"options,omitempty"`      // Filtering options for shows
 
 	// Populated for display
 	SourceName string `json:"source_name,omitempty"`

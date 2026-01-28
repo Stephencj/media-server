@@ -230,6 +230,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 				channels.GET("/:id/sources", channelHandler.GetSources)
 				channels.POST("/:id/sources", channelHandler.AddSource)
 				channels.DELETE("/:id/sources/:sourceId", channelHandler.DeleteSource)
+			channels.GET("/:id/show-options/:showId", channelHandler.GetShowOptions)
 			}
 		}
 	}

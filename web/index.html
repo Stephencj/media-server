@@ -262,9 +262,14 @@
         .source-weight { color: #888; font-size: 0.85rem; }
 
         /* Channel Player Modal */
+        .channel-player-modal {
+            background: #000;
+        }
         .channel-player-modal .channel-player {
-            width: 100%; height: 100%; background: #000;
-            display: flex; flex-direction: column; position: relative;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #000;
+            display: flex; flex-direction: column;
         }
         .channel-player .channel-close {
             position: absolute; top: 20px; right: 20px;
@@ -2470,15 +2475,38 @@
 
     <!-- Add Source Modal -->
     <div class="modal-overlay" id="add-source-modal">
-        <div class="modal" style="max-width: 400px;">
+        <div class="modal" style="max-width: 450px;">
             <button class="detail-close" onclick="closeAddSourceModal()">&times;</button>
             <h2 style="margin-bottom: 1.5rem;">Add Content Source</h2>
 
             <div class="form-group">
                 <label>Source</label>
-                <select id="source-select" class="form-input">
+                <select id="source-select" class="form-input" onchange="onSourceSelectChange()">
                     <option value="">Select content source...</option>
                 </select>
+            </div>
+
+            <!-- Show Options (only visible when a TV show is selected) -->
+            <div id="show-options-container" style="display: none; background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <div class="form-group" id="seasons-options">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <input type="checkbox" id="all-seasons-toggle" checked style="width: auto;" onchange="toggleAllSeasons(this.checked)">
+                        <span>All Seasons</span>
+                    </label>
+                    <div id="seasons-checkboxes" style="display: none; margin-left: 1.5rem; max-height: 150px; overflow-y: auto;"></div>
+                </div>
+
+                <div class="form-group" id="commentary-option" style="display: none; margin-top: 0.75rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                        <input type="checkbox" id="include-commentary" style="width: auto;">
+                        <span>Include Commentary Tracks</span>
+                    </label>
+                </div>
+
+                <div class="form-group" id="extras-options" style="display: none; margin-top: 0.75rem;">
+                    <label style="margin-bottom: 0.5rem; display: block;">Extras</label>
+                    <div id="extras-checkboxes" style="margin-left: 0.5rem;"></div>
+                </div>
             </div>
 
             <div class="form-group">
@@ -3546,6 +3574,7 @@
                     <div class="source-item">
                         <span class="source-type">${getSourceTypeIcon(source.source_type)}</span>
                         <span class="source-name">${escapeHtml(source.source_name || 'Unknown')}</span>
+                        ${formatSourceOptions(source)}
                         <span class="source-weight">×${source.weight}</span>
                         ${source.shuffle ? '<span style="color: #66bb6a; font-size: 0.8rem; margin-left: 4px;" title="Shuffled">Shuffled</span>' : '<span style="color: #888; font-size: 0.8rem; margin-left: 4px;" title="Playing in order">In Order</span>'}
                         <button class="btn-icon btn-sm" onclick="removeChannelSource(${source.id})">🗑️</button>
@@ -3565,6 +3594,36 @@
                 'extra_category': '🎭'
             };
             return icons[type] || '📁';
+        }
+
+        function formatSourceOptions(source) {
+            if (!source.options || source.source_type !== 'show') {
+                return '';
+            }
+
+            const parts = [];
+
+            // Seasons
+            if (source.options.seasons && source.options.seasons.length > 0) {
+                const seasonList = source.options.seasons.sort((a, b) => a - b);
+                parts.push('S' + seasonList.join(','));
+            }
+
+            // Commentary
+            if (source.options.include_commentary) {
+                parts.push('Commentary');
+            }
+
+            // Extras
+            if (source.options.extras_categories && source.options.extras_categories.length > 0) {
+                parts.push(`+${source.options.extras_categories.length} extras`);
+            }
+
+            if (parts.length === 0) {
+                return '';
+            }
+
+            return `<span style="color: #90caf9; font-size: 0.75rem; margin-left: 4px;">(${parts.join(', ')})</span>`;
         }
 
         async function saveChannel() {
@@ -3695,6 +3754,100 @@
             select.appendChild(extraGroup);
         }
 
+        // Current show options data
+        let currentShowOptions = null;
+
+        async function onSourceSelectChange() {
+            const select = document.getElementById('source-select');
+            const container = document.getElementById('show-options-container');
+
+            if (!select.value) {
+                container.style.display = 'none';
+                currentShowOptions = null;
+                return;
+            }
+
+            const [sourceType, sourceId] = select.value.split(':');
+
+            if (sourceType === 'show') {
+                await loadShowOptions(parseInt(sourceId));
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+                currentShowOptions = null;
+            }
+        }
+
+        async function loadShowOptions(showId) {
+            try {
+                const res = await api(`/api/channels/${editingChannelId}/show-options/${showId}`);
+                if (!res.ok) throw new Error('Failed to load show options');
+
+                currentShowOptions = await res.json();
+
+                // Populate seasons checkboxes (all checked by default)
+                const seasonsContainer = document.getElementById('seasons-checkboxes');
+                if (currentShowOptions.seasons && currentShowOptions.seasons.length > 0) {
+                    seasonsContainer.innerHTML = currentShowOptions.seasons.map(s => `
+                        <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                            <input type="checkbox" class="season-checkbox" value="${s.number}" checked style="width: auto;">
+                            <span>Season ${s.number} (${s.episode_count} episodes)</span>
+                        </label>
+                    `).join('');
+                    document.getElementById('seasons-options').style.display = 'block';
+                    document.getElementById('all-seasons-toggle').checked = true;
+                    seasonsContainer.style.display = 'none';
+                } else {
+                    document.getElementById('seasons-options').style.display = 'none';
+                }
+
+                // Show/hide commentary option
+                const commentaryOption = document.getElementById('commentary-option');
+                if (currentShowOptions.has_commentary) {
+                    commentaryOption.style.display = 'block';
+                    document.getElementById('include-commentary').checked = false;
+                } else {
+                    commentaryOption.style.display = 'none';
+                }
+
+                // Populate extras categories (all unchecked by default)
+                const extrasContainer = document.getElementById('extras-checkboxes');
+                const extrasOptions = document.getElementById('extras-options');
+                if (currentShowOptions.extras_categories && currentShowOptions.extras_categories.length > 0) {
+                    extrasContainer.innerHTML = currentShowOptions.extras_categories.map(e => `
+                        <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                            <input type="checkbox" class="extras-checkbox" value="${e.category}" style="width: auto;">
+                            <span>${formatExtraCategory(e.category)} (${e.count})</span>
+                        </label>
+                    `).join('');
+                    extrasOptions.style.display = 'block';
+                } else {
+                    extrasOptions.style.display = 'none';
+                }
+            } catch (err) {
+                console.error('Failed to load show options:', err);
+                currentShowOptions = null;
+            }
+        }
+
+        function formatExtraCategory(category) {
+            return category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        function toggleAllSeasons(checked) {
+            const checkboxes = document.querySelectorAll('.season-checkbox');
+            const container = document.getElementById('seasons-checkboxes');
+
+            if (checked) {
+                // Check all and hide individual selection
+                checkboxes.forEach(cb => cb.checked = true);
+                container.style.display = 'none';
+            } else {
+                // Show individual selection
+                container.style.display = 'block';
+            }
+        }
+
         async function addChannelSource() {
             const select = document.getElementById('source-select');
             const weight = parseInt(document.getElementById('source-weight').value) || 1;
@@ -3716,6 +3869,42 @@
                 payload.source_value = sourceIdOrValue;
             } else {
                 payload.source_id = parseInt(sourceIdOrValue);
+            }
+
+            // Add show options if this is a TV show source
+            if (sourceType === 'show' && currentShowOptions) {
+                const options = {};
+
+                // Check if not all seasons are selected
+                const allSeasonsToggle = document.getElementById('all-seasons-toggle');
+                if (!allSeasonsToggle.checked) {
+                    const selectedSeasons = [];
+                    document.querySelectorAll('.season-checkbox:checked').forEach(cb => {
+                        selectedSeasons.push(parseInt(cb.value));
+                    });
+                    if (selectedSeasons.length > 0 && selectedSeasons.length < currentShowOptions.seasons.length) {
+                        options.seasons = selectedSeasons;
+                    }
+                }
+
+                // Check commentary
+                if (document.getElementById('include-commentary').checked) {
+                    options.include_commentary = true;
+                }
+
+                // Check extras categories
+                const selectedExtras = [];
+                document.querySelectorAll('.extras-checkbox:checked').forEach(cb => {
+                    selectedExtras.push(cb.value);
+                });
+                if (selectedExtras.length > 0) {
+                    options.extras_categories = selectedExtras;
+                }
+
+                // Only add options if there are any selections
+                if (Object.keys(options).length > 0) {
+                    payload.options = options;
+                }
             }
 
             try {
@@ -3755,6 +3944,10 @@
             document.getElementById('add-source-modal').classList.remove('active');
             // Reset shuffle checkbox to checked for next use
             document.getElementById('source-shuffle').checked = true;
+            // Reset show options
+            document.getElementById('show-options-container').style.display = 'none';
+            document.getElementById('source-select').value = '';
+            currentShowOptions = null;
         }
 
         async function regenerateQueue() {

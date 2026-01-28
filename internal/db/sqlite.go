@@ -359,6 +359,8 @@ func (db *DB) Migrate() error {
 	optionalMigrations := []string{
 		// Add shuffle column to channel_sources for existing databases
 		`ALTER TABLE channel_sources ADD COLUMN shuffle BOOLEAN DEFAULT 1`,
+		// Add options column for season/commentary/extras filtering
+		`ALTER TABLE channel_sources ADD COLUMN options TEXT`,
 	}
 
 	for _, migration := range optionalMigrations {
