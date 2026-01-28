@@ -2258,7 +2258,7 @@
 
             <div class="form-actions" style="margin-top: 1.5rem;">
                 <button class="btn-secondary" onclick="closeAddSourceModal()">Cancel</button>
-                <button class="btn" onclick="addSource()">Add</button>
+                <button class="btn" onclick="addChannelSource()">Add</button>
             </div>
         </div>
     </div>
@@ -3297,7 +3297,7 @@
                         <span class="source-type">${getSourceTypeIcon(source.source_type)}</span>
                         <span class="source-name">${escapeHtml(source.source_name || 'Unknown')}</span>
                         <span class="source-weight">×${source.weight}</span>
-                        <button class="btn-icon btn-sm" onclick="removeSource(${source.id})">🗑️</button>
+                        <button class="btn-icon btn-sm" onclick="removeChannelSource(${source.id})">🗑️</button>
                     </div>
                 `).join('');
             } catch (err) {
@@ -3444,7 +3444,7 @@
             select.appendChild(extraGroup);
         }
 
-        async function addSource() {
+        async function addChannelSource() {
             const select = document.getElementById('source-select');
             const weight = parseInt(document.getElementById('source-weight').value) || 1;
 
@@ -3485,7 +3485,7 @@
             }
         }
 
-        async function removeSource(sourceId) {
+        async function removeChannelSource(sourceId) {
             if (!editingChannelId) return;
 
             try {
