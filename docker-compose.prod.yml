@@ -2,7 +2,8 @@ version: '3.8'
 
 services:
   media-server:
-    image: ghcr.io/stephencjuliano/media-server:latest
+    build: .
+    # image: ghcr.io/stephencjuliano/media-server:latest
     container_name: media-server
     ports:
       - "8080:8080"
@@ -10,6 +11,7 @@ services:
       - ./data:/data
       - ./backups:/data/backups
       - /media/stephencjuliano/Media3/Videos:/media/Videos:ro
+      - ./web:/app/web:ro  # Mount web folder for live frontend updates
     environment:
       - MEDIA_SERVER_DB_PATH=/data/media-server.db
       - MEDIA_SERVER_JWT_SECRET=${JWT_SECRET}

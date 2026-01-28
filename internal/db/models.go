@@ -297,3 +297,71 @@ type SectionWithMedia struct {
 	Section
 	Media []interface{} `json:"media"` // Can be Media, Episode, Extra, or TVShow
 }
+
+// Channel source types
+const (
+	ChannelSourceSection      = "section"
+	ChannelSourcePlaylist     = "playlist"
+	ChannelSourceShow         = "show"
+	ChannelSourceMovie        = "movie"
+	ChannelSourceExtraCategory = "extra_category"
+)
+
+// Channel represents a virtual "live TV" channel
+type Channel struct {
+	ID          int64     `json:"id"`
+	UserID      int64     `json:"user_id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description,omitempty"`
+	Icon        string    `json:"icon"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+
+	// Populated when fetching with sources
+	Sources []ChannelSource `json:"sources,omitempty"`
+
+	// Computed fields (for display)
+	TotalDuration int `json:"total_duration,omitempty"` // Total cycle duration in seconds
+	ItemCount     int `json:"item_count,omitempty"`     // Total items in schedule
+}
+
+// ChannelSource defines a content source for a channel
+type ChannelSource struct {
+	ID          int64  `json:"id"`
+	ChannelID   int64  `json:"channel_id"`
+	SourceType  string `json:"source_type"` // 'section', 'playlist', 'show', 'movie', 'extra_category'
+	SourceID    *int64 `json:"source_id,omitempty"`
+	SourceValue string `json:"source_value,omitempty"` // For extra_category: category name
+	Weight      int    `json:"weight"`                 // Higher = more frequent
+
+	// Populated for display
+	SourceName string `json:"source_name,omitempty"`
+}
+
+// ChannelScheduleItem represents a scheduled item in a channel
+type ChannelScheduleItem struct {
+	ID                int64     `json:"id"`
+	ChannelID         int64     `json:"channel_id"`
+	MediaID           int64     `json:"media_id"`
+	MediaType         MediaType `json:"media_type"`
+	ScheduledPosition int       `json:"scheduled_position"`
+	CycleNumber       int       `json:"cycle_number"`
+	Duration          int       `json:"duration"`        // in seconds
+	CumulativeStart   int       `json:"cumulative_start"` // cumulative seconds from cycle start
+	Played            bool      `json:"played"`
+
+	// Populated for display
+	Title       string `json:"title,omitempty"`
+	PosterPath  string `json:"poster_path,omitempty"`
+	BackdropPath string `json:"backdrop_path,omitempty"`
+}
+
+// ChannelNowPlaying represents what's currently playing on a channel
+type ChannelNowPlaying struct {
+	Channel     Channel              `json:"channel"`
+	NowPlaying  *ChannelScheduleItem `json:"now_playing"`
+	Elapsed     int                  `json:"elapsed"`      // seconds into current item
+	UpNext      []ChannelScheduleItem `json:"up_next"`     // next few items
+	CycleStart  time.Time            `json:"cycle_start"` // when current cycle started
+	StreamURL   string               `json:"stream_url,omitempty"`
+}

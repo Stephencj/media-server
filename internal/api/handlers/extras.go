@@ -146,3 +146,20 @@ func (h *ExtrasHandler) GetEpisodeExtras(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"items": extras})
 }
+
+// GetRandomExtra returns a random extra, optionally filtered by category
+func (h *ExtrasHandler) GetRandomExtra(c *gin.Context) {
+	category := c.Query("category")
+
+	extra, err := h.db.GetRandomExtra(category)
+	if err == db.ErrNotFound {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No extras found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch random extra"})
+		return
+	}
+
+	c.JSON(http.StatusOK, extra)
+}

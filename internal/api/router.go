@@ -29,14 +29,19 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	showsHandler := handlers.NewShowsHandler(database)
 	extrasHandler := handlers.NewExtrasHandler(database)
 	metadataHandler := handlers.NewMetadataHandler(database, cfg)
+	channelHandler := handlers.NewChannelHandler(database)
 	deployHandler := handlers.NewDeployHandler()
 	filesHandler := handlers.NewFilesHandler("/media")
 
-	// Serve web admin interface with no-cache headers
+	// Serve web admin interface with aggressive no-cache headers
 	serveIndex := func(c *gin.Context) {
-		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+		c.Header("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")
 		c.Header("Pragma", "no-cache")
 		c.Header("Expires", "0")
+		c.Header("CDN-Cache-Control", "no-store")
+		c.Header("Cloudflare-CDN-Cache-Control", "no-store")
+		c.Header("Surrogate-Control", "no-store")
+		c.Header("X-Content-Version", "2026012711")
 		c.File("./web/index.html")
 	}
 	router.GET("/", serveIndex)
@@ -202,6 +207,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 				extras.GET("", extrasHandler.GetExtras)
 				extras.GET("/categories", extrasHandler.GetExtraCategories)
 				extras.GET("/category/:category", extrasHandler.GetExtrasByCategory)
+				extras.GET("/random", extrasHandler.GetRandomExtra)
 				extras.GET("/:id", extrasHandler.GetExtra)
 			}
 
@@ -209,6 +215,22 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 			protected.GET("/media/:id/extras", extrasHandler.GetMovieExtras)
 			shows.GET("/:showId/extras", extrasHandler.GetShowExtras)
 			protected.GET("/episodes/:episodeId/extras", extrasHandler.GetEpisodeExtras)
+
+			// Channels (virtual live TV)
+			channels := protected.Group("/channels")
+			{
+				channels.GET("", channelHandler.ListChannels)
+				channels.POST("", channelHandler.CreateChannel)
+				channels.GET("/:id", channelHandler.GetChannel)
+				channels.PUT("/:id", channelHandler.UpdateChannel)
+				channels.DELETE("/:id", channelHandler.DeleteChannel)
+				channels.GET("/:id/now", channelHandler.GetNowPlaying)
+				channels.GET("/:id/schedule", channelHandler.GetSchedule)
+				channels.POST("/:id/regenerate", channelHandler.RegenerateSchedule)
+				channels.GET("/:id/sources", channelHandler.GetSources)
+				channels.POST("/:id/sources", channelHandler.AddSource)
+				channels.DELETE("/:id/sources/:sourceId", channelHandler.DeleteSource)
+			}
 		}
 	}
 

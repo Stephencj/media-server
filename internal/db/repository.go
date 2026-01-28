@@ -1423,6 +1423,40 @@ func (db *DB) GetExtrasCount() (int, error) {
 	return count, err
 }
 
+// GetRandomExtra retrieves a random extra, optionally filtered by category
+func (db *DB) GetRandomExtra(category string) (*Extra, error) {
+	extra := &Extra{}
+	var query string
+	var err error
+
+	if category != "" {
+		query = `SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
+			source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
+			audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM extras WHERE category = ? ORDER BY RANDOM() LIMIT 1`
+		err = db.conn.QueryRow(query, category).Scan(&extra.ID, &extra.Title, &extra.Category,
+			&extra.MovieID, &extra.TVShowID, &extra.EpisodeID, &extra.SeasonNumber, &extra.EpisodeNumber,
+			&extra.SourceID, &extra.FilePath, &extra.FileSize, &extra.Duration, &extra.VideoCodec,
+			&extra.AudioCodec, &extra.Resolution, &extra.AudioTracks, &extra.SubtitleTracks,
+			&extra.CreatedAt, &extra.UpdatedAt)
+	} else {
+		query = `SELECT id, title, category, movie_id, tv_show_id, episode_id, season_number, episode_number,
+			source_id, file_path, file_size, duration, video_codec, audio_codec, resolution,
+			audio_tracks, subtitle_tracks, created_at, updated_at
+		 FROM extras ORDER BY RANDOM() LIMIT 1`
+		err = db.conn.QueryRow(query).Scan(&extra.ID, &extra.Title, &extra.Category,
+			&extra.MovieID, &extra.TVShowID, &extra.EpisodeID, &extra.SeasonNumber, &extra.EpisodeNumber,
+			&extra.SourceID, &extra.FilePath, &extra.FileSize, &extra.Duration, &extra.VideoCodec,
+			&extra.AudioCodec, &extra.Resolution, &extra.AudioTracks, &extra.SubtitleTracks,
+			&extra.CreatedAt, &extra.UpdatedAt)
+	}
+
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return extra, err
+}
+
 // DeleteExtrasBySourceID removes all extras from a source
 func (db *DB) DeleteExtrasBySourceID(sourceID int64) error {
 	_, err := db.conn.Exec(`DELETE FROM extras WHERE source_id = ?`, sourceID)
@@ -1830,4 +1864,533 @@ func (db *DB) GetLibraryStats() (*LibraryStats, error) {
 	}
 
 	return stats, nil
+}
+
+// ============ Channel Repository Methods ============
+
+// CreateChannel creates a new channel for a user
+func (db *DB) CreateChannel(userID int64, name, description, icon string) (*Channel, error) {
+	if icon == "" {
+		icon = "📺"
+	}
+
+	result, err := db.conn.Exec(
+		`INSERT INTO channels (user_id, name, description, icon) VALUES (?, ?, ?, ?)`,
+		userID, name, description, icon,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return db.GetChannelByID(id)
+}
+
+// GetChannelByID retrieves a channel by ID
+func (db *DB) GetChannelByID(id int64) (*Channel, error) {
+	channel := &Channel{}
+	err := db.conn.QueryRow(
+		`SELECT id, user_id, name, description, icon, created_at, updated_at FROM channels WHERE id = ?`,
+		id,
+	).Scan(&channel.ID, &channel.UserID, &channel.Name, &channel.Description, &channel.Icon, &channel.CreatedAt, &channel.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Load sources
+	sources, err := db.GetChannelSources(id)
+	if err == nil {
+		channel.Sources = sources
+	}
+
+	return channel, nil
+}
+
+// GetUserChannels retrieves all channels for a user
+func (db *DB) GetUserChannels(userID int64) ([]Channel, error) {
+	// Use a single query with LEFT JOIN to get channel data and schedule stats together
+	// This avoids nested queries which can cause SQLite deadlocks
+	rows, err := db.conn.Query(
+		`SELECT c.id, c.user_id, c.name, c.description, c.icon, c.created_at, c.updated_at,
+			COALESCE(s.item_count, 0) as item_count,
+			COALESCE(s.total_duration, 0) as total_duration
+		FROM channels c
+		LEFT JOIN (
+			SELECT channel_id, COUNT(*) as item_count, SUM(duration) as total_duration
+			FROM channel_schedule
+			WHERE cycle_number = 1
+			GROUP BY channel_id
+		) s ON c.id = s.channel_id
+		WHERE c.user_id = ?
+		ORDER BY c.created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var channels []Channel
+	for rows.Next() {
+		var ch Channel
+		if err := rows.Scan(&ch.ID, &ch.UserID, &ch.Name, &ch.Description, &ch.Icon, &ch.CreatedAt, &ch.UpdatedAt, &ch.ItemCount, &ch.TotalDuration); err != nil {
+			continue
+		}
+		channels = append(channels, ch)
+	}
+
+	return channels, rows.Err()
+}
+
+// UpdateChannel updates a channel's details
+func (db *DB) UpdateChannel(id int64, name, description, icon string) (*Channel, error) {
+	_, err := db.conn.Exec(
+		`UPDATE channels SET name = ?, description = ?, icon = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		name, description, icon, id,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return db.GetChannelByID(id)
+}
+
+// DeleteChannel deletes a channel and all its data
+func (db *DB) DeleteChannel(id int64) error {
+	_, err := db.conn.Exec(`DELETE FROM channels WHERE id = ?`, id)
+	return err
+}
+
+// ============ Channel Sources ============
+
+// AddChannelSource adds a content source to a channel
+func (db *DB) AddChannelSource(channelID int64, sourceType string, sourceID *int64, sourceValue string, weight int) (*ChannelSource, error) {
+	if weight < 1 {
+		weight = 1
+	}
+
+	result, err := db.conn.Exec(
+		`INSERT INTO channel_sources (channel_id, source_type, source_id, source_value, weight) VALUES (?, ?, ?, ?, ?)`,
+		channelID, sourceType, sourceID, sourceValue, weight,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, _ := result.LastInsertId()
+	return db.GetChannelSourceByID(id)
+}
+
+// GetChannelSourceByID retrieves a channel source by ID
+func (db *DB) GetChannelSourceByID(id int64) (*ChannelSource, error) {
+	source := &ChannelSource{}
+	err := db.conn.QueryRow(
+		`SELECT id, channel_id, source_type, source_id, source_value, weight FROM channel_sources WHERE id = ?`,
+		id,
+	).Scan(&source.ID, &source.ChannelID, &source.SourceType, &source.SourceID, &source.SourceValue, &source.Weight)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return source, err
+}
+
+// GetChannelSources retrieves all sources for a channel
+func (db *DB) GetChannelSources(channelID int64) ([]ChannelSource, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, channel_id, source_type, source_id, source_value, weight FROM channel_sources WHERE channel_id = ?`,
+		channelID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// First pass: collect all sources without nested queries
+	var sources []ChannelSource
+	for rows.Next() {
+		var s ChannelSource
+		if err := rows.Scan(&s.ID, &s.ChannelID, &s.SourceType, &s.SourceID, &s.SourceValue, &s.Weight); err != nil {
+			continue
+		}
+		sources = append(sources, s)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Second pass: populate source names (now safe since rows is closed)
+	for i := range sources {
+		sources[i].SourceName = db.getSourceName(sources[i].SourceType, sources[i].SourceID, sources[i].SourceValue)
+	}
+
+	return sources, nil
+}
+
+// getSourceName returns a display name for a channel source
+func (db *DB) getSourceName(sourceType string, sourceID *int64, sourceValue string) string {
+	if sourceID == nil {
+		if sourceValue != "" {
+			return sourceValue
+		}
+		return "Unknown"
+	}
+
+	var name string
+	switch sourceType {
+	case ChannelSourcePlaylist:
+		db.conn.QueryRow(`SELECT name FROM playlists WHERE id = ?`, *sourceID).Scan(&name)
+	case ChannelSourceSection:
+		db.conn.QueryRow(`SELECT name FROM sections WHERE id = ?`, *sourceID).Scan(&name)
+	case ChannelSourceShow:
+		db.conn.QueryRow(`SELECT title FROM tv_shows WHERE id = ?`, *sourceID).Scan(&name)
+	case ChannelSourceMovie:
+		db.conn.QueryRow(`SELECT title FROM media WHERE id = ?`, *sourceID).Scan(&name)
+	}
+
+	if name == "" {
+		return "Unknown"
+	}
+	return name
+}
+
+// DeleteChannelSource removes a source from a channel
+func (db *DB) DeleteChannelSource(id int64) error {
+	_, err := db.conn.Exec(`DELETE FROM channel_sources WHERE id = ?`, id)
+	return err
+}
+
+// ============ Channel Schedule Generation ============
+
+// channelScheduleInput is used internally for schedule generation
+type channelScheduleInput struct {
+	MediaID   int64
+	MediaType MediaType
+	Duration  int
+	Title     string
+}
+
+// GenerateChannelSchedule generates or regenerates a channel's schedule
+func (db *DB) GenerateChannelSchedule(channelID int64) error {
+	// Get all sources for this channel
+	sources, err := db.GetChannelSources(channelID)
+	if err != nil {
+		return err
+	}
+
+	if len(sources) == 0 {
+		return nil // No sources, nothing to schedule
+	}
+
+	// Collect all media items from sources
+	var items []channelScheduleInput
+
+	for _, source := range sources {
+		sourceItems := db.getMediaFromSource(source)
+		// Add items based on weight (higher weight = more copies)
+		for i := 0; i < source.Weight; i++ {
+			items = append(items, sourceItems...)
+		}
+	}
+
+	if len(items) == 0 {
+		return nil
+	}
+
+	// Shuffle items using Fisher-Yates
+	for i := len(items) - 1; i > 0; i-- {
+		j := int(time.Now().UnixNano()) % (i + 1)
+		items[i], items[j] = items[j], items[i]
+	}
+
+	// Clear existing schedule
+	_, err = db.conn.Exec(`DELETE FROM channel_schedule WHERE channel_id = ?`, channelID)
+	if err != nil {
+		return err
+	}
+
+	// Insert new schedule with cumulative timing
+	cumulativeStart := 0
+	for position, item := range items {
+		_, err = db.conn.Exec(
+			`INSERT INTO channel_schedule (channel_id, media_id, media_type, scheduled_position, cycle_number, duration, cumulative_start)
+			VALUES (?, ?, ?, ?, 1, ?, ?)`,
+			channelID, item.MediaID, item.MediaType, position, item.Duration, cumulativeStart,
+		)
+		if err != nil {
+			return err
+		}
+		cumulativeStart += item.Duration
+	}
+
+	return nil
+}
+
+// getMediaFromSource extracts media items from a channel source
+func (db *DB) getMediaFromSource(source ChannelSource) []channelScheduleInput {
+	var items []channelScheduleInput
+
+	switch source.SourceType {
+	case ChannelSourceShow:
+		if source.SourceID != nil {
+			rows, err := db.conn.Query(
+				`SELECT id, title, duration FROM episodes WHERE tv_show_id = ? AND duration > 0`,
+				*source.SourceID,
+			)
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var i channelScheduleInput
+					var duration sql.NullInt64
+					if rows.Scan(&i.MediaID, &i.Title, &duration) == nil {
+						i.MediaType = MediaTypeEpisode
+						i.Duration = int(duration.Int64)
+						if i.Duration > 0 {
+							items = append(items, i)
+						}
+					}
+				}
+			}
+		}
+
+	case ChannelSourceMovie:
+		if source.SourceID != nil {
+			var i channelScheduleInput
+			var duration sql.NullInt64
+			err := db.conn.QueryRow(
+				`SELECT id, title, duration FROM media WHERE id = ? AND type = 'movie'`,
+				*source.SourceID,
+			).Scan(&i.MediaID, &i.Title, &duration)
+			if err == nil {
+				i.MediaType = MediaTypeMovie
+				i.Duration = int(duration.Int64)
+				if i.Duration > 0 {
+					items = append(items, i)
+				}
+			}
+		}
+
+	case ChannelSourcePlaylist:
+		if source.SourceID != nil {
+			rows, err := db.conn.Query(
+				`SELECT pi.media_id, pi.media_type,
+					CASE
+						WHEN pi.media_type = 'movie' THEN (SELECT duration FROM media WHERE id = pi.media_id)
+						WHEN pi.media_type = 'episode' THEN (SELECT duration FROM episodes WHERE id = pi.media_id)
+						WHEN pi.media_type = 'extra' THEN (SELECT duration FROM extras WHERE id = pi.media_id)
+					END as duration,
+					CASE
+						WHEN pi.media_type = 'movie' THEN (SELECT title FROM media WHERE id = pi.media_id)
+						WHEN pi.media_type = 'episode' THEN (SELECT title FROM episodes WHERE id = pi.media_id)
+						WHEN pi.media_type = 'extra' THEN (SELECT title FROM extras WHERE id = pi.media_id)
+					END as title
+				FROM playlist_items pi
+				WHERE pi.playlist_id = ?
+				ORDER BY pi.position`,
+				*source.SourceID,
+			)
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var i channelScheduleInput
+					var duration sql.NullInt64
+					var title sql.NullString
+					if rows.Scan(&i.MediaID, &i.MediaType, &duration, &title) == nil {
+						i.Duration = int(duration.Int64)
+						i.Title = title.String
+						if i.Duration > 0 {
+							items = append(items, i)
+						}
+					}
+				}
+			}
+		}
+
+	case ChannelSourceExtraCategory:
+		rows, err := db.conn.Query(
+			`SELECT id, title, duration FROM extras WHERE category = ? AND duration > 0`,
+			source.SourceValue,
+		)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var i channelScheduleInput
+				var duration sql.NullInt64
+				if rows.Scan(&i.MediaID, &i.Title, &duration) == nil {
+					i.MediaType = MediaTypeExtra
+					i.Duration = int(duration.Int64)
+					if i.Duration > 0 {
+						items = append(items, i)
+					}
+				}
+			}
+		}
+	}
+
+	return items
+}
+
+// ============ Channel Now Playing ============
+
+// GetChannelNowPlaying calculates what's currently playing on a channel
+func (db *DB) GetChannelNowPlaying(channelID int64) (*ChannelNowPlaying, error) {
+	channel, err := db.GetChannelByID(channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get total cycle duration
+	var totalDuration sql.NullInt64
+	err = db.conn.QueryRow(
+		`SELECT COALESCE(SUM(duration), 0) FROM channel_schedule WHERE channel_id = ? AND cycle_number = 1`,
+		channelID,
+	).Scan(&totalDuration)
+	if err != nil || totalDuration.Int64 == 0 {
+		return &ChannelNowPlaying{Channel: *channel}, nil
+	}
+
+	cycleDuration := int(totalDuration.Int64)
+
+	// Calculate current position in cycle based on time
+	// Use channel creation time as epoch for consistent scheduling
+	elapsed := int(time.Since(channel.CreatedAt).Seconds())
+	positionInCycle := elapsed % cycleDuration
+
+	// Find current item
+	var current ChannelScheduleItem
+	err = db.conn.QueryRow(
+		`SELECT cs.id, cs.channel_id, cs.media_id, cs.media_type, cs.scheduled_position,
+			cs.cycle_number, cs.duration, cs.cumulative_start, cs.played
+		FROM channel_schedule cs
+		WHERE cs.channel_id = ? AND cs.cycle_number = 1
+			AND cs.cumulative_start <= ?
+			AND cs.cumulative_start + cs.duration > ?
+		LIMIT 1`,
+		channelID, positionInCycle, positionInCycle,
+	).Scan(
+		&current.ID, &current.ChannelID, &current.MediaID, &current.MediaType,
+		&current.ScheduledPosition, &current.CycleNumber, &current.Duration,
+		&current.CumulativeStart, &current.Played,
+	)
+	if err != nil {
+		return &ChannelNowPlaying{Channel: *channel}, nil
+	}
+
+	// Populate title and poster for current item
+	db.populateScheduleItemDetails(&current)
+
+	// Calculate elapsed time within current item
+	elapsedInItem := positionInCycle - current.CumulativeStart
+
+	// Get up next items (next 3)
+	var upNext []ChannelScheduleItem
+	rows, err := db.conn.Query(
+		`SELECT cs.id, cs.channel_id, cs.media_id, cs.media_type, cs.scheduled_position,
+			cs.cycle_number, cs.duration, cs.cumulative_start, cs.played
+		FROM channel_schedule cs
+		WHERE cs.channel_id = ? AND cs.cycle_number = 1
+			AND cs.scheduled_position > ?
+		ORDER BY cs.scheduled_position
+		LIMIT 3`,
+		channelID, current.ScheduledPosition,
+	)
+	if err == nil {
+		// First pass: collect items without nested queries
+		for rows.Next() {
+			var item ChannelScheduleItem
+			if rows.Scan(
+				&item.ID, &item.ChannelID, &item.MediaID, &item.MediaType,
+				&item.ScheduledPosition, &item.CycleNumber, &item.Duration,
+				&item.CumulativeStart, &item.Played,
+			) == nil {
+				upNext = append(upNext, item)
+			}
+		}
+		rows.Close() // Close immediately before any nested queries
+	}
+
+	// Second pass: populate details (safe now that rows is closed)
+	for i := range upNext {
+		db.populateScheduleItemDetails(&upNext[i])
+	}
+
+	return &ChannelNowPlaying{
+		Channel:    *channel,
+		NowPlaying: &current,
+		Elapsed:    elapsedInItem,
+		UpNext:     upNext,
+		CycleStart: channel.CreatedAt,
+	}, nil
+}
+
+// populateScheduleItemDetails fills in title and poster for a schedule item
+func (db *DB) populateScheduleItemDetails(item *ChannelScheduleItem) {
+	switch item.MediaType {
+	case MediaTypeMovie:
+		db.conn.QueryRow(
+			`SELECT title, poster_path, backdrop_path FROM media WHERE id = ?`,
+			item.MediaID,
+		).Scan(&item.Title, &item.PosterPath, &item.BackdropPath)
+	case MediaTypeEpisode:
+		db.conn.QueryRow(
+			`SELECT e.title, t.poster_path, t.backdrop_path
+			FROM episodes e
+			JOIN tv_shows t ON e.tv_show_id = t.id
+			WHERE e.id = ?`,
+			item.MediaID,
+		).Scan(&item.Title, &item.PosterPath, &item.BackdropPath)
+	case MediaTypeExtra:
+		db.conn.QueryRow(
+			`SELECT title FROM extras WHERE id = ?`,
+			item.MediaID,
+		).Scan(&item.Title)
+	}
+}
+
+// GetChannelSchedule returns the full schedule for a channel
+func (db *DB) GetChannelSchedule(channelID int64, limit, offset int) ([]ChannelScheduleItem, int, error) {
+	// Get total count
+	var total int
+	db.conn.QueryRow(
+		`SELECT COUNT(*) FROM channel_schedule WHERE channel_id = ? AND cycle_number = 1`,
+		channelID,
+	).Scan(&total)
+
+	// Get items
+	rows, err := db.conn.Query(
+		`SELECT id, channel_id, media_id, media_type, scheduled_position,
+			cycle_number, duration, cumulative_start, played
+		FROM channel_schedule
+		WHERE channel_id = ? AND cycle_number = 1
+		ORDER BY scheduled_position
+		LIMIT ? OFFSET ?`,
+		channelID, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// First pass: collect items without nested queries
+	var items []ChannelScheduleItem
+	for rows.Next() {
+		var item ChannelScheduleItem
+		if rows.Scan(
+			&item.ID, &item.ChannelID, &item.MediaID, &item.MediaType,
+			&item.ScheduledPosition, &item.CycleNumber, &item.Duration,
+			&item.CumulativeStart, &item.Played,
+		) == nil {
+			items = append(items, item)
+		}
+	}
+	rowsErr := rows.Err()
+	rows.Close() // Close before nested queries
+
+	// Second pass: populate details
+	for i := range items {
+		db.populateScheduleItemDetails(&items[i])
+	}
+
+	return items, total, rowsErr
 }

@@ -260,6 +260,41 @@ func (db *DB) Migrate() error {
 			UNIQUE(media_id, media_type, section_id)
 		)`,
 
+		// Channels - virtual "live TV" feature
+		`CREATE TABLE IF NOT EXISTS channels (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT,
+			icon TEXT DEFAULT '📺',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS channel_sources (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			channel_id INTEGER NOT NULL,
+			source_type TEXT NOT NULL,
+			source_id INTEGER,
+			source_value TEXT,
+			weight INTEGER DEFAULT 1,
+			FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS channel_schedule (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			channel_id INTEGER NOT NULL,
+			media_id INTEGER NOT NULL,
+			media_type TEXT NOT NULL,
+			scheduled_position INTEGER NOT NULL,
+			cycle_number INTEGER DEFAULT 1,
+			duration INTEGER NOT NULL,
+			cumulative_start INTEGER NOT NULL,
+			played BOOLEAN DEFAULT 0,
+			FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
+		)`,
+
 		// Indexes for common queries
 		`CREATE INDEX IF NOT EXISTS idx_media_type ON media(type)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_title ON media(title)`,
@@ -280,6 +315,9 @@ func (db *DB) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_section_rules_section ON section_rules(section_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_sections_section ON media_sections(section_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_media_sections_media ON media_sections(media_id, media_type)`,
+		`CREATE INDEX IF NOT EXISTS idx_channels_user ON channels(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_channel_sources_channel ON channel_sources(channel_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_channel_schedule_channel ON channel_schedule(channel_id, cycle_number, scheduled_position)`,
 
 		// Insert default sections (only if sections table is empty)
 		`INSERT INTO sections (name, slug, icon, section_type, display_order, is_visible)
