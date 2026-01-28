@@ -279,6 +279,7 @@ func (db *DB) Migrate() error {
 			source_id INTEGER,
 			source_value TEXT,
 			weight INTEGER DEFAULT 1,
+			shuffle BOOLEAN DEFAULT 1,
 			FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
 		)`,
 
@@ -352,6 +353,17 @@ func (db *DB) Migrate() error {
 		FROM sections WHERE slug = 'extras' AND NOT EXISTS (
 			SELECT 1 FROM section_rules WHERE section_id = (SELECT id FROM sections WHERE slug = 'extras')
 		)`,
+	}
+
+	// Run migrations that might fail (e.g., column already exists)
+	optionalMigrations := []string{
+		// Add shuffle column to channel_sources for existing databases
+		`ALTER TABLE channel_sources ADD COLUMN shuffle BOOLEAN DEFAULT 1`,
+	}
+
+	for _, migration := range optionalMigrations {
+		// Ignore errors (column may already exist)
+		db.conn.Exec(migration)
 	}
 
 	for _, migration := range migrations {

@@ -29,6 +29,7 @@ type AddSourceRequest struct {
 	SourceID    *int64 `json:"source_id"`
 	SourceValue string `json:"source_value"`
 	Weight      int    `json:"weight"`
+	Shuffle     *bool  `json:"shuffle"` // Defaults to true if not provided
 }
 
 // ListChannels returns all channels for the current user
@@ -209,7 +210,13 @@ func (h *ChannelHandler) AddSource(c *gin.Context) {
 		return
 	}
 
-	source, err := h.db.AddChannelSource(channelID, req.SourceType, req.SourceID, req.SourceValue, req.Weight)
+	// Default shuffle to true if not provided
+	shuffle := true
+	if req.Shuffle != nil {
+		shuffle = *req.Shuffle
+	}
+
+	source, err := h.db.AddChannelSource(channelID, req.SourceType, req.SourceID, req.SourceValue, req.Weight, shuffle)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add source"})
 		return

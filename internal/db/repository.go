@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"errors"
+	"math/rand"
 	"time"
 )
 
@@ -1966,14 +1967,14 @@ func (db *DB) DeleteChannel(id int64) error {
 // ============ Channel Sources ============
 
 // AddChannelSource adds a content source to a channel
-func (db *DB) AddChannelSource(channelID int64, sourceType string, sourceID *int64, sourceValue string, weight int) (*ChannelSource, error) {
+func (db *DB) AddChannelSource(channelID int64, sourceType string, sourceID *int64, sourceValue string, weight int, shuffle bool) (*ChannelSource, error) {
 	if weight < 1 {
 		weight = 1
 	}
 
 	result, err := db.conn.Exec(
-		`INSERT INTO channel_sources (channel_id, source_type, source_id, source_value, weight) VALUES (?, ?, ?, ?, ?)`,
-		channelID, sourceType, sourceID, sourceValue, weight,
+		`INSERT INTO channel_sources (channel_id, source_type, source_id, source_value, weight, shuffle) VALUES (?, ?, ?, ?, ?, ?)`,
+		channelID, sourceType, sourceID, sourceValue, weight, shuffle,
 	)
 	if err != nil {
 		return nil, err
@@ -1987,9 +1988,9 @@ func (db *DB) AddChannelSource(channelID int64, sourceType string, sourceID *int
 func (db *DB) GetChannelSourceByID(id int64) (*ChannelSource, error) {
 	source := &ChannelSource{}
 	err := db.conn.QueryRow(
-		`SELECT id, channel_id, source_type, source_id, source_value, weight FROM channel_sources WHERE id = ?`,
+		`SELECT id, channel_id, source_type, source_id, source_value, weight, shuffle FROM channel_sources WHERE id = ?`,
 		id,
-	).Scan(&source.ID, &source.ChannelID, &source.SourceType, &source.SourceID, &source.SourceValue, &source.Weight)
+	).Scan(&source.ID, &source.ChannelID, &source.SourceType, &source.SourceID, &source.SourceValue, &source.Weight, &source.Shuffle)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
@@ -1999,7 +2000,7 @@ func (db *DB) GetChannelSourceByID(id int64) (*ChannelSource, error) {
 // GetChannelSources retrieves all sources for a channel
 func (db *DB) GetChannelSources(channelID int64) ([]ChannelSource, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, channel_id, source_type, source_id, source_value, weight FROM channel_sources WHERE channel_id = ?`,
+		`SELECT id, channel_id, source_type, source_id, source_value, weight, shuffle FROM channel_sources WHERE channel_id = ?`,
 		channelID,
 	)
 	if err != nil {
@@ -2011,7 +2012,7 @@ func (db *DB) GetChannelSources(channelID int64) ([]ChannelSource, error) {
 	var sources []ChannelSource
 	for rows.Next() {
 		var s ChannelSource
-		if err := rows.Scan(&s.ID, &s.ChannelID, &s.SourceType, &s.SourceID, &s.SourceValue, &s.Weight); err != nil {
+		if err := rows.Scan(&s.ID, &s.ChannelID, &s.SourceType, &s.SourceID, &s.SourceValue, &s.Weight, &s.Shuffle); err != nil {
 			continue
 		}
 		sources = append(sources, s)
@@ -2074,6 +2075,9 @@ type channelScheduleInput struct {
 
 // GenerateChannelSchedule generates or regenerates a channel's schedule
 func (db *DB) GenerateChannelSchedule(channelID int64) error {
+	// Seed random number generator
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+
 	// Get all sources for this channel
 	sources, err := db.GetChannelSources(channelID)
 	if err != nil {
@@ -2084,25 +2088,94 @@ func (db *DB) GenerateChannelSchedule(channelID int64) error {
 		return nil // No sources, nothing to schedule
 	}
 
-	// Collect all media items from sources
-	var items []channelScheduleInput
+	// Build per-source item lists
+	type sourceWithItems struct {
+		source ChannelSource
+		items  []channelScheduleInput
+	}
+	var sourcesWithItems []sourceWithItems
 
 	for _, source := range sources {
-		sourceItems := db.getMediaFromSource(source)
-		// Add items based on weight (higher weight = more copies)
-		for i := 0; i < source.Weight; i++ {
-			items = append(items, sourceItems...)
+		items := db.getMediaFromSource(source)
+		if len(items) == 0 {
+			continue // Skip empty sources
 		}
+
+		// Shuffle items only if source.Shuffle is true
+		if source.Shuffle {
+			rng.Shuffle(len(items), func(i, j int) {
+				items[i], items[j] = items[j], items[i]
+			})
+		}
+
+		sourcesWithItems = append(sourcesWithItems, sourceWithItems{source: source, items: items})
 	}
 
-	if len(items) == 0 {
+	if len(sourcesWithItems) == 0 {
 		return nil
 	}
 
-	// Shuffle items using Fisher-Yates
-	for i := len(items) - 1; i > 0; i-- {
-		j := int(time.Now().UnixNano()) % (i + 1)
-		items[i], items[j] = items[j], items[i]
+	var finalItems []channelScheduleInput
+
+	// Check if all sources have equal weight (fair rotation mode)
+	allEqualWeight := true
+	firstWeight := sourcesWithItems[0].source.Weight
+	for _, sw := range sourcesWithItems {
+		if sw.source.Weight != firstWeight {
+			allEqualWeight = false
+			break
+		}
+	}
+
+	if allEqualWeight && len(sourcesWithItems) > 1 {
+		// Fair rotation: cycle through sources in round-robin fashion
+		// Each source gets weight repetitions per cycle
+		weight := firstWeight
+
+		// Find the maximum number of items across all sources
+		maxItems := 0
+		for _, sw := range sourcesWithItems {
+			if len(sw.items) > maxItems {
+				maxItems = len(sw.items)
+			}
+		}
+
+		// Repeat for weight * maxItems rounds to ensure full coverage
+		totalRounds := weight * maxItems
+		sourceOrder := make([]int, len(sourcesWithItems))
+		for i := range sourceOrder {
+			sourceOrder[i] = i
+		}
+
+		for round := 0; round < totalRounds; round++ {
+			// Shuffle source order each round for variety
+			rng.Shuffle(len(sourceOrder), func(i, j int) {
+				sourceOrder[i], sourceOrder[j] = sourceOrder[j], sourceOrder[i]
+			})
+
+			// Pick one item from each source (wrapping around if needed)
+			for _, srcIdx := range sourceOrder {
+				sw := sourcesWithItems[srcIdx]
+				itemIdx := round % len(sw.items)
+				finalItems = append(finalItems, sw.items[itemIdx])
+			}
+		}
+	} else {
+		// Weighted shuffle: multiply items by weight and shuffle together
+		for _, sw := range sourcesWithItems {
+			for i := 0; i < sw.source.Weight; i++ {
+				finalItems = append(finalItems, sw.items...)
+			}
+		}
+
+		// Shuffle the combined list
+		rng.Shuffle(len(finalItems), func(i, j int) {
+			finalItems[i], finalItems[j] = finalItems[j], finalItems[i]
+		})
+	}
+
+	if len(finalItems) == 0 {
+		return nil
 	}
 
 	// Clear existing schedule
@@ -2113,7 +2186,7 @@ func (db *DB) GenerateChannelSchedule(channelID int64) error {
 
 	// Insert new schedule with cumulative timing
 	cumulativeStart := 0
-	for position, item := range items {
+	for position, item := range finalItems {
 		_, err = db.conn.Exec(
 			`INSERT INTO channel_schedule (channel_id, media_id, media_type, scheduled_position, cycle_number, duration, cumulative_start)
 			VALUES (?, ?, ?, ?, 1, ?, ?)`,

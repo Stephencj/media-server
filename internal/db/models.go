@@ -333,6 +333,7 @@ type ChannelSource struct {
 	SourceID    *int64 `json:"source_id,omitempty"`
 	SourceValue string `json:"source_value,omitempty"` // For extra_category: category name
 	Weight      int    `json:"weight"`                 // Higher = more frequent
+	Shuffle     bool   `json:"shuffle"`                // true=randomize items, false=play in order
 
 	// Populated for display
 	SourceName string `json:"source_name,omitempty"`

@@ -1078,6 +1078,48 @@
                 width: 100%;
             }
 
+            /* Channel Cards - Mobile Layout */
+            .channel-card {
+                flex-wrap: wrap;
+                padding: 1rem;
+                gap: 0.75rem;
+            }
+            .channel-icon {
+                width: 50px;
+                height: 50px;
+                font-size: 2rem;
+                flex-shrink: 0;
+            }
+            .channel-info {
+                flex: 1 1 calc(100% - 130px);
+                min-width: 120px;
+            }
+            .channel-name {
+                font-size: 1rem;
+            }
+            .channel-meta {
+                font-size: 0.8rem;
+            }
+            .channel-actions {
+                flex-shrink: 0;
+                gap: 4px;
+            }
+            .channel-actions .btn-icon {
+                padding: 10px;
+                min-width: 44px;
+                min-height: 44px;
+            }
+
+            /* Channel Player - Mobile Adjustments */
+            .channel-info-overlay {
+                top: 10px;
+                left: 10px;
+                padding: 8px 12px;
+            }
+            .channel-up-next {
+                display: none; /* Hide on mobile to avoid clutter */
+            }
+
             /* General Modal Fixes - All Modals Full-Screen on Mobile */
             .modal {
                 width: 100% !important;
@@ -2227,7 +2269,10 @@
                 <div id="channel-sources-list" class="sources-list" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; max-height: 200px; overflow-y: auto;">
                     <p style="color: #888;">Save channel first to add sources</p>
                 </div>
-                <button id="add-source-btn" class="btn-secondary btn-sm" onclick="showAddSourceModal()" style="display: none;">+ Add Source</button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button id="add-source-btn" class="btn-secondary btn-sm" onclick="showAddSourceModal()" style="display: none;">+ Add Source</button>
+                    <button id="regen-queue-btn" class="btn-secondary btn-sm" onclick="regenerateQueue()" style="display: none;">Regenerate Queue</button>
+                </div>
             </div>
 
             <div class="form-actions" style="margin-top: 1.5rem;">
@@ -2256,6 +2301,12 @@
                 <p style="color: #888; font-size: 0.85rem; margin-top: 0.25rem;">Higher weight = more frequent in rotation</p>
             </div>
 
+            <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="source-shuffle" checked style="width: auto;">
+                <label for="source-shuffle" style="margin: 0;">Shuffle items</label>
+            </div>
+            <p style="color: #888; font-size: 0.85rem; margin-top: -0.5rem;">Uncheck to play items in order (e.g., movie series)</p>
+
             <div class="form-actions" style="margin-top: 1.5rem;">
                 <button class="btn-secondary" onclick="closeAddSourceModal()">Cancel</button>
                 <button class="btn" onclick="addChannelSource()">Add</button>
@@ -2273,7 +2324,10 @@
                 <div class="now-playing-title" id="channel-now-title">Now Playing</div>
             </div>
             <div class="channel-up-next">
-                <h4>Up Next</h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h4 style="margin: 0;">Up Next</h4>
+                    <button onclick="regenerateChannelQueueFromPlayer()" title="Shuffle Queue" style="background: transparent; border: none; cursor: pointer; font-size: 1.2rem; padding: 4px 8px; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='transparent'">🔀</button>
+                </div>
                 <div id="channel-up-next" class="up-next-list"></div>
             </div>
         </div>
@@ -3251,6 +3305,7 @@
             document.getElementById('channel-icon-input').value = '📺';
             document.getElementById('channel-sources-list').innerHTML = '<p style="color: #888;">Save channel first to add sources</p>';
             document.getElementById('add-source-btn').style.display = 'none';
+            document.getElementById('regen-queue-btn').style.display = 'none';
             document.getElementById('channel-modal').classList.add('active');
         }
 
@@ -3268,6 +3323,7 @@
                 document.getElementById('channel-desc-input').value = channel.description || '';
                 document.getElementById('channel-icon-input').value = channel.icon || '📺';
                 document.getElementById('add-source-btn').style.display = 'block';
+                document.getElementById('regen-queue-btn').style.display = 'block';
 
                 await loadChannelSources(channelId);
 
@@ -3297,6 +3353,7 @@
                         <span class="source-type">${getSourceTypeIcon(source.source_type)}</span>
                         <span class="source-name">${escapeHtml(source.source_name || 'Unknown')}</span>
                         <span class="source-weight">×${source.weight}</span>
+                        ${!source.shuffle ? '<span style="color: #888; font-size: 0.8rem; margin-left: 4px;" title="Playing in order">In Order</span>' : ''}
                         <button class="btn-icon btn-sm" onclick="removeChannelSource(${source.id})">🗑️</button>
                     </div>
                 `).join('');
@@ -3447,6 +3504,7 @@
         async function addChannelSource() {
             const select = document.getElementById('source-select');
             const weight = parseInt(document.getElementById('source-weight').value) || 1;
+            const shuffle = document.getElementById('source-shuffle').checked;
 
             if (!select.value) {
                 showToast('Please select a source', 'error');
@@ -3456,7 +3514,8 @@
             const [sourceType, sourceIdOrValue] = select.value.split(':');
             const payload = {
                 source_type: sourceType,
-                weight: weight
+                weight: weight,
+                shuffle: shuffle
             };
 
             if (sourceType === 'extra_category') {
@@ -3508,6 +3567,56 @@
 
         function closeAddSourceModal() {
             document.getElementById('add-source-modal').classList.remove('active');
+            // Reset shuffle checkbox to checked for next use
+            document.getElementById('source-shuffle').checked = true;
+        }
+
+        async function regenerateQueue() {
+            if (!editingChannelId) return;
+
+            try {
+                const res = await api(`/api/channels/${editingChannelId}/regenerate`, { method: 'POST' });
+                if (!res.ok) throw new Error('Failed to regenerate');
+
+                showToast('Queue regenerated', 'success');
+                loadChannels();
+            } catch (err) {
+                showToast('Failed to regenerate queue', 'error');
+            }
+        }
+
+        async function regenerateChannelQueueFromPlayer() {
+            if (!window.currentChannel || !window.currentChannel.channel) return;
+
+            const channelId = window.currentChannel.channel.id;
+
+            try {
+                const res = await api(`/api/channels/${channelId}/regenerate`, { method: 'POST' });
+                if (!res.ok) throw new Error('Failed to regenerate');
+
+                showToast('Queue shuffled', 'success');
+
+                // Refresh the now playing data
+                const nowRes = await api(`/api/channels/${channelId}/now`);
+                if (nowRes.ok) {
+                    const data = await nowRes.json();
+                    window.currentChannel = data;
+                    // Update up-next list
+                    const upNextList = document.getElementById('channel-up-next');
+                    if (data.up_next && data.up_next.length > 0) {
+                        upNextList.innerHTML = data.up_next.map(item => `
+                            <div class="up-next-item">
+                                <span class="up-next-title">${escapeHtml(item.title || 'Unknown')}</span>
+                                <span class="up-next-duration">${formatDuration(item.duration)}</span>
+                            </div>
+                        `).join('');
+                    } else {
+                        upNextList.innerHTML = '<p style="color: #888;">Nothing scheduled next</p>';
+                    }
+                }
+            } catch (err) {
+                showToast('Failed to shuffle queue', 'error');
+            }
         }
 
         async function watchChannel(channelId) {
