@@ -360,8 +360,9 @@ type ChannelScheduleItem struct {
 	Played            bool      `json:"played"`
 
 	// Populated for display
-	Title       string `json:"title,omitempty"`
-	PosterPath  string `json:"poster_path,omitempty"`
+	Title        string `json:"title,omitempty"`
+	ShowTitle    string `json:"show_title,omitempty"`
+	PosterPath   string `json:"poster_path,omitempty"`
 	BackdropPath string `json:"backdrop_path,omitempty"`
 }
 

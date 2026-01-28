@@ -2595,12 +2595,12 @@ func (db *DB) populateScheduleItemDetails(item *ChannelScheduleItem) {
 		).Scan(&item.Title, &item.PosterPath, &item.BackdropPath)
 	case MediaTypeEpisode:
 		db.conn.QueryRow(
-			`SELECT e.title, t.poster_path, t.backdrop_path
+			`SELECT e.title, t.title, t.poster_path, t.backdrop_path
 			FROM episodes e
 			JOIN tv_shows t ON e.tv_show_id = t.id
 			WHERE e.id = ?`,
 			item.MediaID,
-		).Scan(&item.Title, &item.PosterPath, &item.BackdropPath)
+		).Scan(&item.Title, &item.ShowTitle, &item.PosterPath, &item.BackdropPath)
 	case MediaTypeExtra:
 		db.conn.QueryRow(
 			`SELECT title FROM extras WHERE id = ?`,

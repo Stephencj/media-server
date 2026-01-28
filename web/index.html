@@ -4157,18 +4157,20 @@
                 let timelineHtml = '';
                 if (np) {
                     const remaining = np.duration - elapsed;
+                    const npDisplayTitle = np.show_title ? `${np.show_title} - ${np.title}` : np.title;
                     timelineHtml += `
                         <div class="guide-program now-playing">
                             <div class="guide-program-badge">Now</div>
-                            <div class="guide-program-title">${escapeHtml(np.title || 'Unknown')}</div>
+                            <div class="guide-program-title">${escapeHtml(npDisplayTitle || 'Unknown')}</div>
                             <div class="guide-program-time">${formatDuration(remaining)} remaining</div>
                         </div>
                     `;
                 }
                 upNext.slice(0, 3).forEach(item => {
+                    const displayTitle = item.show_title ? `${item.show_title} - ${item.title}` : item.title;
                     timelineHtml += `
                         <div class="guide-program">
-                            <div class="guide-program-title">${escapeHtml(item.title || 'Unknown')}</div>
+                            <div class="guide-program-title">${escapeHtml(displayTitle || 'Unknown')}</div>
                             <div class="guide-program-time">${formatDuration(item.duration)}</div>
                         </div>
                     `;
@@ -4197,10 +4199,11 @@
                 const elapsed = nowPlaying?.elapsed || 0;
                 const progressPercent = np && np.duration > 0 ? Math.round((elapsed / np.duration) * 100) : 0;
 
+                const npDisplayTitle = np && np.show_title ? `${np.show_title} - ${np.title}` : (np?.title || 'Unknown');
                 let nowPlayingHtml = np ? `
                     <div class="guide-card-now">
                         <div class="guide-card-now-label">Now Playing</div>
-                        <div class="guide-card-now-title">${escapeHtml(np.title || 'Unknown')}</div>
+                        <div class="guide-card-now-title">${escapeHtml(npDisplayTitle)}</div>
                         <div class="guide-card-now-progress">
                             <div class="progress-bar"><div class="progress-bar-fill" style="width: ${progressPercent}%"></div></div>
                         </div>
@@ -4210,12 +4213,14 @@
                 let upNextHtml = upNext.length > 0 ? `
                     <div class="guide-card-up-next">
                         <div class="guide-card-up-next-label">Up Next</div>
-                        ${upNext.slice(0, 3).map(item => `
+                        ${upNext.slice(0, 3).map(item => {
+                            const displayTitle = item.show_title ? `${item.show_title} - ${item.title}` : item.title;
+                            return `
                             <div class="guide-card-up-next-item">
-                                <span>${escapeHtml(item.title || 'Unknown')}</span>
+                                <span>${escapeHtml(displayTitle || 'Unknown')}</span>
                                 <span>${formatDuration(item.duration)}</span>
                             </div>
-                        `).join('')}
+                        `;}).join('')}
                     </div>
                 ` : '';
 
