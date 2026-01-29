@@ -250,6 +250,25 @@ class APIClient: ObservableObject {
         try await get("/api/playlists/\(id)")
     }
 
+    // MARK: - Channel Endpoints
+
+    func getChannels() async throws -> ChannelsResponse {
+        try await get("/api/channels")
+    }
+
+    func getChannelNowPlaying(channelId: Int64) async throws -> ChannelNowPlayingResponse {
+        try await get("/api/channels/\(channelId)/now")
+    }
+
+    func getChannelSchedule(channelId: Int64, limit: Int = 50, offset: Int = 0) async throws -> ChannelScheduleResponse {
+        try await get("/api/channels/\(channelId)/schedule?limit=\(limit)&offset=\(offset)")
+    }
+
+    func getChannelStreamURL(channelId: Int64) -> URL? {
+        guard let token = authToken else { return nil }
+        return URL(string: "\(baseURL)/api/channels/\(channelId)/stream?token=\(token)")
+    }
+
     func createPlaylist(name: String, description: String?) async throws -> Playlist {
         let request = CreatePlaylistRequest(name: name, description: description)
         return try await post("/api/playlists", body: request)

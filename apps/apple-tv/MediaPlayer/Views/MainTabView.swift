@@ -31,17 +31,23 @@ struct MainTabView: View {
                     }
                     .tag(3)
 
+                ChannelListView()
+                    .tabItem {
+                        Label("Channels", systemImage: "tv.inset.filled")
+                    }
+                    .tag(4)
+
                 SearchView()
                     .tabItem {
                         Label("Search", systemImage: "magnifyingglass")
                     }
-                    .tag(4)
+                    .tag(5)
 
                 SettingsView()
                     .tabItem {
                         Label("Settings", systemImage: "gear")
                     }
-                    .tag(5)
+                    .tag(6)
             }
 
             // Error toast overlay

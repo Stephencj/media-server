@@ -35,6 +35,16 @@
 		A10000000000000000000026 /* TVShowDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* TVShowDetailView.swift */; };
 		A10000000000000000000027 /* TVShowDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* TVShowDetailViewModel.swift */; };
 		A10000000000000000000028 /* Section.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* Section.swift */; };
+		A10000000000000000000029 /* Channel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000029 /* Channel.swift */; };
+		A10000000000000000000030 /* ChannelViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000030 /* ChannelViewModel.swift */; };
+		A10000000000000000000031 /* ChannelPlayerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000031 /* ChannelPlayerViewModel.swift */; };
+		A10000000000000000000032 /* ChannelListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000032 /* ChannelListView.swift */; };
+		A10000000000000000000033 /* ChannelPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000033 /* ChannelPlayerView.swift */; };
+		A10000000000000000000034 /* ChannelCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* ChannelCardView.swift */; };
+		A10000000000000000000035 /* ChannelGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* ChannelGuideView.swift */; };
+		A10000000000000000000036 /* ChannelGuideViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* ChannelGuideViewModel.swift */; };
+		A10000000000000000000037 /* ChannelGuideRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* ChannelGuideRowView.swift */; };
+		A10000000000000000000038 /* ChannelSwitchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* ChannelSwitchOverlay.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -66,6 +76,16 @@
 		A20000000000000000000026 /* TVShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVShowDetailView.swift; sourceTree = "<group>"; };
 		A20000000000000000000027 /* TVShowDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVShowDetailViewModel.swift; sourceTree = "<group>"; };
 		A20000000000000000000028 /* Section.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Section.swift; sourceTree = "<group>"; };
+		A20000000000000000000029 /* Channel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Channel.swift; sourceTree = "<group>"; };
+		A20000000000000000000030 /* ChannelViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelViewModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000031 /* ChannelPlayerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelPlayerViewModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000032 /* ChannelListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelListView.swift; sourceTree = "<group>"; };
+		A20000000000000000000033 /* ChannelPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelPlayerView.swift; sourceTree = "<group>"; };
+		A20000000000000000000034 /* ChannelCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelCardView.swift; sourceTree = "<group>"; };
+		A20000000000000000000035 /* ChannelGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideView.swift; sourceTree = "<group>"; };
+		A20000000000000000000036 /* ChannelGuideViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideViewModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000037 /* ChannelGuideRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideRowView.swift; sourceTree = "<group>"; };
+		A20000000000000000000038 /* ChannelSwitchOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelSwitchOverlay.swift; sourceTree = "<group>"; };
 		A30000000000000000000001 /* MediaPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediaPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -124,6 +144,9 @@
 				A20000000000000000000010 /* SettingsView.swift */,
 				A20000000000000000000023 /* PlaylistView.swift */,
 				A20000000000000000000026 /* TVShowDetailView.swift */,
+				A20000000000000000000032 /* ChannelListView.swift */,
+				A20000000000000000000033 /* ChannelPlayerView.swift */,
+				A20000000000000000000035 /* ChannelGuideView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -137,6 +160,9 @@
 				A20000000000000000000014 /* PlayerViewModel.swift */,
 				A20000000000000000000024 /* PlaylistViewModel.swift */,
 				A20000000000000000000027 /* TVShowDetailViewModel.swift */,
+				A20000000000000000000030 /* ChannelViewModel.swift */,
+				A20000000000000000000031 /* ChannelPlayerViewModel.swift */,
+				A20000000000000000000036 /* ChannelGuideViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -149,6 +175,7 @@
 				A20000000000000000000017 /* Progress.swift */,
 				A20000000000000000000022 /* Playlist.swift */,
 				A20000000000000000000028 /* Section.swift */,
+				A20000000000000000000029 /* Channel.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -167,6 +194,9 @@
 			children = (
 				A20000000000000000000020 /* MediaCardView.swift */,
 				A20000000000000000000025 /* AddToPlaylistSheet.swift */,
+				A20000000000000000000034 /* ChannelCardView.swift */,
+				A20000000000000000000037 /* ChannelGuideRowView.swift */,
+				A20000000000000000000038 /* ChannelSwitchOverlay.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -275,6 +305,16 @@
 				A10000000000000000000019 /* AuthService.swift in Sources */,
 				A10000000000000000000020 /* MediaCardView.swift in Sources */,
 				A10000000000000000000025 /* AddToPlaylistSheet.swift in Sources */,
+				A10000000000000000000029 /* Channel.swift in Sources */,
+				A10000000000000000000030 /* ChannelViewModel.swift in Sources */,
+				A10000000000000000000031 /* ChannelPlayerViewModel.swift in Sources */,
+				A10000000000000000000032 /* ChannelListView.swift in Sources */,
+				A10000000000000000000033 /* ChannelPlayerView.swift in Sources */,
+				A10000000000000000000034 /* ChannelCardView.swift in Sources */,
+				A10000000000000000000035 /* ChannelGuideView.swift in Sources */,
+				A10000000000000000000036 /* ChannelGuideViewModel.swift in Sources */,
+				A10000000000000000000037 /* ChannelGuideRowView.swift in Sources */,
+				A10000000000000000000038 /* ChannelSwitchOverlay.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
