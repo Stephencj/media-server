@@ -2654,10 +2654,13 @@
                 </div>
 
                 <div class="form-group" id="commentary-option" style="display: none; margin-top: 0.75rem;">
-                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
-                        <input type="checkbox" id="include-commentary" style="width: auto;">
-                        <span>Include Commentary Tracks</span>
-                    </label>
+                    <label style="margin-bottom: 0.5rem; display: block;">Episode Versions</label>
+                    <select id="version-mode" class="form-input" style="width: auto; min-width: 180px;">
+                        <option value="main">Main Only</option>
+                        <option value="commentary">Commentary Only</option>
+                        <option value="both">Both</option>
+                    </select>
+                    <p style="color: #888; font-size: 0.75rem; margin-top: 0.25rem;">Choose which episode versions to include</p>
                 </div>
 
                 <div class="form-group" id="extras-options" style="display: none; margin-top: 0.75rem;">
@@ -3778,9 +3781,13 @@
                 parts.push('S' + seasonList.join(','));
             }
 
-            // Commentary
-            if (source.options.include_commentary) {
-                parts.push('Commentary');
+            // Version mode (handle backward compatibility)
+            const versionMode = source.options.version_mode ||
+                (source.options.include_commentary ? 'both' : 'main');
+            if (versionMode === 'commentary') {
+                parts.push('Commentary Only');
+            } else if (versionMode === 'both') {
+                parts.push('+Commentary');
             }
 
             // Extras
@@ -3970,11 +3977,11 @@
                     document.getElementById('seasons-options').style.display = 'none';
                 }
 
-                // Show/hide commentary option
+                // Show/hide version mode dropdown (only if show has commentary)
                 const commentaryOption = document.getElementById('commentary-option');
                 if (currentShowOptions.has_commentary) {
                     commentaryOption.style.display = 'block';
-                    document.getElementById('include-commentary').checked = false;
+                    document.getElementById('version-mode').value = 'main';
                 } else {
                     commentaryOption.style.display = 'none';
                 }
@@ -4056,9 +4063,10 @@
                     }
                 }
 
-                // Check commentary
-                if (document.getElementById('include-commentary').checked) {
-                    options.include_commentary = true;
+                // Get version mode (only add if not default 'main')
+                const versionMode = document.getElementById('version-mode').value;
+                if (versionMode && versionMode !== 'main') {
+                    options.version_mode = versionMode;
                 }
 
                 // Check extras categories
@@ -4501,8 +4509,9 @@
             try {
                 const channelsRes = await api('/api/channels');
                 if (!channelsRes.ok) throw new Error('Failed to fetch channels');
-                const channelsData = await channelsRes.json();
-                const channels = channelsData.items || [];
+                const channelsResponse = await channelsRes.json();
+                const channels = channelsResponse.items || [];
+                channelsData = channels;  // Update global for channel switcher
 
                 if (channels.length === 0) {
                     renderEmptyGuide();

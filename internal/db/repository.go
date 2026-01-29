@@ -2240,41 +2240,49 @@ func (db *DB) getMediaFromSource(source ChannelSource) []channelScheduleInput {
 	switch source.SourceType {
 	case ChannelSourceShow:
 		if source.SourceID != nil {
-			// Build query with optional season filtering
-			query := `SELECT id, title, duration, season_number FROM episodes WHERE tv_show_id = ? AND duration > 0`
-			rows, err := db.conn.Query(query, *source.SourceID)
-			if err == nil {
-				defer rows.Close()
+			// Determine version mode (main, commentary, or both)
+			versionMode := VersionModeMain
+			if source.Options != nil {
+				versionMode = source.Options.GetEffectiveVersionMode()
+			}
 
-				// Build season filter set if options specify seasons
-				var seasonFilter map[int]bool
-				if source.Options != nil && len(source.Options.Seasons) > 0 {
-					seasonFilter = make(map[int]bool)
-					for _, s := range source.Options.Seasons {
-						seasonFilter[s] = true
-					}
-				}
+			// Add regular episodes (unless commentary-only mode)
+			if versionMode == VersionModeMain || versionMode == VersionModeBoth {
+				query := `SELECT id, title, duration, season_number FROM episodes WHERE tv_show_id = ? AND duration > 0`
+				rows, err := db.conn.Query(query, *source.SourceID)
+				if err == nil {
+					defer rows.Close()
 
-				for rows.Next() {
-					var i channelScheduleInput
-					var duration sql.NullInt64
-					var seasonNum int
-					if rows.Scan(&i.MediaID, &i.Title, &duration, &seasonNum) == nil {
-						// Skip if season filtering is active and this season isn't selected
-						if seasonFilter != nil && !seasonFilter[seasonNum] {
-							continue
+					// Build season filter set if options specify seasons
+					var seasonFilter map[int]bool
+					if source.Options != nil && len(source.Options.Seasons) > 0 {
+						seasonFilter = make(map[int]bool)
+						for _, s := range source.Options.Seasons {
+							seasonFilter[s] = true
 						}
-						i.MediaType = MediaTypeEpisode
-						i.Duration = int(duration.Int64)
-						if i.Duration > 0 {
-							items = append(items, i)
+					}
+
+					for rows.Next() {
+						var i channelScheduleInput
+						var duration sql.NullInt64
+						var seasonNum int
+						if rows.Scan(&i.MediaID, &i.Title, &duration, &seasonNum) == nil {
+							// Skip if season filtering is active and this season isn't selected
+							if seasonFilter != nil && !seasonFilter[seasonNum] {
+								continue
+							}
+							i.MediaType = MediaTypeEpisode
+							i.Duration = int(duration.Int64)
+							if i.Duration > 0 {
+								items = append(items, i)
+							}
 						}
 					}
 				}
 			}
 
-			// Add commentary extras if requested
-			if source.Options != nil && source.Options.IncludeCommentary {
+			// Add commentary (if commentary or both mode)
+			if versionMode == VersionModeCommentary || versionMode == VersionModeBoth {
 				extras := db.getShowExtrasForChannel(*source.SourceID, []string{string(ExtraCategoryCommentary)}, nil)
 				items = append(items, extras...)
 			}

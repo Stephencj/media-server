@@ -325,11 +325,35 @@ type Channel struct {
 	ItemCount     int `json:"item_count,omitempty"`     // Total items in schedule
 }
 
+// Version mode constants for TV show sources
+const (
+	VersionModeMain       = "main"       // Only regular episodes (default)
+	VersionModeCommentary = "commentary" // Only commentary tracks
+	VersionModeBoth       = "both"       // Both regular episodes and commentary
+)
+
 // ChannelSourceOptions contains filtering options for TV show sources
 type ChannelSourceOptions struct {
-	Seasons           []int    `json:"seasons,omitempty"`            // Specific seasons to include (nil = all)
-	IncludeCommentary bool     `json:"include_commentary,omitempty"` // Include commentary tracks
-	ExtrasCategories  []string `json:"extras_categories,omitempty"`  // Extra categories to include
+	Seasons          []int    `json:"seasons,omitempty"`            // Specific seasons to include (nil = all)
+	VersionMode      string   `json:"version_mode,omitempty"`       // "main", "commentary", or "both"
+	ExtrasCategories []string `json:"extras_categories,omitempty"`  // Extra categories to include
+	// Deprecated: kept for backward compatibility, use VersionMode instead
+	IncludeCommentary *bool `json:"include_commentary,omitempty"`
+}
+
+// GetEffectiveVersionMode returns the version mode, handling backward compatibility
+func (o *ChannelSourceOptions) GetEffectiveVersionMode() string {
+	if o == nil {
+		return VersionModeMain
+	}
+	if o.VersionMode != "" {
+		return o.VersionMode
+	}
+	// Backward compat: include_commentary=true maps to "both"
+	if o.IncludeCommentary != nil && *o.IncludeCommentary {
+		return VersionModeBoth
+	}
+	return VersionModeMain
 }
 
 // ChannelSource defines a content source for a channel
