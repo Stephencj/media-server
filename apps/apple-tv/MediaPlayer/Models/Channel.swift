@@ -77,7 +77,15 @@ struct ChannelScheduleItem: Codable, Identifiable, Hashable {
     }
 
     func toMedia() -> Media {
-        let type: MediaType = mediaType == "episode" ? .episode : .movie
+        let type: MediaType
+        switch mediaType {
+        case "episode":
+            type = .episode
+        case "extra":
+            type = .extra
+        default:
+            type = .movie
+        }
         return Media(
             id: mediaId,
             title: title,

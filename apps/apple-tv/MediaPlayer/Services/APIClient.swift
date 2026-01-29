@@ -170,13 +170,29 @@ class APIClient: ObservableObject {
 
     func getStreamURL(mediaId: Int64, mediaType: MediaType = .movie) -> URL? {
         guard let token = authToken else { return nil }
-        let typeParam = mediaType == .episode ? "&type=episode" : ""
+        let typeParam: String
+        switch mediaType {
+        case .episode:
+            typeParam = "&type=episode"
+        case .extra:
+            typeParam = "&type=extra"
+        default:
+            typeParam = ""
+        }
         return URL(string: "\(baseURL)/api/stream/\(mediaId)/manifest.m3u8?token=\(token)\(typeParam)")
     }
 
     func getDirectPlayURL(mediaId: Int64, mediaType: MediaType = .movie) -> URL? {
         guard let token = authToken else { return nil }
-        let typeParam = mediaType == .episode ? "&type=episode" : ""
+        let typeParam: String
+        switch mediaType {
+        case .episode:
+            typeParam = "&type=episode"
+        case .extra:
+            typeParam = "&type=extra"
+        default:
+            typeParam = ""
+        }
         return URL(string: "\(baseURL)/api/stream/\(mediaId)/direct?token=\(token)\(typeParam)")
     }
 

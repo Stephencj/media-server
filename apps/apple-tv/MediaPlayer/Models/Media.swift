@@ -4,6 +4,7 @@ enum MediaType: String, Codable {
     case movie
     case tvshow
     case episode
+    case extra
 }
 
 struct Media: Identifiable, Codable, Hashable {
