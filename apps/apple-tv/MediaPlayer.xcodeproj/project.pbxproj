@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* MediaPlayerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* MediaPlayerApp.swift */; };
 		A10000000000000000000002 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* AppState.swift */; };
-		A10000000000000000000003 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* LoginView.swift */; };
 		A10000000000000000000004 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* MainTabView.swift */; };
 		A10000000000000000000005 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* HomeView.swift */; };
 		A10000000000000000000006 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* LibraryView.swift */; };
@@ -45,12 +44,12 @@
 		A10000000000000000000036 /* ChannelGuideViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* ChannelGuideViewModel.swift */; };
 		A10000000000000000000037 /* ChannelGuideRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* ChannelGuideRowView.swift */; };
 		A10000000000000000000038 /* ChannelSwitchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* ChannelSwitchOverlay.swift */; };
+		A10000000000000000000099 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000099 /* Secrets.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		A20000000000000000000001 /* MediaPlayerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaPlayerApp.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
-		A20000000000000000000003 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		A20000000000000000000006 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
@@ -86,6 +85,7 @@
 		A20000000000000000000036 /* ChannelGuideViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideViewModel.swift; sourceTree = "<group>"; };
 		A20000000000000000000037 /* ChannelGuideRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideRowView.swift; sourceTree = "<group>"; };
 		A20000000000000000000038 /* ChannelSwitchOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelSwitchOverlay.swift; sourceTree = "<group>"; };
+		A20000000000000000000099 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
 		A30000000000000000000001 /* MediaPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediaPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -111,13 +111,13 @@
 		A50000000000000000000002 /* MediaPlayer */ = {
 			isa = PBXGroup;
 			children = (
-				A50000000000000000000003 /* App */,
 				A50000000000000000000004 /* Views */,
 				A50000000000000000000005 /* ViewModels */,
 				A50000000000000000000006 /* Models */,
 				A50000000000000000000007 /* Services */,
 				A50000000000000000000008 /* Components */,
 				A20000000000000000000021 /* Assets.xcassets */,
+				A50000000000000000000003 /* App */,
 			);
 			path = MediaPlayer;
 			sourceTree = "<group>";
@@ -127,6 +127,7 @@
 			children = (
 				A20000000000000000000001 /* MediaPlayerApp.swift */,
 				A20000000000000000000002 /* AppState.swift */,
+				A20000000000000000000099 /* Secrets.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -134,7 +135,6 @@
 		A50000000000000000000004 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				A20000000000000000000003 /* LoginView.swift */,
 				A20000000000000000000004 /* MainTabView.swift */,
 				A20000000000000000000005 /* HomeView.swift */,
 				A20000000000000000000006 /* LibraryView.swift */,
@@ -280,7 +280,7 @@
 			files = (
 				A10000000000000000000001 /* MediaPlayerApp.swift in Sources */,
 				A10000000000000000000002 /* AppState.swift in Sources */,
-				A10000000000000000000003 /* LoginView.swift in Sources */,
+				A10000000000000000000099 /* Secrets.swift in Sources */,
 				A10000000000000000000004 /* MainTabView.swift in Sources */,
 				A10000000000000000000005 /* HomeView.swift in Sources */,
 				A10000000000000000000006 /* LibraryView.swift in Sources */,
@@ -443,7 +443,7 @@
 		B10000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -469,7 +469,7 @@
 		B10000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "App Icon & Top Shelf Image";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

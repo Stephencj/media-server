@@ -61,7 +61,10 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/exchange", authHandler.ExchangeDeviceKey)
 			auth.POST("/refresh", authHandler.RefreshToken)
+			auth.POST("/web-login/create", authHandler.CreateWebLoginCode)
+			auth.GET("/web-login/poll", authHandler.PollWebLoginCode)
 		}
 
 		// Deployment status (public - for deploy app monitoring)
@@ -75,6 +78,9 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 		protected := api.Group("")
 		protected.Use(middleware.JWTAuth(cfg.JWTSecret))
 		{
+			// Authenticated iOS device claims a web-login code from a QR scan.
+			protected.POST("/auth/web-login/claim", authHandler.ClaimWebLoginCode)
+
 			// Library
 			library := protected.Group("/library")
 			{

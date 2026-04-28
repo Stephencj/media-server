@@ -20,58 +20,42 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if appState.serverURL.isEmpty {
-                SettingsView()
-            } else if authService.isAuthenticated {
-                WebView()
+            if authService.isAuthenticated {
+                MainTabView()
+            } else if authService.isLoading {
+                ProgressView("Connecting...")
+                    .font(.title3)
             } else {
-                LoginPromptView()
+                VStack(spacing: 20) {
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.system(size: 50))
+                        .foregroundColor(.secondary)
+
+                    Text("Unable to connect")
+                        .font(.title3)
+
+                    Text(appState.serverURL)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    if let err = authService.lastAuthError {
+                        Text(err)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+
+                    Button("Retry") {
+                        Task {
+                            await authService.ensureAuthenticated()
+                        }
+                    }
+                }
             }
         }
         .task {
-            await authService.checkAuthState()
+            await authService.ensureAuthenticated()
         }
     }
-}
-
-struct LoginPromptView: View {
-    @EnvironmentObject var appState: AppState
-
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 20) {
-                Image(systemName: "play.tv")
-                    .font(.system(size: 80))
-                    .foregroundColor(.blue)
-
-                Text("Welcome to Media Server")
-                    .font(.title)
-                    .fontWeight(.bold)
-
-                Text("Please configure your server URL in settings, then login through the web interface.")
-                    .font(.body)
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal)
-
-                NavigationLink(destination: SettingsView()) {
-                    Label("Open Settings", systemImage: "gear")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .padding()
-                        .background(Color.blue)
-                        .cornerRadius(10)
-                }
-                .padding(.top)
-            }
-            .padding()
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-}
-
-#Preview {
-    RootView()
-        .environmentObject(AuthService.shared)
-        .environmentObject(AppState.shared)
 }

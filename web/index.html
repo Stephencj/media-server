@@ -2303,6 +2303,16 @@
         <div class="tabs">
             <button class="tab active" onclick="showAuthTab('login')">Login</button>
             <button class="tab" onclick="showAuthTab('register')">Register</button>
+            <button class="tab" onclick="showAuthTab('qr')">Sign in with iOS app</button>
+        </div>
+
+        <div id="qr-form" class="hidden">
+            <p style="text-align:center; opacity: 0.8; margin-bottom: 16px;">
+                Open the Media Server app on your iPhone, tap Settings &rarr; Scan to log in browser, and point the camera at this code.
+            </p>
+            <div id="qr-canvas" style="display:flex; justify-content:center; align-items:center; min-height: 220px;"></div>
+            <p id="qr-countdown" style="text-align:center; opacity: 0.7; margin-top: 12px;">Generating code…</p>
+            <p id="qr-status" style="text-align:center; min-height: 1.2em; margin-top: 4px;"></p>
         </div>
 
         <div id="login-form">
@@ -2990,6 +3000,96 @@
             event.target.classList.add('active');
             document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
             document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+            document.getElementById('qr-form').classList.toggle('hidden', tab !== 'qr');
+            if (tab === 'qr') {
+                startQrLogin();
+            } else {
+                stopQrLogin();
+            }
+        }
+
+        // ---- QR scan-to-log-in flow ----
+        let qrPollTimer = null;
+        let qrCountdownTimer = null;
+        let qrInstance = null;
+        let qrActiveCode = null;
+
+        function stopQrLogin() {
+            if (qrPollTimer) { clearInterval(qrPollTimer); qrPollTimer = null; }
+            if (qrCountdownTimer) { clearInterval(qrCountdownTimer); qrCountdownTimer = null; }
+            qrActiveCode = null;
+        }
+
+        async function startQrLogin() {
+            stopQrLogin();
+            const canvas = document.getElementById('qr-canvas');
+            const status = document.getElementById('qr-status');
+            const countdown = document.getElementById('qr-countdown');
+            status.textContent = '';
+            countdown.textContent = 'Generating code…';
+            canvas.innerHTML = '';
+
+            let res;
+            try {
+                res = await fetch('/api/auth/web-login/create', { method: 'POST' });
+            } catch (e) {
+                status.textContent = 'Network error: ' + e.message;
+                status.style.color = '#f55';
+                return;
+            }
+            if (!res.ok) {
+                status.textContent = 'Failed to start sign-in (' + res.status + ')';
+                status.style.color = '#f55';
+                return;
+            }
+            const body = await res.json();
+            qrActiveCode = body.code;
+
+            const payload = 'mediaserver://login?code=' + body.code;
+            qrInstance = new QRCode(canvas, {
+                text: payload,
+                width: 220,
+                height: 220,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+
+            const expiresAt = body.expires_at * 1000;
+            const updateCountdown = () => {
+                const secs = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+                countdown.textContent = secs > 0 ? 'Expires in ' + secs + 's' : 'Refreshing…';
+                if (secs <= 0) {
+                    startQrLogin();
+                }
+            };
+            updateCountdown();
+            qrCountdownTimer = setInterval(updateCountdown, 1000);
+
+            qrPollTimer = setInterval(() => pollQrLogin(body.code), 2000);
+        }
+
+        async function pollQrLogin(code) {
+            if (qrActiveCode !== code) return;
+            let res;
+            try {
+                res = await fetch('/api/auth/web-login/poll?code=' + encodeURIComponent(code));
+            } catch (e) {
+                return; // transient — keep polling
+            }
+            if (res.status === 204) return;
+            if (res.status === 410 || res.status === 404) {
+                startQrLogin(); // refresh to a new code
+                return;
+            }
+            if (res.ok) {
+                const body = await res.json();
+                stopQrLogin();
+                localStorage.setItem('token', body.token);
+                document.getElementById('qr-status').textContent = 'Signed in! Reloading…';
+                document.getElementById('qr-status').style.color = '#5d5';
+                setTimeout(() => window.location.reload(), 400);
+            }
         }
 
         async function login() {
@@ -7014,6 +7114,7 @@
         });
 
     </script>
+    <script src="assets/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 
     <!-- Bottom Navigation (Mobile Only) -->

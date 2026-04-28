@@ -118,6 +118,170 @@ func (db *DB) GetUserByUsername(username string) (*User, error) {
 	return user, err
 }
 
+// ============ Device Key Methods ============
+
+// GetDeviceKeyByHash retrieves a device key by its SHA-256 key hash.
+// Returns ErrNotFound if no matching, non-revoked key exists.
+func (db *DB) GetDeviceKeyByHash(keyHash string) (*DeviceKey, error) {
+	dk := &DeviceKey{}
+	var lastUsed, revoked sql.NullTime
+	err := db.conn.QueryRow(
+		`SELECT id, user_id, label, key_hash, last_used_at, revoked_at, created_at
+		 FROM device_keys WHERE key_hash = ? AND revoked_at IS NULL`,
+		keyHash,
+	).Scan(&dk.ID, &dk.UserID, &dk.Label, &dk.KeyHash, &lastUsed, &revoked, &dk.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if lastUsed.Valid {
+		dk.LastUsedAt = &lastUsed.Time
+	}
+	return dk, nil
+}
+
+// TouchDeviceKey updates the last_used_at timestamp for a device key.
+func (db *DB) TouchDeviceKey(id int64) error {
+	_, err := db.conn.Exec(`UPDATE device_keys SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
+	return err
+}
+
+// UpsertDeviceKey inserts a device key by label, or no-ops if the label exists.
+// Used by SeedDeviceKeys at startup so re-seeding is idempotent.
+func (db *DB) UpsertDeviceKey(userID int64, label, keyHash string) error {
+	_, err := db.conn.Exec(
+		`INSERT OR IGNORE INTO device_keys (user_id, label, key_hash) VALUES (?, ?, ?)`,
+		userID, label, keyHash,
+	)
+	return err
+}
+
+// CountDeviceKeys returns the number of non-revoked device keys.
+func (db *DB) CountDeviceKeys() (int, error) {
+	var n int
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM device_keys WHERE revoked_at IS NULL`).Scan(&n)
+	return n, err
+}
+
+// ============ Web Login Code Methods ============
+
+// CreateWebLoginCode inserts a new code with the given expiration.
+func (db *DB) CreateWebLoginCode(codeHash string, expiresAt time.Time) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO web_login_codes (code_hash, expires_at) VALUES (?, ?)`,
+		codeHash, expiresAt,
+	)
+	return err
+}
+
+// ClaimWebLoginCode binds a still-pending code to userID. Returns ErrNotFound
+// if the code doesn't exist, is expired, or has already been claimed.
+func (db *DB) ClaimWebLoginCode(codeHash string, userID int64) error {
+	res, err := db.conn.Exec(
+		`UPDATE web_login_codes
+		   SET user_id = ?, claimed_at = CURRENT_TIMESTAMP
+		 WHERE code_hash = ?
+		   AND expires_at > CURRENT_TIMESTAMP
+		   AND claimed_at IS NULL`,
+		userID, codeHash,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// WebLoginPollResult describes the outcome of polling for a claimed code.
+type WebLoginPollResult int
+
+const (
+	// WebLoginNotFound means no row exists for this code hash.
+	WebLoginNotFound WebLoginPollResult = iota
+	// WebLoginPending means the code exists but no iOS device has claimed it yet.
+	WebLoginPending
+	// WebLoginExpired means the code expired before being claimed, or has already
+	// been consumed by a prior poll.
+	WebLoginExpired
+	// WebLoginReady means the code was claimed and we just consumed it; the
+	// caller should now mint a JWT for the returned user.
+	WebLoginReady
+)
+
+// ConsumeWebLoginCode atomically marks a claimed code as consumed and returns
+// the owning user. Wrapped in BEGIN IMMEDIATE so two concurrent browser polls
+// can't both succeed.
+func (db *DB) ConsumeWebLoginCode(codeHash string) (WebLoginPollResult, *User, error) {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return WebLoginNotFound, nil, err
+	}
+	defer tx.Rollback()
+
+	var (
+		id         int64
+		userID     sql.NullInt64
+		claimedAt  sql.NullTime
+		consumedAt sql.NullTime
+		expiresAt  time.Time
+	)
+	err = tx.QueryRow(
+		`SELECT id, user_id, claimed_at, consumed_at, expires_at
+		   FROM web_login_codes WHERE code_hash = ?`,
+		codeHash,
+	).Scan(&id, &userID, &claimedAt, &consumedAt, &expiresAt)
+	if err == sql.ErrNoRows {
+		return WebLoginNotFound, nil, nil
+	}
+	if err != nil {
+		return WebLoginNotFound, nil, err
+	}
+
+	if consumedAt.Valid || time.Now().After(expiresAt) {
+		return WebLoginExpired, nil, nil
+	}
+	if !claimedAt.Valid || !userID.Valid {
+		return WebLoginPending, nil, nil
+	}
+
+	if _, err := tx.Exec(
+		`UPDATE web_login_codes SET consumed_at = CURRENT_TIMESTAMP WHERE id = ?`, id,
+	); err != nil {
+		return WebLoginNotFound, nil, err
+	}
+
+	user := &User{}
+	err = tx.QueryRow(
+		`SELECT id, username, email, password_hash, created_at, updated_at FROM users WHERE id = ?`,
+		userID.Int64,
+	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return WebLoginNotFound, nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return WebLoginNotFound, nil, err
+	}
+	return WebLoginReady, user, nil
+}
+
+// FirstUser returns the lowest-id user, used as the default owner when seeding device keys.
+func (db *DB) FirstUser() (*User, error) {
+	user := &User{}
+	err := db.conn.QueryRow(
+		`SELECT id, username, email, password_hash, created_at, updated_at FROM users ORDER BY id ASC LIMIT 1`,
+	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrNotFound
+	}
+	return user, err
+}
+
 // GetUserByEmail retrieves a user by email
 func (db *DB) GetUserByEmail(email string) (*User, error) {
 	user := &User{}

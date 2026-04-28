@@ -1,5 +1,4 @@
 import SwiftUI
-import Combine
 
 struct AppError: Identifiable {
     let id = UUID()
@@ -11,25 +10,26 @@ struct AppError: Identifiable {
 class AppState: ObservableObject {
     static let shared = AppState()
 
-    @Published var serverURL: String {
-        didSet {
-            UserDefaults.standard.set(serverURL, forKey: "serverURL")
-            // Notify WebView to reload
-            NotificationCenter.default.post(name: .serverURLChanged, object: nil)
-        }
-    }
+    @Published var serverURL: String = Secrets.serverURL
 
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var errors: [AppError] = []
 
-    // WebView state
-    @Published var canGoBack = false
-    @Published var canGoForward = false
-    @Published var isWebViewLoading = false
+    @Published var preferredAudioLanguage: String {
+        didSet { UserDefaults.standard.set(preferredAudioLanguage, forKey: "preferredAudioLanguage") }
+    }
+    @Published var preferredSubtitleLanguage: String? {
+        didSet { UserDefaults.standard.set(preferredSubtitleLanguage, forKey: "preferredSubtitleLanguage") }
+    }
+    @Published var subtitlesEnabled: Bool {
+        didSet { UserDefaults.standard.set(subtitlesEnabled, forKey: "subtitlesEnabled") }
+    }
 
     private init() {
-        self.serverURL = UserDefaults.standard.string(forKey: "serverURL") ?? ""
+        self.preferredAudioLanguage = UserDefaults.standard.string(forKey: "preferredAudioLanguage") ?? "en"
+        self.preferredSubtitleLanguage = UserDefaults.standard.string(forKey: "preferredSubtitleLanguage")
+        self.subtitlesEnabled = UserDefaults.standard.bool(forKey: "subtitlesEnabled")
     }
 
     func showError(_ message: String) {
@@ -54,9 +54,4 @@ class AppState: ObservableObject {
             }
         }
     }
-}
-
-extension Notification.Name {
-    static let serverURLChanged = Notification.Name("serverURLChanged")
-    static let authTokenChanged = Notification.Name("authTokenChanged")
 }

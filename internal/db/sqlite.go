@@ -283,6 +283,30 @@ func (db *DB) Migrate() error {
 			FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
 		)`,
 
+		// Short-lived codes used by the "scan QR with iOS app to log in" web flow.
+		// `code_hash` is the hex sha256 of the raw code; raw never persisted.
+		`CREATE TABLE IF NOT EXISTS web_login_codes (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			code_hash TEXT NOT NULL UNIQUE,
+			user_id INTEGER REFERENCES users(id),
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			expires_at DATETIME NOT NULL,
+			claimed_at DATETIME,
+			consumed_at DATETIME
+		)`,
+
+		// Device API keys for per-platform auto-auth (iOS/tvOS/FireTV)
+		`CREATE TABLE IF NOT EXISTS device_keys (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			label TEXT NOT NULL UNIQUE,
+			key_hash TEXT NOT NULL UNIQUE,
+			last_used_at DATETIME,
+			revoked_at DATETIME,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		)`,
+
 		`CREATE TABLE IF NOT EXISTS channel_schedule (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			channel_id INTEGER NOT NULL,
@@ -319,6 +343,9 @@ func (db *DB) Migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_channels_user ON channels(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_channel_sources_channel ON channel_sources(channel_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_channel_schedule_channel ON channel_schedule(channel_id, cycle_number, scheduled_position)`,
+		`CREATE INDEX IF NOT EXISTS idx_device_keys_hash ON device_keys(key_hash)`,
+		`CREATE INDEX IF NOT EXISTS idx_device_keys_user ON device_keys(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_web_login_codes_hash_exp ON web_login_codes(code_hash, expires_at)`,
 
 		// Insert default sections (only if sections table is empty)
 		`INSERT INTO sections (name, slug, icon, section_type, display_order, is_visible)

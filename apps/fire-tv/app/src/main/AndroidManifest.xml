@@ -35,12 +35,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Login Activity -->
-        <activity
-            android:name=".ui.login.LoginActivity"
-            android:exported="false"
-            android:screenOrientation="landscape" />
-
         <!-- Detail Activity -->
         <activity
             android:name=".ui.detail.DetailActivity"

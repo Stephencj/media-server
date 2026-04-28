@@ -7,7 +7,7 @@ enum ChannelViewMode: String, CaseIterable {
 
 struct ChannelListView: View {
     @StateObject private var viewModel = ChannelViewModel()
-    @State private var viewMode: ChannelViewMode = .channels
+    @State private var viewMode: ChannelViewMode = .guide
     @State private var selectedChannelIndex: Int?
 
     private let columns = [

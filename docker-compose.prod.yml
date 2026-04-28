@@ -17,6 +17,7 @@ services:
       - MEDIA_SERVER_JWT_SECRET=${JWT_SECRET}
       - MEDIA_SERVER_ENV=production
       - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - MEDIA_SERVER_DEVICE_KEYS=${MEDIA_SERVER_DEVICE_KEYS:-}
     restart: unless-stopped
     logging:
       driver: "json-file"

@@ -48,12 +48,19 @@ temp/
 # Apps - Xcode/Android Studio user data
 apps/apple-tv/MediaPlayer.xcodeproj/xcuserdata/
 apps/apple-tv/MediaPlayer.xcodeproj/project.xcworkspace/xcuserdata/
+apps/ios-mobile/MediaServerMobile.xcodeproj/xcuserdata/
+apps/ios-mobile/MediaServerMobile.xcodeproj/project.xcworkspace/xcuserdata/
 apps/apple-tv/MediaPlayer.xcworkspace/
 apps/apple-tv/MediaPlayer/build/
 apps/apple-tv/DerivedData/
 apps/fire-tv/.gradle/
 apps/fire-tv/app/build/
 apps/fire-tv/local.properties
+
+# Per-platform device API keys (never commit plaintext)
+apps/ios-mobile/MediaServerMobile/App/Secrets.swift
+apps/apple-tv/MediaPlayer/App/Secrets.swift
+apps/fire-tv/app/src/main/java/com/mediaserver/tv/Secrets.kt
 
 # Deploy app (Electron)
 tools/deploy-app/node_modules/

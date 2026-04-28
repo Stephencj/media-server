@@ -6,6 +6,9 @@ import retrofit2.http.*
 interface MediaServerApi {
 
     // Auth
+    @POST("api/auth/exchange")
+    suspend fun exchangeDeviceKey(@Body request: ExchangeKeyRequest): AuthResponse
+
     @POST("api/auth/login")
     suspend fun login(@Body request: LoginRequest): AuthResponse
 
@@ -90,6 +93,11 @@ interface MediaServerApi {
         @Body request: ReorderPlaylistRequest
     ): MessageResponse
 }
+
+@kotlinx.serialization.Serializable
+data class ExchangeKeyRequest(
+    val key: String
+)
 
 @kotlinx.serialization.Serializable
 data class LoginRequest(

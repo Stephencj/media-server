@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"time"
 
@@ -10,6 +13,8 @@ import (
 	"github.com/stephencjuliano/media-server/internal/db"
 	"golang.org/x/crypto/bcrypt"
 )
+
+const webLoginCodeTTL = 60 * time.Second
 
 type AuthHandler struct {
 	db  *db.DB
@@ -114,6 +119,147 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// ExchangeKeyRequest is the body for /api/auth/exchange.
+type ExchangeKeyRequest struct {
+	Key string `json:"key" binding:"required"`
+}
+
+// ExchangeDeviceKey validates a per-platform device API key and returns a JWT.
+// This is the auto-auth path used by iOS / tvOS / Fire TV builds — no
+// username or password ever leaves the client.
+func (h *AuthHandler) ExchangeDeviceKey(c *gin.Context) {
+	var req ExchangeKeyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	sum := sha256.Sum256([]byte(req.Key))
+	keyHash := hex.EncodeToString(sum[:])
+
+	dk, err := h.db.GetDeviceKeyByHash(keyHash)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid device key"})
+		return
+	}
+
+	user, err := h.db.GetUserByID(dk.UserID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Device owner not found"})
+		return
+	}
+
+	_ = h.db.TouchDeviceKey(dk.ID)
+
+	response, err := h.generateTokenResponse(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// WebLoginCreateResponse is the body of /api/auth/web-login/create.
+type WebLoginCreateResponse struct {
+	Code      string `json:"code"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+// CreateWebLoginCode mints a fresh single-use code that the web admin can
+// embed in a QR. Public — no auth required, since the code is useless until
+// an authenticated iOS device claims it.
+func (h *AuthHandler) CreateWebLoginCode(c *gin.Context) {
+	var raw [32]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate code"})
+		return
+	}
+	code := hex.EncodeToString(raw[:])
+
+	sum := sha256.Sum256([]byte(code))
+	hash := hex.EncodeToString(sum[:])
+	expires := time.Now().Add(webLoginCodeTTL)
+
+	if err := h.db.CreateWebLoginCode(hash, expires); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to persist code"})
+		return
+	}
+
+	c.JSON(http.StatusOK, WebLoginCreateResponse{
+		Code:      code,
+		ExpiresAt: expires.Unix(),
+	})
+}
+
+// WebLoginClaimRequest is the body for /api/auth/web-login/claim.
+type WebLoginClaimRequest struct {
+	Code string `json:"code" binding:"required"`
+}
+
+// ClaimWebLoginCode is called by an authenticated iOS device after scanning
+// a QR. It binds the code to the JWT user so the next browser poll succeeds.
+func (h *AuthHandler) ClaimWebLoginCode(c *gin.Context) {
+	var req WebLoginClaimRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found in context"})
+		return
+	}
+	userID, _ := userIDVal.(int64)
+
+	sum := sha256.Sum256([]byte(req.Code))
+	hash := hex.EncodeToString(sum[:])
+
+	if err := h.db.ClaimWebLoginCode(hash, userID); err != nil {
+		c.JSON(http.StatusGone, gin.H{"error": "Code unknown, expired, or already claimed"})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// PollWebLoginCode is called by the browser every ~2s while the QR is shown.
+// Returns the standard TokenResponse on the first poll after claim, then 410
+// for any subsequent polls (single-use).
+func (h *AuthHandler) PollWebLoginCode(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "code query parameter required"})
+		return
+	}
+
+	sum := sha256.Sum256([]byte(code))
+	hash := hex.EncodeToString(sum[:])
+
+	result, user, err := h.db.ConsumeWebLoginCode(hash)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read code"})
+		return
+	}
+
+	switch result {
+	case db.WebLoginNotFound:
+		c.JSON(http.StatusNotFound, gin.H{"error": "Unknown code"})
+	case db.WebLoginPending:
+		c.Status(http.StatusNoContent)
+	case db.WebLoginExpired:
+		c.JSON(http.StatusGone, gin.H{"error": "Code expired or already used"})
+	case db.WebLoginReady:
+		response, err := h.generateTokenResponse(user)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+			return
+		}
+		c.JSON(http.StatusOK, response)
+	}
 }
 
 // RefreshToken generates a new token from an existing valid token

@@ -10,11 +10,7 @@ struct AppError: Identifiable {
 class AppState: ObservableObject {
     static let shared = AppState()
 
-    @Published var serverURL: String {
-        didSet {
-            UserDefaults.standard.set(serverURL, forKey: "serverURL")
-        }
-    }
+    @Published var serverURL: String = Secrets.serverURL
 
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -31,7 +27,6 @@ class AppState: ObservableObject {
     }
 
     private init() {
-        self.serverURL = UserDefaults.standard.string(forKey: "serverURL") ?? ""
         self.preferredAudioLanguage = UserDefaults.standard.string(forKey: "preferredAudioLanguage") ?? "en"
         self.preferredSubtitleLanguage = UserDefaults.standard.string(forKey: "preferredSubtitleLanguage")
         self.subtitlesEnabled = UserDefaults.standard.bool(forKey: "subtitlesEnabled")

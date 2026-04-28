@@ -47,6 +47,28 @@ type User struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// WebLoginCode is a short-lived single-use code used in the web QR-scan login flow.
+type WebLoginCode struct {
+	ID         int64      `json:"id"`
+	CodeHash   string     `json:"-"`
+	UserID     *int64     `json:"user_id,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	ExpiresAt  time.Time  `json:"expires_at"`
+	ClaimedAt  *time.Time `json:"claimed_at,omitempty"`
+	ConsumedAt *time.Time `json:"consumed_at,omitempty"`
+}
+
+// DeviceKey represents a per-platform API key used for auto-auth
+type DeviceKey struct {
+	ID         int64      `json:"id"`
+	UserID     int64      `json:"user_id"`
+	Label      string     `json:"label"`
+	KeyHash    string     `json:"-"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	RevokedAt  *time.Time `json:"revoked_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
 // MediaType represents the type of media
 type MediaType string
 
