@@ -5,6 +5,10 @@ struct MediaServerMobileApp: App {
     @StateObject private var authService = AuthService.shared
     @StateObject private var appState = AppState.shared
 
+    init() {
+        AudioSessionManager.shared.activatePlayback()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

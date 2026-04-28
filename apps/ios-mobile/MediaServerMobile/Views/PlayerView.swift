@@ -1,5 +1,8 @@
 import SwiftUI
 import AVKit
+import UIKit
+
+enum SeekDirection: Equatable { case forward, backward }
 
 struct PlayerView: View {
     let media: Media
@@ -7,6 +10,8 @@ struct PlayerView: View {
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: PlayerViewModel
+    @State private var seekFlash: SeekDirection? = nil
+    @State private var flashTask: Task<Void, Never>? = nil
 
     init(media: Media, startPosition: Int = 0) {
         self.media = media
@@ -16,25 +21,55 @@ struct PlayerView: View {
 
     var body: some View {
         ZStack {
-            // Video Player - use AVPlayerViewController for proper iOS controls
             AVPlayerView(player: viewModel.player)
                 .ignoresSafeArea()
                 .onAppear {
+                    AudioSessionManager.shared.activatePlayback()
                     viewModel.play()
                 }
                 .onDisappear {
                     viewModel.cleanup()
                 }
 
-            // Loading indicator
             if viewModel.isBuffering {
                 ProgressView()
                     .scaleEffect(1.5)
                     .tint(.white)
             }
 
-            // Dismiss button overlay
-            VStack {
+            // Double-tap-to-seek catchers on the leading + trailing 30%
+            // of the player. Center 40% stays clear so AVKit's tap-to-toggle
+            // works naturally.
+            GeometryReader { geo in
+                HStack(spacing: 0) {
+                    sideTapCatcher(side: .backward)
+                        .frame(width: geo.size.width * 0.30)
+                    Spacer(minLength: 0)
+                    sideTapCatcher(side: .forward)
+                        .frame(width: geo.size.width * 0.30)
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
+            }
+            .ignoresSafeArea()
+
+            // Transient ±10s flash anchored to whichever side was tapped.
+            if let dir = seekFlash {
+                HStack {
+                    if dir == .backward {
+                        SeekFlashView(direction: .backward)
+                        Spacer()
+                    } else {
+                        Spacer()
+                        SeekFlashView(direction: .forward)
+                    }
+                }
+                .padding(.horizontal, 48)
+                .transition(.opacity.combined(with: .scale(scale: 0.85)))
+                .allowsHitTesting(false)
+            }
+
+            // Top bar: close (leading) + title (centered).
+            ZStack {
                 HStack {
                     Button {
                         viewModel.pause()
@@ -47,29 +82,111 @@ struct PlayerView: View {
                     }
                     Spacer()
                 }
-                Spacer()
+                TitleBar(title: media.title)
             }
+            .frame(maxHeight: .infinity, alignment: .top)
         }
         .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { _ in
             viewModel.markAsCompleted()
             dismiss()
         }
     }
+
+    private func sideTapCatcher(side: SeekDirection) -> some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) { triggerSeek(side) }
+    }
+
+    private func triggerSeek(_ side: SeekDirection) {
+        flashTask?.cancel()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        switch side {
+        case .backward:
+            viewModel.seek(to: max(0, viewModel.currentTime - 10))
+        case .forward:
+            let target = viewModel.duration > 0
+                ? min(viewModel.duration, viewModel.currentTime + 10)
+                : viewModel.currentTime + 10
+            viewModel.seek(to: target)
+        }
+        withAnimation(.easeOut(duration: 0.15)) { seekFlash = side }
+        flashTask = Task {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            if !Task.isCancelled {
+                await MainActor.run {
+                    withAnimation(.easeOut(duration: 0.35)) { seekFlash = nil }
+                }
+            }
+        }
+    }
 }
 
-// Wrap AVPlayerViewController for proper iOS playback controls
+private struct TitleBar: View {
+    let title: String
+    var body: some View {
+        Text(title)
+            .font(.headline.weight(.semibold))
+            .foregroundColor(.white)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .shadow(color: .black.opacity(0.6), radius: 3, x: 0, y: 1)
+            .padding(.horizontal, 60)
+            .padding(.top, 18)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .allowsHitTesting(false)
+    }
+}
+
+private struct SeekFlashView: View {
+    let direction: SeekDirection
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: direction == .forward ? "goforward.10" : "gobackward.10")
+                .font(.system(size: 38, weight: .semibold))
+            Text("10s").font(.caption.weight(.semibold))
+        }
+        .foregroundColor(.white)
+        .padding(22)
+        .background(Circle().fill(.black.opacity(0.55)))
+    }
+}
+
+/// Wraps `AVPlayerViewController` so SwiftUI gets Apple's full playback chrome
+/// plus Picture-in-Picture and AirPlay support.
 struct AVPlayerView: UIViewControllerRepresentable {
-    let player: AVPlayer
+    let player: AVPlayer?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
         controller.player = player
         controller.showsPlaybackControls = true
+        controller.allowsPictureInPicturePlayback = true
+        controller.canStartPictureInPictureAutomaticallyFromInline = true
+        controller.videoGravity = .resizeAspect
+        controller.delegate = context.coordinator
         return controller
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        uiViewController.player = player
+        if uiViewController.player !== player {
+            uiViewController.player = player
+        }
+    }
+
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        // Required for the user to be able to tap the floating PiP window
+        // and return to the full player UI.
+        func playerViewController(
+            _ playerViewController: AVPlayerViewController,
+            restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
+        ) {
+            completionHandler(true)
+        }
     }
 }
 

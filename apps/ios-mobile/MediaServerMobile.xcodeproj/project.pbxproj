@@ -12,6 +12,7 @@
 		A10000000000000000000099 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000099 /* Secrets.swift */; };
 		A10000000000000000000095 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000095 /* SettingsView.swift */; };
 		A10000000000000000000096 /* QRLoginScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000096 /* QRLoginScannerView.swift */; };
+		A10000000000000000000094 /* AudioSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000094 /* AudioSessionManager.swift */; };
 		A10000000000000000000005 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* AuthService.swift */; };
 		A10000000000000000000007 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* User.swift */; };
 		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* Assets.xcassets */; };
@@ -52,6 +53,7 @@
 		A20000000000000000000099 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
 		A20000000000000000000095 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A20000000000000000000096 /* QRLoginScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRLoginScannerView.swift; sourceTree = "<group>"; };
+		A20000000000000000000094 /* AudioSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSessionManager.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -159,6 +161,7 @@
 			children = (
 				A20000000000000000000005 /* AuthService.swift */,
 				A20000000000000000000020 /* APIClient.swift */,
+				A20000000000000000000094 /* AudioSessionManager.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -274,6 +277,7 @@
 				A10000000000000000000099 /* Secrets.swift in Sources */,
 				A10000000000000000000095 /* SettingsView.swift in Sources */,
 				A10000000000000000000096 /* QRLoginScannerView.swift in Sources */,
+				A10000000000000000000094 /* AudioSessionManager.swift in Sources */,
 				A10000000000000000000005 /* AuthService.swift in Sources */,
 				A10000000000000000000007 /* User.swift in Sources */,
 				A10000000000000000000020 /* APIClient.swift in Sources */,
