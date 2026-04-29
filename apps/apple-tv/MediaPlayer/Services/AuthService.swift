@@ -116,9 +116,6 @@ class AuthService: ObservableObject {
             token = storedToken
             tokenExpiration = expiration
             isAuthenticated = true
-        } else {
-            token = storedToken
-            tokenExpiration = expiration
         }
 
         if let userData = UserDefaults.standard.data(forKey: userKey),

@@ -138,17 +138,14 @@ class AuthService: ObservableObject {
         let storedExpiration = UserDefaults.standard.integer(forKey: tokenExpirationKey)
         let expiration = storedExpiration > 0 ? Date(timeIntervalSince1970: TimeInterval(storedExpiration)) : nil
 
-        // Only consider ourselves authenticated if the cached token is
-        // present AND demonstrably still valid. Otherwise fall through and
-        // let `ensureAuthenticated()` mint a fresh one — avoids the flash
-        // of MainTabView with a stale token that 401s on every API call.
+        // Only adopt the cached token if it is demonstrably still valid.
+        // Leaving `token` nil for stale/missing entries forces
+        // `ensureAuthenticated()` to mint a fresh JWT instead of letting a
+        // stale one flow into `getStreamURL` and 401 the player.
         if let storedToken, let expiration, Date() < expiration {
             token = storedToken
             tokenExpiration = expiration
             isAuthenticated = true
-        } else {
-            token = storedToken
-            tokenExpiration = expiration
         }
 
         if let userData = UserDefaults.standard.data(forKey: userKey),

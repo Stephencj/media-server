@@ -326,7 +326,7 @@ struct PlaylistPlayerView: View {
                 AVPlayerView(player: playerVM.player)
                     .ignoresSafeArea()
                     .onAppear {
-                        playerVM.play()
+                        Task { await playerVM.loadAndPlay() }
                     }
 
                 // Loading indicator

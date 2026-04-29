@@ -20,7 +20,7 @@ struct PlayerView: View {
             AVPlayerView(player: viewModel.player)
                 .ignoresSafeArea()
                 .onAppear {
-                    viewModel.play()
+                    Task { await viewModel.loadAndPlay() }
                 }
                 .onDisappear {
                     viewModel.cleanup()
@@ -30,6 +30,32 @@ struct PlayerView: View {
             if viewModel.isBuffering {
                 ProgressView()
                     .scaleEffect(2)
+            }
+
+            if let errorMessage = viewModel.errorMessage {
+                VStack(spacing: 24) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 80))
+                        .foregroundColor(.yellow)
+
+                    Text("Playback error")
+                        .font(.title)
+                        .foregroundColor(.white)
+
+                    Text(errorMessage)
+                        .font(.body)
+                        .foregroundColor(.white.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 60)
+
+                    Button("Go Back") {
+                        dismiss()
+                    }
+                    .padding(.top, 16)
+                }
+                .padding(60)
+                .background(Color.black.opacity(0.85))
+                .cornerRadius(24)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { _ in

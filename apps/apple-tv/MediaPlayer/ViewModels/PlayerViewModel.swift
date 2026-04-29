@@ -4,14 +4,15 @@ import Combine
 
 @MainActor
 class PlayerViewModel: ObservableObject {
-    @Published var player: AVPlayer
+    @Published var player: AVPlayer = AVPlayer()
     @Published var isBuffering = false
     @Published var showControls = false
     @Published var currentTime: Double = 0
     @Published var duration: Double = 0
     @Published var progress: Double = 0
+    @Published var errorMessage: String?
 
-    private let media: Media
+    let media: Media
     private let startPosition: Int
     private let api = APIClient.shared
 
@@ -23,24 +24,31 @@ class PlayerViewModel: ObservableObject {
     init(media: Media, startPosition: Int) {
         self.media = media
         self.startPosition = startPosition
-
-        // Create player with stream URL
-        let streamURL: URL?
-        if let directURL = api.getDirectPlayURL(mediaId: media.id, mediaType: media.type) {
-            streamURL = directURL
-        } else {
-            streamURL = api.getStreamURL(mediaId: media.id, mediaType: media.type)
-        }
-
-        if let url = streamURL {
-            // Token is included in URL query parameter for AVPlayer compatibility
-            let playerItem = AVPlayerItem(url: url)
-            self.player = AVPlayer(playerItem: playerItem)
-        } else {
-            self.player = AVPlayer()
-        }
-
         setupObservers()
+    }
+
+    func loadAndPlay() async {
+        await AuthService.shared.ensureAuthenticated()
+
+        let streamURL = api.getDirectPlayURL(mediaId: media.id, mediaType: media.type)
+            ?? api.getStreamURL(mediaId: media.id, mediaType: media.type)
+
+        guard let url = streamURL else {
+            errorMessage = AuthService.shared.lastAuthError ?? "Could not build stream URL — sign-in may have expired."
+            return
+        }
+
+        let playerItem = AVPlayerItem(url: url)
+        player.replaceCurrentItem(with: playerItem)
+
+        if startPosition > 0 {
+            await player.seek(to: CMTime(seconds: Double(startPosition), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
+        }
+
+        player.play()
+
+        try? await Task.sleep(nanoseconds: 3_000_000_000)
+        showControls = false
     }
 
     func cleanup() {
@@ -87,6 +95,16 @@ class PlayerViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+
+        player.publisher(for: \.currentItem?.status)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] status in
+                guard let self else { return }
+                if status == .failed {
+                    self.errorMessage = self.player.currentItem?.error?.localizedDescription ?? "Playback failed"
+                }
+            }
+            .store(in: &cancellables)
     }
 
     private func applyPreferences() async {
@@ -130,22 +148,6 @@ class PlayerViewModel: ObservableObject {
             Task {
                 await saveProgress()
             }
-        }
-    }
-
-    func play() {
-        // Seek to start position if provided
-        if startPosition > 0 {
-            let time = CMTime(seconds: Double(startPosition), preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-            player.seek(to: time)
-        }
-
-        player.play()
-
-        // Auto-hide controls after a delay
-        Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            showControls = false
         }
     }
 

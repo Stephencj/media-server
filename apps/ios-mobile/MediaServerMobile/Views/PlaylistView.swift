@@ -350,7 +350,7 @@ struct PlaylistPlayerView: View {
                 VideoPlayer(player: playerVM.player)
                     .ignoresSafeArea()
                     .onAppear {
-                        playerVM.play()
+                        Task { await playerVM.loadAndPlay() }
                     }
 
                 // Loading indicator

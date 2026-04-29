@@ -25,7 +25,7 @@ struct PlayerView: View {
                 .ignoresSafeArea()
                 .onAppear {
                     AudioSessionManager.shared.activatePlayback()
-                    viewModel.play()
+                    Task { await viewModel.loadAndPlay() }
                 }
                 .onDisappear {
                     viewModel.cleanup()
@@ -51,6 +51,32 @@ struct PlayerView: View {
                 .frame(width: geo.size.width, height: geo.size.height)
             }
             .ignoresSafeArea()
+
+            if let errorMessage = viewModel.errorMessage {
+                VStack(spacing: 20) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.yellow)
+
+                    Text("Playback error")
+                        .font(.title)
+                        .foregroundColor(.white)
+
+                    Text(errorMessage)
+                        .font(.body)
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+
+                    Button("Go Back") {
+                        dismiss()
+                    }
+                    .padding(.top, 20)
+                }
+                .padding(40)
+                .background(Color.black.opacity(0.8))
+                .cornerRadius(20)
+            }
 
             // Transient ±10s flash anchored to whichever side was tapped.
             if let dir = seekFlash {
