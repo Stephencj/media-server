@@ -80,6 +80,7 @@ struct ChannelSwitchOverlay: View {
                 name: "Movie Marathon",
                 description: "Classic action movies",
                 icon: "🎬",
+                channelNumber: 101,
                 createdAt: "2024-01-01",
                 updatedAt: "2024-01-01",
                 totalDuration: 7200,

@@ -267,6 +267,7 @@ func (db *DB) Migrate() error {
 			name TEXT NOT NULL,
 			description TEXT,
 			icon TEXT DEFAULT '📺',
+			channel_number INTEGER,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -380,6 +381,15 @@ func (db *DB) Migrate() error {
 		FROM sections WHERE slug = 'extras' AND NOT EXISTS (
 			SELECT 1 FROM section_rules WHERE section_id = (SELECT id FROM sections WHERE slug = 'extras')
 		)`,
+
+		// Give every existing channel a guide number, 101 upward per user,
+		// in creation order. New channels get theirs in CreateChannel.
+		`UPDATE channels SET channel_number = 100 + (
+			SELECT COUNT(*) FROM channels c2
+			WHERE c2.user_id = channels.user_id
+				AND (c2.created_at < channels.created_at
+					OR (c2.created_at = channels.created_at AND c2.id <= channels.id))
+		) WHERE channel_number IS NULL`,
 	}
 
 	// Run migrations that might fail (e.g., column already exists)
@@ -388,6 +398,8 @@ func (db *DB) Migrate() error {
 		`ALTER TABLE channel_sources ADD COLUMN shuffle BOOLEAN DEFAULT 1`,
 		// Add options column for season/commentary/extras filtering
 		`ALTER TABLE channel_sources ADD COLUMN options TEXT`,
+		// Add guide channel numbers for existing databases
+		`ALTER TABLE channels ADD COLUMN channel_number INTEGER`,
 	}
 
 	for _, migration := range optionalMigrations {

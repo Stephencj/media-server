@@ -12,6 +12,17 @@ struct ChannelPlayerView: View {
     @State private var dragOffset: CGFloat = 0
     @State private var pendingTarget: Channel? = nil
 
+    // The now-playing card behaves like player chrome: it appears when the
+    // program or channel changes, is brought back by a tap, and otherwise
+    // fades out after 5s -- matching the tvOS info overlay -- so it doesn't
+    // sit on top of the video for the whole session.
+    @State private var infoVisible = true
+    @State private var hideInfoTask: Task<Void, Never>? = nil
+
+    private let infoAutoHideDelay: UInt64 = 5_000_000_000
+
+    @State private var showSleepOptions = false
+
     init(channels: [Channel], startIndex: Int) {
         self.channels = channels
         self.startIndex = startIndex
@@ -103,11 +114,35 @@ struct ChannelPlayerView: View {
                     .padding(16)
 
                     Spacer()
+
+                    // The armed countdown stays up even while the rest of the
+                    // chrome is hidden, so you can always see time running out.
+                    if let countdown = viewModel.sleepCountdownText {
+                        Label(countdown, systemImage: "moon.fill")
+                            .font(.caption.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(.orange)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(.black.opacity(0.6), in: Capsule())
+                            .padding(.trailing, 8)
+                    }
+
+                    if infoVisible {
+                        Button {
+                            showSleepOptions = true
+                        } label: {
+                            Image(systemName: viewModel.isSleepTimerArmed ? "moon.fill" : "moon")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.white.opacity(0.8))
+                                .shadow(radius: 4)
+                        }
+                        .padding(16)
+                    }
                 }
 
                 Spacer()
 
-                if let nowPlaying = viewModel.nowPlaying {
+                if let nowPlaying = viewModel.nowPlaying, infoVisible {
                     NowPlayingCard(
                         channelName: viewModel.channel?.name,
                         nowPlayingTitle: nowPlaying.title,
@@ -119,7 +154,11 @@ struct ChannelPlayerView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: viewModel.nowPlaying?.mediaId)
+            .animation(.easeInOut(duration: 0.3), value: infoVisible)
         }
+        .simultaneousGesture(
+            TapGesture().onEnded { showInfoBriefly() }
+        )
         .simultaneousGesture(
             DragGesture(minimumDistance: 30)
                 .onChanged { value in
@@ -141,13 +180,51 @@ struct ChannelPlayerView: View {
                 viewModel.handleVideoEnd()
             }
         }
+        .onChange(of: viewModel.nowPlaying?.mediaId) { _ in
+            showInfoBriefly()
+        }
+        .onChange(of: viewModel.sleepFireCount) { _ in
+            // Timer elapsed: playback is already paused, so leave the player.
+            dismiss()
+        }
+        .confirmationDialog("Sleep Timer", isPresented: $showSleepOptions, titleVisibility: .visible) {
+            ForEach([15, 30, 45, 60], id: \.self) { minutes in
+                Button("\(minutes) minutes") { viewModel.armSleepTimer(minutes: minutes) }
+            }
+            if viewModel.secondsUntilEndOfProgram != nil {
+                Button("End of program") { viewModel.armSleepTimerForEndOfProgram() }
+            }
+            if viewModel.isSleepTimerArmed {
+                Button("Turn off", role: .destructive) { viewModel.cancelSleepTimer() }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text(viewModel.isSleepTimerArmed
+                 ? "Playback stops in \(viewModel.sleepCountdownText ?? "")."
+                 : "Playback will stop and return you to the guide.")
+        }
         .task(id: currentChannel?.id) {
+            showInfoBriefly()
             if let channel = currentChannel {
                 await viewModel.loadChannel(channelId: channel.id)
             }
         }
         .onDisappear {
+            hideInfoTask?.cancel()
+            hideInfoTask = nil
             viewModel.cleanup()
+        }
+    }
+
+    /// Shows the now-playing card, then fades it out after a few seconds.
+    /// Restarts the countdown if it is already on screen.
+    private func showInfoBriefly() {
+        hideInfoTask?.cancel()
+        infoVisible = true
+        hideInfoTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: infoAutoHideDelay)
+            guard !Task.isCancelled else { return }
+            infoVisible = false
         }
     }
 
@@ -224,6 +301,7 @@ private struct NowPlayingCard: View {
                 name: "Movie Marathon",
                 description: "Classic action movies",
                 icon: "\u{1F3AC}",
+                channelNumber: 101,
                 createdAt: "2024-01-01",
                 updatedAt: "2024-01-01",
                 totalDuration: 7200,

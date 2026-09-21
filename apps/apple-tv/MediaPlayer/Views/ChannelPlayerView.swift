@@ -12,6 +12,7 @@ struct ChannelPlayerView: View {
     @State private var showOverlay = true
     @State private var overlayTimer: Timer?
     @State private var showSwitchOverlay = false
+    @State private var showSleepOptions = false
     @State private var switchDirection: ChannelSwitchDirection = .up
 
     init(channels: [Channel], startIndex: Int) {
@@ -88,6 +89,11 @@ struct ChannelPlayerView: View {
                                             .font(.subheadline)
                                             .foregroundColor(.white.opacity(0.8))
                                     }
+
+                                    Label("Sleep Timer", systemImage: "arrow.right")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.5))
+                                        .padding(.top, 2)
                                 }
                             }
                             .padding()
@@ -122,6 +128,23 @@ struct ChannelPlayerView: View {
                         .padding()
                     }
                 }
+            }
+
+            // Armed sleep timer stays visible regardless of the info overlay.
+            if let countdown = viewModel.sleepCountdownText {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Label(countdown, systemImage: "moon.fill")
+                            .font(.callout.monospacedDigit().weight(.semibold))
+                            .foregroundColor(.orange)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 10)
+                            .background(Color.black.opacity(0.7), in: Capsule())
+                    }
+                    Spacer()
+                }
+                .padding(40)
             }
 
             // Channel Switch Overlay
@@ -172,9 +195,20 @@ struct ChannelPlayerView: View {
                 switchToNextChannel()
             case .down:
                 switchToPreviousChannel()
+            case .right:
+                // Left/right are otherwise unused here, and a focusable button
+                // in the auto-hiding overlay would fight the focus engine.
+                showSleepOptions = true
             default:
                 break
             }
+        }
+        .onChange(of: viewModel.sleepFireCount) { _ in
+            // Playback is already paused; leave the player.
+            dismiss()
+        }
+        .sheet(isPresented: $showSleepOptions) {
+            SleepTimerSheet(viewModel: viewModel)
         }
     }
 
@@ -268,6 +302,7 @@ struct UpNextItemRow: View {
                 name: "Movie Marathon",
                 description: "Classic action movies",
                 icon: "🎬",
+                channelNumber: 101,
                 createdAt: "2024-01-01",
                 updatedAt: "2024-01-01",
                 totalDuration: 7200,
@@ -276,4 +311,78 @@ struct UpNextItemRow: View {
         ],
         startIndex: 0
     )
+}
+
+
+/// Sleep timer options for the Apple TV player.
+struct SleepTimerSheet: View {
+    @ObservedObject var viewModel: ChannelPlayerViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    private let presets = [15, 30, 45, 60]
+
+    var body: some View {
+        VStack(spacing: 28) {
+            VStack(spacing: 6) {
+                Text("Sleep Timer")
+                    .font(.title2.weight(.semibold))
+                Text(viewModel.isSleepTimerArmed
+                     ? "Playback stops in \(viewModel.sleepCountdownText ?? "")."
+                     : "Playback will stop and return you to the guide.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            VStack(spacing: 14) {
+                ForEach(presets, id: \.self) { minutes in
+                    Button {
+                        viewModel.armSleepTimer(minutes: minutes)
+                        dismiss()
+                    } label: {
+                        optionLabel("\(minutes) minutes", detail: stopTime(afterMinutes: minutes))
+                    }
+                }
+
+                if let seconds = viewModel.secondsUntilEndOfProgram {
+                    Button {
+                        viewModel.armSleepTimerForEndOfProgram()
+                        dismiss()
+                    } label: {
+                        optionLabel("End of program",
+                                    detail: stopTime(afterMinutes: max(1, seconds / 60)))
+                    }
+                }
+
+                if viewModel.isSleepTimerArmed {
+                    Button {
+                        viewModel.cancelSleepTimer()
+                        dismiss()
+                    } label: {
+                        optionLabel("Turn off", detail: "")
+                    }
+                }
+            }
+            .frame(maxWidth: 620)
+        }
+        .padding(60)
+    }
+
+    private func optionLabel(_ title: String, detail: String) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(detail)
+                .font(.callout.monospacedDigit())
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 8)
+    }
+
+    /// Shows when playback would actually stop, so the choice is concrete.
+    private func stopTime(afterMinutes minutes: Int) -> String {
+        let date = Date().addingTimeInterval(Double(minutes) * 60)
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f.string(from: date)
+    }
 }

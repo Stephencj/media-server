@@ -42,7 +42,6 @@
 		A10000000000000000000034 /* ChannelCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000034 /* ChannelCardView.swift */; };
 		A10000000000000000000035 /* ChannelGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000035 /* ChannelGuideView.swift */; };
 		A10000000000000000000036 /* ChannelGuideViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* ChannelGuideViewModel.swift */; };
-		A10000000000000000000037 /* ChannelGuideRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000037 /* ChannelGuideRowView.swift */; };
 		A10000000000000000000038 /* ChannelSwitchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* ChannelSwitchOverlay.swift */; };
 		A10000000000000000000099 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000099 /* Secrets.swift */; };
 /* End PBXBuildFile section */
@@ -83,7 +82,6 @@
 		A20000000000000000000034 /* ChannelCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelCardView.swift; sourceTree = "<group>"; };
 		A20000000000000000000035 /* ChannelGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideView.swift; sourceTree = "<group>"; };
 		A20000000000000000000036 /* ChannelGuideViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideViewModel.swift; sourceTree = "<group>"; };
-		A20000000000000000000037 /* ChannelGuideRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideRowView.swift; sourceTree = "<group>"; };
 		A20000000000000000000038 /* ChannelSwitchOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelSwitchOverlay.swift; sourceTree = "<group>"; };
 		A20000000000000000000099 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
 		A30000000000000000000001 /* MediaPlayer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediaPlayer.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -195,7 +193,6 @@
 				A20000000000000000000020 /* MediaCardView.swift */,
 				A20000000000000000000025 /* AddToPlaylistSheet.swift */,
 				A20000000000000000000034 /* ChannelCardView.swift */,
-				A20000000000000000000037 /* ChannelGuideRowView.swift */,
 				A20000000000000000000038 /* ChannelSwitchOverlay.swift */,
 			);
 			path = Components;
@@ -313,7 +310,6 @@
 				A10000000000000000000034 /* ChannelCardView.swift in Sources */,
 				A10000000000000000000035 /* ChannelGuideView.swift in Sources */,
 				A10000000000000000000036 /* ChannelGuideViewModel.swift in Sources */,
-				A10000000000000000000037 /* ChannelGuideRowView.swift in Sources */,
 				A10000000000000000000038 /* ChannelSwitchOverlay.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -2041,8 +2041,9 @@ func (db *DB) CreateChannel(userID int64, name, description, icon string) (*Chan
 	}
 
 	result, err := db.conn.Exec(
-		`INSERT INTO channels (user_id, name, description, icon) VALUES (?, ?, ?, ?)`,
-		userID, name, description, icon,
+		`INSERT INTO channels (user_id, name, description, icon, channel_number)
+		VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(channel_number), 100) + 1 FROM channels WHERE user_id = ?))`,
+		userID, name, description, icon, userID,
 	)
 	if err != nil {
 		return nil, err
@@ -2056,9 +2057,10 @@ func (db *DB) CreateChannel(userID int64, name, description, icon string) (*Chan
 func (db *DB) GetChannelByID(id int64) (*Channel, error) {
 	channel := &Channel{}
 	err := db.conn.QueryRow(
-		`SELECT id, user_id, name, description, icon, created_at, updated_at FROM channels WHERE id = ?`,
+		`SELECT id, user_id, name, description, icon, COALESCE(channel_number, 0), created_at, updated_at
+		FROM channels WHERE id = ?`,
 		id,
-	).Scan(&channel.ID, &channel.UserID, &channel.Name, &channel.Description, &channel.Icon, &channel.CreatedAt, &channel.UpdatedAt)
+	).Scan(&channel.ID, &channel.UserID, &channel.Name, &channel.Description, &channel.Icon, &channel.ChannelNumber, &channel.CreatedAt, &channel.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, ErrNotFound
 	}
@@ -2080,7 +2082,8 @@ func (db *DB) GetUserChannels(userID int64) ([]Channel, error) {
 	// Use a single query with LEFT JOIN to get channel data and schedule stats together
 	// This avoids nested queries which can cause SQLite deadlocks
 	rows, err := db.conn.Query(
-		`SELECT c.id, c.user_id, c.name, c.description, c.icon, c.created_at, c.updated_at,
+		`SELECT c.id, c.user_id, c.name, c.description, c.icon, COALESCE(c.channel_number, 0),
+			c.created_at, c.updated_at,
 			COALESCE(s.item_count, 0) as item_count,
 			COALESCE(s.total_duration, 0) as total_duration
 		FROM channels c
@@ -2091,7 +2094,7 @@ func (db *DB) GetUserChannels(userID int64) ([]Channel, error) {
 			GROUP BY channel_id
 		) s ON c.id = s.channel_id
 		WHERE c.user_id = ?
-		ORDER BY c.created_at DESC`,
+		ORDER BY c.channel_number, c.id`,
 		userID,
 	)
 	if err != nil {
@@ -2102,7 +2105,7 @@ func (db *DB) GetUserChannels(userID int64) ([]Channel, error) {
 	var channels []Channel
 	for rows.Next() {
 		var ch Channel
-		if err := rows.Scan(&ch.ID, &ch.UserID, &ch.Name, &ch.Description, &ch.Icon, &ch.CreatedAt, &ch.UpdatedAt, &ch.ItemCount, &ch.TotalDuration); err != nil {
+		if err := rows.Scan(&ch.ID, &ch.UserID, &ch.Name, &ch.Description, &ch.Icon, &ch.ChannelNumber, &ch.CreatedAt, &ch.UpdatedAt, &ch.ItemCount, &ch.TotalDuration); err != nil {
 			continue
 		}
 		channels = append(channels, ch)
@@ -2743,6 +2746,34 @@ func (db *DB) GetChannelNowPlaying(channelID int64) (*ChannelNowPlaying, error) 
 		rows.Close() // Close immediately before any nested queries
 	}
 
+	// The cycle loops, so a channel near the end of its schedule must keep
+	// going from the top rather than returning a short list.
+	if len(upNext) < 3 {
+		wrapRows, wrapErr := db.conn.Query(
+			`SELECT cs.id, cs.channel_id, cs.media_id, cs.media_type, cs.scheduled_position,
+				cs.cycle_number, cs.duration, cs.cumulative_start, cs.played
+			FROM channel_schedule cs
+			WHERE cs.channel_id = ? AND cs.cycle_number = 1
+				AND cs.scheduled_position < ?
+			ORDER BY cs.scheduled_position
+			LIMIT ?`,
+			channelID, current.ScheduledPosition, 3-len(upNext),
+		)
+		if wrapErr == nil {
+			for wrapRows.Next() {
+				var item ChannelScheduleItem
+				if wrapRows.Scan(
+					&item.ID, &item.ChannelID, &item.MediaID, &item.MediaType,
+					&item.ScheduledPosition, &item.CycleNumber, &item.Duration,
+					&item.CumulativeStart, &item.Played,
+				) == nil {
+					upNext = append(upNext, item)
+				}
+			}
+			wrapRows.Close()
+		}
+	}
+
 	// Second pass: populate details (safe now that rows is closed)
 	for i := range upNext {
 		db.populateScheduleItemDetails(&upNext[i])
@@ -2755,6 +2786,107 @@ func (db *DB) GetChannelNowPlaying(channelID int64) (*ChannelNowPlaying, error) 
 		UpNext:     upNext,
 		CycleStart: channel.CreatedAt,
 	}, nil
+}
+
+// getChannelCycle loads one full cycle for a channel, in play order, with
+// display details already populated. Returned items are the building blocks
+// the guide repeats; total is the cycle length in seconds.
+func (db *DB) getChannelCycle(channelID int64) (items []ChannelScheduleItem, total int, err error) {
+	rows, err := db.conn.Query(
+		`SELECT cs.id, cs.channel_id, cs.media_id, cs.media_type, cs.scheduled_position,
+			cs.cycle_number, cs.duration, cs.cumulative_start, cs.played
+		FROM channel_schedule cs
+		WHERE cs.channel_id = ? AND cs.cycle_number = 1
+		ORDER BY cs.scheduled_position`,
+		channelID,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	for rows.Next() {
+		var item ChannelScheduleItem
+		if rows.Scan(
+			&item.ID, &item.ChannelID, &item.MediaID, &item.MediaType,
+			&item.ScheduledPosition, &item.CycleNumber, &item.Duration,
+			&item.CumulativeStart, &item.Played,
+		) == nil {
+			items = append(items, item)
+			total += item.Duration
+		}
+	}
+	rows.Close()
+
+	// Populate once per cycle item rather than once per airing — a 3-hour
+	// window can air the same 22-minute episode several times.
+	for i := range items {
+		db.populateScheduleItemDetails(&items[i])
+	}
+	return items, total, nil
+}
+
+// GetChannelGuide projects every channel's looping schedule onto wall-clock
+// time for the given window.
+//
+// A channel has no stored air times; its position is derived from how long it
+// has existed: position = (now - created_at) % cycleDuration. Projecting that
+// forward is what turns a cycle into a guide, and it wraps for free.
+func (db *DB) GetChannelGuide(userID int64, start, end time.Time) (*ChannelGuide, error) {
+	channels, err := db.GetUserChannels(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	guide := &ChannelGuide{Start: start, End: end, Channels: []ChannelGuideEntry{}}
+
+	for _, channel := range channels {
+		items, cycleDuration, err := db.getChannelCycle(channel.ID)
+		if err != nil || cycleDuration == 0 || len(items) == 0 {
+			// A channel with no schedule still gets a row, so the guide keeps
+			// a stable set of lanes instead of shifting when one goes empty.
+			guide.Channels = append(guide.Channels, ChannelGuideEntry{
+				Channel:  channel,
+				Programs: []GuideProgram{},
+			})
+			continue
+		}
+
+		// Where the channel sits in its cycle at the window's start.
+		offset := int(start.Sub(channel.CreatedAt).Seconds())
+		position := ((offset % cycleDuration) + cycleDuration) % cycleDuration
+
+		// Rewind to the item already airing at the window start, so the first
+		// program correctly begins before the window and bleeds into it.
+		idx := 0
+		for i, item := range items {
+			if position >= item.CumulativeStart && position < item.CumulativeStart+item.Duration {
+				idx = i
+				break
+			}
+		}
+		cursor := start.Add(-time.Duration(position-items[idx].CumulativeStart) * time.Second)
+
+		programs := []GuideProgram{}
+		// Guard against a pathological cycle (many zero-duration rows) pinning
+		// the loop; a guide window never legitimately needs this many airings.
+		for guard := 0; cursor.Before(end) && guard < 500; guard++ {
+			item := items[idx]
+			endsAt := cursor.Add(time.Duration(item.Duration) * time.Second)
+			programs = append(programs, GuideProgram{
+				ChannelScheduleItem: item,
+				StartTime:           cursor,
+				EndTime:             endsAt,
+			})
+			cursor = endsAt
+			idx = (idx + 1) % len(items)
+		}
+
+		guide.Channels = append(guide.Channels, ChannelGuideEntry{
+			Channel:  channel,
+			Programs: programs,
+		})
+	}
+
+	return guide, nil
 }
 
 // populateScheduleItemDetails fills in title and poster for a schedule item

@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stephencjuliano/media-server/internal/db"
@@ -48,6 +49,50 @@ func (h *ChannelHandler) ListChannels(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"items": channels})
+}
+
+// GetGuide returns a time-windowed schedule across all of the user's channels.
+//
+// Replaces the clients' N+1 fan-out (list channels, then one /now per channel)
+// with a single request, and is the only endpoint that reports wall-clock air
+// times rather than offsets into a cycle.
+//
+//	GET /api/channels/guide?start=<RFC3339>&hours=<1..12>
+//
+// Both params are optional: start defaults to the previous half-hour boundary
+// so the grid lines up with its own column headings, hours defaults to 4.
+func (h *ChannelHandler) GetGuide(c *gin.Context) {
+	userID := c.GetInt64("user_id")
+
+	start := time.Now()
+	if raw := c.Query("start"); raw != "" {
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "start must be an RFC3339 timestamp"})
+			return
+		}
+		start = parsed
+	}
+	// Snap back to the half hour so column headings read 8:00, 8:30, 9:00.
+	start = start.Truncate(30 * time.Minute)
+
+	hours := 4
+	if raw := c.Query("hours"); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > 12 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "hours must be between 1 and 12"})
+			return
+		}
+		hours = parsed
+	}
+
+	guide, err := h.db.GetChannelGuide(userID, start, start.Add(time.Duration(hours)*time.Hour))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to build guide"})
+		return
+	}
+
+	c.JSON(http.StatusOK, guide)
 }
 
 // CreateChannel creates a new channel

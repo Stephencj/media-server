@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// The guide on a phone. A time axis doesn't survive at this width, so each
+/// channel gets one row carrying what the axis was for: what's on, how far
+/// through it is, and what follows.
 struct ChannelGuideView: View {
     let channels: [Channel]
     let onSelectChannel: (Channel, Int) -> Void
@@ -20,46 +23,34 @@ struct ChannelGuideView: View {
                     Text("Create channels in the web interface to watch here")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                 }
+                .padding(32)
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: 0) {
                         ForEach(viewModel.entries) { entry in
-                            ChannelGuideRowView(entry: entry) {
-                                if let index = channels.firstIndex(where: { $0.id == entry.channel.id }) {
-                                    onSelectChannel(entry.channel, index)
-                                }
-                            }
+                            ChannelGuideRowView(
+                                entry: entry,
+                                now: viewModel.now,
+                                onSelect: { tune(to: entry) }
+                            )
+                            Divider().padding(.leading, 76)
                         }
                     }
-                    .padding(16)
                 }
+                .refreshable { await viewModel.loadGuide() }
             }
         }
         .task {
             await viewModel.loadGuide()
             viewModel.startAutoRefresh()
         }
-        .onDisappear {
-            viewModel.stopAutoRefresh()
-        }
+        .onDisappear { viewModel.stopAutoRefresh() }
     }
-}
 
-#Preview {
-    ChannelGuideView(
-        channels: [
-            Channel(
-                id: 1,
-                name: "Movie Marathon",
-                description: "Classic action movies",
-                icon: "\u{1F3AC}",
-                createdAt: "2024-01-01",
-                updatedAt: "2024-01-01",
-                totalDuration: 7200,
-                itemCount: 5
-            )
-        ],
-        onSelectChannel: { _, _ in }
-    )
+    private func tune(to entry: ChannelGuideEntry) {
+        guard let index = channels.firstIndex(where: { $0.id == entry.channel.id }) else { return }
+        onSelectChannel(entry.channel, index)
+    }
 }

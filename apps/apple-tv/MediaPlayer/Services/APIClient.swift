@@ -50,7 +50,32 @@ class APIClient: ObservableObject {
         self.session = URLSession(configuration: config)
 
         self.decoder = JSONDecoder()
+        // Go emits RFC3339, sometimes with fractional seconds and sometimes
+        // without. `.iso8601` only handles the latter, so parse both.
+        self.decoder.dateDecodingStrategy = .custom { decoder in
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            if let date = APIClient.rfc3339WithFraction.date(from: raw) { return date }
+            if let date = APIClient.rfc3339.date(from: raw) { return date }
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Expected an RFC3339 date, got \(raw)"
+                )
+            )
+        }
     }
+
+    private static let rfc3339WithFraction: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let rfc3339: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
 
     // MARK: - Generic Request Methods
 
@@ -274,6 +299,16 @@ class APIClient: ObservableObject {
 
     func getChannelNowPlaying(channelId: Int64) async throws -> ChannelNowPlayingResponse {
         try await get("/api/channels/\(channelId)/now")
+    }
+
+    /// Single-request guide across every channel, with wall-clock air times.
+    /// Replaces listing channels and then fetching /now for each one.
+    func getChannelGuide(start: Date = Date(), hours: Int = 4) async throws -> ChannelGuideResponse {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let encoded = formatter.string(from: start)
+            .addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+        return try await get("/api/channels/guide?start=\(encoded)&hours=\(hours)")
     }
 
     func getChannelSchedule(channelId: Int64, limit: Int = 50, offset: Int = 0) async throws -> ChannelScheduleResponse {

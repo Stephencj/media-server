@@ -227,6 +227,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 			{
 				channels.GET("", channelHandler.ListChannels)
 				channels.POST("", channelHandler.CreateChannel)
+				channels.GET("/guide", channelHandler.GetGuide)
 				channels.GET("/:id", channelHandler.GetChannel)
 				channels.PUT("/:id", channelHandler.UpdateChannel)
 				channels.DELETE("/:id", channelHandler.DeleteChannel)

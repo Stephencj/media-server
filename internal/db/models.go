@@ -331,13 +331,14 @@ const (
 
 // Channel represents a virtual "live TV" channel
 type Channel struct {
-	ID          int64     `json:"id"`
-	UserID      int64     `json:"user_id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description,omitempty"`
-	Icon        string    `json:"icon"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID            int64     `json:"id"`
+	UserID        int64     `json:"user_id"`
+	Name          string    `json:"name"`
+	Description   string    `json:"description,omitempty"`
+	Icon          string    `json:"icon"`
+	ChannelNumber int       `json:"channel_number"` // Guide number, 101 upward per user
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 
 	// Populated when fetching with sources
 	Sources []ChannelSource `json:"sources,omitempty"`
@@ -420,4 +421,26 @@ type ChannelNowPlaying struct {
 	UpNext      []ChannelScheduleItem `json:"up_next"`     // next few items
 	CycleStart  time.Time            `json:"cycle_start"` // when current cycle started
 	StreamURL   string               `json:"stream_url,omitempty"`
+}
+
+// GuideProgram is a schedule item projected onto wall-clock time. The same
+// cycle item appears once per airing, so start/end are what differ between
+// two GuideProgram values carrying the same underlying schedule row.
+type GuideProgram struct {
+	ChannelScheduleItem
+	StartTime time.Time `json:"start_time"`
+	EndTime   time.Time `json:"end_time"`
+}
+
+// ChannelGuideEntry is one channel's row in the guide.
+type ChannelGuideEntry struct {
+	Channel  Channel        `json:"channel"`
+	Programs []GuideProgram `json:"programs"`
+}
+
+// ChannelGuide is a time-windowed schedule across every channel a user owns.
+type ChannelGuide struct {
+	Start    time.Time           `json:"start"`
+	End      time.Time           `json:"end"`
+	Channels []ChannelGuideEntry `json:"channels"`
 }
