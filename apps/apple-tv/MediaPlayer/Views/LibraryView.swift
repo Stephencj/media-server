@@ -5,6 +5,10 @@ struct LibraryView: View {
 
     @StateObject private var viewModel: LibraryViewModel
 
+    // Drives default focus so that moving down from the tab bar lands on the
+    // grid instead of the Sort menu in the toolbar.
+    @FocusState private var focusedMediaID: Int64?
+
     init(mediaType: MediaType) {
         self.mediaType = mediaType
         _viewModel = StateObject(wrappedValue: LibraryViewModel(mediaType: mediaType))
@@ -30,11 +34,14 @@ struct LibraryView: View {
                                 MediaCardView(media: media)
                             }
                             .buttonStyle(.card)
+                            .focused($focusedMediaID, equals: media.id)
                         }
                     }
                     .padding(50)
+                    .focusSection()
                 }
             }
+            .defaultFocus($focusedMediaID, viewModel.sortedItems.first?.id)
             .navigationTitle(mediaType == .movie ? "Movies" : "TV Shows")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

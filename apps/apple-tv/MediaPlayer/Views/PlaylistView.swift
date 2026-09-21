@@ -8,6 +8,10 @@ struct PlaylistView: View {
     @State private var newPlaylistDescription = ""
     @State private var selectedPlaylist: Playlist?
 
+    // Drives default focus so that moving down from the tab bar lands on the
+    // grid instead of the New Playlist button in the toolbar.
+    @FocusState private var focusedPlaylistID: Int64?
+
     var body: some View {
         NavigationStack {
             VStack {
@@ -31,6 +35,7 @@ struct PlaylistView: View {
                                     PlaylistCard(playlist: playlist)
                                 }
                                 .buttonStyle(.card)
+                                .focused($focusedPlaylistID, equals: playlist.id)
                                 .contextMenu {
                                     Button(role: .destructive) {
                                         Task { await viewModel.deletePlaylist(playlist) }
@@ -41,7 +46,9 @@ struct PlaylistView: View {
                             }
                         }
                         .padding(40)
+                        .focusSection()
                     }
+                    .defaultFocus($focusedPlaylistID, viewModel.playlists.first?.id)
                 }
             }
             .navigationTitle("Playlists")
