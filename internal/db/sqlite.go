@@ -227,6 +227,17 @@ func (db *DB) Migrate() error {
 		)`,
 
 		// Customizable sections
+		`CREATE TABLE IF NOT EXISTS match_reviews (
+			media_id INTEGER PRIMARY KEY,
+			status TEXT NOT NULL DEFAULT 'pending',
+			current_tmdb_id INTEGER NOT NULL DEFAULT 0,
+			suggested_tmdb_id INTEGER NOT NULL DEFAULT 0,
+			suggested_json TEXT,
+			reason TEXT,
+			checked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE
+		)`,
+
 		`CREATE TABLE IF NOT EXISTS sections (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,

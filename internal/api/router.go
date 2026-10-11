@@ -29,6 +29,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 	showsHandler := handlers.NewShowsHandler(database)
 	extrasHandler := handlers.NewExtrasHandler(database)
 	metadataHandler := handlers.NewMetadataHandler(database, cfg)
+	matchReviewHandler := handlers.NewMatchReviewHandler(database, cfg)
 	channelHandler := handlers.NewChannelHandler(database)
 	deployHandler := handlers.NewDeployHandler()
 	filesHandler := handlers.NewFilesHandler("/media")
@@ -89,6 +90,15 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 				library.GET("/recent", libraryHandler.GetRecent)
 				library.GET("/stats", libraryHandler.GetStats)
 				library.POST("/scan", libraryHandler.TriggerScan)
+
+				// Check matches: movies whose TMDB match looks wrong
+				library.GET("/match-review", matchReviewHandler.List)
+				library.POST("/match-review/scan", matchReviewHandler.Scan)
+				library.POST("/match-review/accept-all", matchReviewHandler.AcceptAll)
+				library.POST("/match-review/:mediaId/accept", matchReviewHandler.Accept)
+				library.POST("/match-review/:mediaId/keep", matchReviewHandler.Keep)
+				library.POST("/match-review/:mediaId/choose", matchReviewHandler.Choose)
+				library.GET("/match-review/:mediaId/candidates", matchReviewHandler.Candidates)
 			}
 
 			// Media

@@ -298,3 +298,22 @@ func titleTokens(title string) []string {
 	}
 	return tokens
 }
+
+// TitlesAgree reports whether a title parsed from a file name and a TMDB title
+// are close enough to be the same film.
+func TitlesAgree(fileTitle, tmdbTitle string) bool {
+	return movieTitleSimilarity(fileTitle, tmdbTitle) >= minTitleSimilarity
+}
+
+// RuntimesAgree reports whether a file's running time confirms a film's, in
+// minutes. False when either is unknown.
+func RuntimesAgree(fileMinutes, tmdbMinutes int) bool {
+	return runtimeScore(fileMinutes, tmdbMinutes) > 0
+}
+
+// RuntimesConflict reports whether a file's running time rules a film out.
+// It and RuntimesAgree are both false across the band where cuts of the same
+// film differ.
+func RuntimesConflict(fileMinutes, tmdbMinutes int) bool {
+	return runtimeScore(fileMinutes, tmdbMinutes) < 0
+}

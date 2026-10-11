@@ -191,6 +191,11 @@ func (h *MetadataHandler) RefreshMetadata(c *gin.Context) {
 
 // Helper functions
 func (h *MetadataHandler) applyMovieMetadata(media *db.Media, details *tmdb.MovieDetails) {
+	applyMovieDetails(media, details)
+}
+
+// applyMovieDetails makes a TMDB film a movie's match.
+func applyMovieDetails(media *db.Media, details *tmdb.MovieDetails) {
 	media.Title = details.Title
 	media.OriginalTitle = details.OriginalTitle
 	media.Overview = details.Overview
