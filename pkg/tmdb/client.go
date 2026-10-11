@@ -185,16 +185,6 @@ func (c *Client) SearchMovieWithResults(title string, year int) ([]MovieSearchRe
 	return result.Results, nil
 }
 
-// SearchMovie searches for movies by title and optional year, returning the best match
-func (c *Client) SearchMovie(title string, year int) (*MovieResult, error) {
-	results, err := c.SearchMovieWithResults(title, year)
-	if err != nil {
-		return nil, err
-	}
-
-	return c.FindBestMovieMatch(results, title, year), nil
-}
-
 // GetMovieDetails fetches detailed movie info by TMDB ID
 func (c *Client) GetMovieDetails(tmdbID int) (*MovieDetails, error) {
 	if !c.IsConfigured() {
@@ -335,32 +325,6 @@ func (c *Client) GetTVEpisodeDetails(showID int, seasonNum int, episodeNum int) 
 	return &details, nil
 }
 
-// FindBestMovieMatch scores and ranks search results to find the best match
-// Returns nil if no match meets the minimum confidence threshold (50.0)
-func (c *Client) FindBestMovieMatch(results []MovieSearchResult, searchTitle string, searchYear int) *MovieSearchResult {
-	if len(results) == 0 {
-		return nil
-	}
-
-	var bestMatch *MovieSearchResult
-	bestScore := 0.0
-
-	for i := range results {
-		score := calculateMovieMatchScore(&results[i], searchTitle, searchYear)
-		if score > bestScore {
-			bestScore = score
-			bestMatch = &results[i]
-		}
-	}
-
-	// Only return if score is above threshold (50.0)
-	if bestScore >= 50.0 {
-		return bestMatch
-	}
-
-	return nil
-}
-
 // FindBestTVMatch scores and ranks search results to find the best match
 // Returns nil if no match meets the minimum confidence threshold (50.0)
 func (c *Client) FindBestTVMatch(results []TVSearchResult, searchTitle string, searchYear int) *TVSearchResult {
@@ -387,44 +351,7 @@ func (c *Client) FindBestTVMatch(results []TVSearchResult, searchTitle string, s
 	return nil
 }
 
-// calculateMovieMatchScore calculates a confidence score (0-100) for a movie match
-// Scoring breakdown:
-// - Title similarity: 0-50 points (exact match = 50, contains = 40, partial = 25)
-// - Year proximity: 0-30 points (exact = 30, ±1 year = 20, ±2 years = 10, ±3-5 years = 5)
-// - Popularity boost: 0-20 points (higher popularity results get slight preference)
-func calculateMovieMatchScore(result *MovieSearchResult, searchTitle string, searchYear int) float64 {
-	score := 0.0
-
-	// Title similarity (0-50 points)
-	titleScore := titleSimilarity(result.Title, searchTitle)
-	score += titleScore * 50.0
-
-	// Year proximity (0-30 points)
-	if searchYear > 0 && result.ReleaseDate != "" {
-		resultYear := extractYearFromDate(result.ReleaseDate)
-		yearDiff := abs(resultYear - searchYear)
-
-		if yearDiff == 0 {
-			score += 30.0
-		} else if yearDiff == 1 {
-			score += 20.0
-		} else if yearDiff == 2 {
-			score += 10.0
-		} else if yearDiff <= 5 {
-			score += 5.0
-		}
-	}
-
-	// Popularity boost (0-20 points)
-	// More popular results get slight preference to help disambiguate
-	popularityScore := min(result.Popularity/100.0*20.0, 20.0)
-	score += popularityScore
-
-	return score
-}
-
 // calculateTVMatchScore calculates a confidence score (0-100) for a TV show match
-// Uses the same scoring logic as movies but with FirstAirDate instead of ReleaseDate
 func calculateTVMatchScore(result *TVSearchResult, searchTitle string, searchYear int) float64 {
 	score := 0.0
 

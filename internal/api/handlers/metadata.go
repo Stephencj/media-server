@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stephencjuliano/media-server/internal/config"
 	"github.com/stephencjuliano/media-server/internal/db"
+	"github.com/stephencjuliano/media-server/internal/library"
 	"github.com/stephencjuliano/media-server/pkg/tmdb"
 )
 
@@ -132,7 +133,10 @@ func (h *MetadataHandler) ApplyMetadata(c *gin.Context) {
 }
 
 // POST /api/media/:id/metadata/refresh
-// Force re-lookup metadata from TMDB using existing title/year
+// Force re-lookup metadata from TMDB. Movies are matched again from the
+// file's own name and running time, not from the title and year already
+// stored: if those came from a wrong match, searching on them finds the same
+// wrong film again.
 func (h *MetadataHandler) RefreshMetadata(c *gin.Context) {
 	mediaID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
@@ -146,18 +150,15 @@ func (h *MetadataHandler) RefreshMetadata(c *gin.Context) {
 		return
 	}
 
-	// Search using existing title and year
 	if media.Type == db.MediaTypeMovie {
-		result, err := h.tmdb.SearchMovie(media.Title, media.Year)
-		if err != nil || result == nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": "No match found on TMDB"})
+		title, year := library.MovieNameFromPath(media.FilePath)
+		details, err := h.tmdb.MatchMovie(title, year, (media.Duration+30)/60)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reach TMDB"})
 			return
 		}
-
-		// Get full details
-		details, err := h.tmdb.GetMovieDetails(result.ID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch details"})
+		if details == nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "No match found on TMDB"})
 			return
 		}
 

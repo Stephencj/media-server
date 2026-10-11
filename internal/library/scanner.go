@@ -415,13 +415,11 @@ func (s *Scanner) refreshMetadata(media *db.Media) {
 	updated := *media
 
 	if media.Type == db.MediaTypeMovie {
-		result, err := s.tmdb.SearchMovie(title, year)
-		if err != nil || result == nil {
-			return
-		}
-
-		details, err := s.tmdb.GetMovieDetails(result.ID)
-		if err != nil {
+		// Match from the file itself. The stored title and year are whatever
+		// an earlier scan made of the name, which is not evidence.
+		fileTitle, fileYear := MovieNameFromPath(media.FilePath)
+		details, err := s.tmdb.MatchMovie(fileTitle, fileYear, runtimeMinutes(media.Duration))
+		if err != nil || details == nil {
 			return
 		}
 
@@ -490,20 +488,13 @@ func (s *Scanner) enrichWithTMDB(media *db.Media, title string, year int, mediaT
 	}
 
 	if mediaType == db.MediaTypeMovie {
-		// Search for movie
-		result, err := s.tmdb.SearchMovie(title, year)
+		details, err := s.tmdb.MatchMovie(title, year, runtimeMinutes(media.Duration))
 		if err != nil {
-			log.Printf("TMDB search failed for %s: %v", title, err)
+			log.Printf("TMDB match failed for %s: %v", title, err)
 			return
 		}
-		if result == nil {
-			return
-		}
-
-		// Get detailed info
-		details, err := s.tmdb.GetMovieDetails(result.ID)
-		if err != nil {
-			log.Printf("TMDB details failed for %s: %v", title, err)
+		if details == nil {
+			log.Printf("No confident TMDB match for %s (%d), keeping file name", title, year)
 			return
 		}
 
@@ -598,9 +589,11 @@ func parseFilename(filePath string) (title string, year int, mediaType db.MediaT
 		}
 	}
 
-	// Set default media type if not TV
+	// Movies have their own parser: the cleanup below is tuned to pulling a
+	// show name out from in front of an episode marker.
 	if mediaType == "" {
-		mediaType = db.MediaTypeMovie
+		title, year = MovieNameFromPath(filePath)
+		return title, year, db.MediaTypeMovie, 0, 0
 	}
 
 	// Remove quality indicators FIRST (before separators become spaces)
@@ -653,6 +646,12 @@ func parseFilename(filePath string) (title string, year int, mediaType db.MediaT
 	}
 
 	return
+}
+
+// runtimeMinutes converts a file duration in seconds to whole minutes, the
+// unit TMDB reports running times in.
+func runtimeMinutes(seconds int) int {
+	return (seconds + 30) / 60
 }
 
 func min(a, b int) int {
