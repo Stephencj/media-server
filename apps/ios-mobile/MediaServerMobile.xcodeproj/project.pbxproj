@@ -28,7 +28,6 @@
 		A10000000000000000000040 /* ChannelListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000040 /* ChannelListView.swift */; };
 		A10000000000000000000041 /* ChannelGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000041 /* ChannelGuideView.swift */; };
 		A10000000000000000000042 /* ChannelPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000042 /* ChannelPlayerView.swift */; };
-		A10000000000000000000043 /* ChannelGuideRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000043 /* ChannelGuideRowView.swift */; };
 		A10000000000000000000050 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000050 /* MainTabView.swift */; };
 		A10000000000000000000051 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000051 /* HomeView.swift */; };
 		A10000000000000000000052 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000052 /* LibraryView.swift */; };
@@ -70,7 +69,6 @@
 		A20000000000000000000040 /* ChannelListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelListView.swift; sourceTree = "<group>"; };
 		A20000000000000000000041 /* ChannelGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideView.swift; sourceTree = "<group>"; };
 		A20000000000000000000042 /* ChannelPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelPlayerView.swift; sourceTree = "<group>"; };
-		A20000000000000000000043 /* ChannelGuideRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideRowView.swift; sourceTree = "<group>"; };
 		A20000000000000000000050 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		A20000000000000000000051 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		A20000000000000000000052 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
@@ -143,7 +141,6 @@
 				A20000000000000000000040 /* ChannelListView.swift */,
 				A20000000000000000000041 /* ChannelGuideView.swift */,
 				A20000000000000000000042 /* ChannelPlayerView.swift */,
-				A20000000000000000000043 /* ChannelGuideRowView.swift */,
 				A20000000000000000000054 /* SearchView.swift */,
 				A20000000000000000000055 /* MediaDetailView.swift */,
 				A20000000000000000000056 /* TVShowDetailView.swift */,
@@ -292,7 +289,6 @@
 				A10000000000000000000040 /* ChannelListView.swift in Sources */,
 				A10000000000000000000041 /* ChannelGuideView.swift in Sources */,
 				A10000000000000000000042 /* ChannelPlayerView.swift in Sources */,
-				A10000000000000000000043 /* ChannelGuideRowView.swift in Sources */,
 				A10000000000000000000050 /* MainTabView.swift in Sources */,
 				A10000000000000000000051 /* HomeView.swift in Sources */,
 				A10000000000000000000052 /* LibraryView.swift in Sources */,
