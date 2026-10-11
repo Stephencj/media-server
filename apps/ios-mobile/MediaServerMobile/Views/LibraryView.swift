@@ -4,6 +4,7 @@ struct LibraryView: View {
     let mediaType: MediaType
 
     @StateObject private var viewModel: LibraryViewModel
+    @State private var showMatchReview = false
 
     init(mediaType: MediaType) {
         self.mediaType = mediaType
@@ -61,11 +62,24 @@ struct LibraryView: View {
                             systemImage: viewModel.sortOrder == .ascending ? "arrow.up" : "arrow.down"
                         )
                     }
+
+                    if mediaType == .movie {
+                        Divider()
+                        Button {
+                            showMatchReview = true
+                        } label: {
+                            Label("Check Matches", systemImage: "checkmark.seal")
+                        }
+                    }
                 } label: {
                     Label("Sort", systemImage: "arrow.up.arrow.down")
                 }
             }
         }
+        .background(
+            NavigationLink(destination: MatchReviewView(), isActive: $showMatchReview) { EmptyView() }
+                .hidden()
+        )
         .overlay {
             if viewModel.isLoading && viewModel.items.isEmpty {
                 ProgressView("Loading...")

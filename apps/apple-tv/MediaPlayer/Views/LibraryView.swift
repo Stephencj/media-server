@@ -8,6 +8,7 @@ struct LibraryView: View {
     // Drives default focus so that moving down from the tab bar lands on the
     // grid instead of the Sort menu in the toolbar.
     @FocusState private var focusedMediaID: Int64?
+    @State private var showMatchReview = false
 
     init(mediaType: MediaType) {
         self.mediaType = mediaType
@@ -44,6 +45,15 @@ struct LibraryView: View {
             .defaultFocus($focusedMediaID, viewModel.sortedItems.first?.id)
             .navigationTitle(mediaType == .movie ? "Movies" : "TV Shows")
             .toolbar {
+                if mediaType == .movie {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showMatchReview = true
+                        } label: {
+                            Label("Check Matches", systemImage: "checkmark.seal")
+                        }
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Picker("Sort by", selection: $viewModel.sortOption) {
@@ -71,6 +81,9 @@ struct LibraryView: View {
                 } else {
                     MediaDetailView(media: media)
                 }
+            }
+            .navigationDestination(isPresented: $showMatchReview) {
+                MatchReviewView()
             }
             .overlay {
                 if viewModel.isLoading && viewModel.items.isEmpty {
