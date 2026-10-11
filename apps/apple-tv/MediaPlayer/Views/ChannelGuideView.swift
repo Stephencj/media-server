@@ -22,6 +22,8 @@ struct ChannelGuideView: View {
     private let rowHeight: CGFloat = 92
     private let axisHeight: CGFloat = 52
     private let slotMinutes = 30
+    private let pillWidth: CGFloat = 104
+    private let pillHeight: CGFloat = 36
 
     var body: some View {
         VStack(spacing: 0) {
@@ -55,7 +57,7 @@ struct ChannelGuideView: View {
     private var detailBanner: some View {
         HStack(alignment: .top, spacing: 28) {
             if let focused {
-                GuidePosterView(posterPath: focused.program.posterPath, fallback: focused.channel.icon)
+                GuideBackdropView(backdropPath: focused.program.backdropPath, fallback: focused.channel.icon)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(statusText(for: focused.program))
@@ -90,6 +92,17 @@ struct ChannelGuideView: View {
                 Text("Channel Guide")
                     .font(.title2.weight(.semibold))
                 Spacer(minLength: 0)
+            }
+
+            // The wall clock the playhead is tracking, where a cable box
+            // keeps it.
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(Self.clockWithPeriod.string(from: viewModel.now))
+                    .font(.title2.weight(.semibold))
+                    .monospacedDigit()
+                Text(Self.day.string(from: viewModel.now))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(height: 190, alignment: .top)
@@ -132,7 +145,7 @@ struct ChannelGuideView: View {
                             lane(for: entry)
                         }
                     }
-                    .overlay(alignment: .topLeading) { nowLine }
+                    .overlay(alignment: .topLeading) { playhead }
                 }
             }
             .padding(.leading, 50)
@@ -225,11 +238,12 @@ struct ChannelGuideView: View {
                 Text(program.showTitle.map { "\($0) · \(program.title)" } ?? program.title)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
-                Text(subtitle(for: program, isLive: isLive))
+                Text(subtitle(for: program))
                     .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isFocused ? Color.black.opacity(0.65) : Color.secondary)
                     .lineLimit(1)
             }
+            .foregroundStyle(isFocused ? Color.black : Color.primary)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .padding(.horizontal, 14)
             .background(blockBackground(isLive: isLive, isFocused: isFocused))
@@ -246,18 +260,14 @@ struct ChannelGuideView: View {
         }
     }
 
-    private func subtitle(for program: GuideProgram, isLive: Bool) -> String {
-        let start = Self.clock.string(from: program.startTime)
-        if isLive {
-            return "\(start) · \(program.remaining(at: viewModel.now) / 60)m left"
-        }
-        return "\(start) · \(program.formattedDuration)"
+    private func subtitle(for program: GuideProgram) -> String {
+        "\(Self.clock.string(from: program.startTime)) – \(Self.clock.string(from: program.endTime))"
     }
 
     @ViewBuilder
     private func blockBackground(isLive: Bool, isFocused: Bool) -> some View {
         if isFocused {
-            RoundedRectangle(cornerRadius: 10).fill(Color.blue)
+            RoundedRectangle(cornerRadius: 10).fill(Color.white)
         } else if isLive {
             RoundedRectangle(cornerRadius: 10).fill(Color.orange.opacity(0.22))
         } else {
@@ -265,18 +275,33 @@ struct ChannelGuideView: View {
         }
     }
 
-    private var nowLine: some View {
+    /// The line every lane is read against: the current time in a pill on the
+    /// axis, the line dropping from it through every channel, and the time
+    /// already gone tinted behind it.
+    private var playhead: some View {
         let minutes = viewModel.now.timeIntervalSince(viewModel.windowStart) / 60
-        let offset = CGFloat(minutes) * pointsPerMinute
+        let offset = min(laneWidth, max(0, CGFloat(minutes) * pointsPerMinute))
         let inWindow = viewModel.now >= viewModel.windowStart && viewModel.now <= viewModel.windowEnd
+        let lanesHeight = CGFloat(viewModel.entries.count) * rowHeight
 
-        return Rectangle()
-            .fill(Color.orange)
-            .frame(width: 3)
-            .offset(x: offset, y: axisHeight)
-            .frame(height: CGFloat(viewModel.entries.count) * rowHeight, alignment: .top)
-            .opacity(inWindow ? 1 : 0)
-            .allowsHitTesting(false)
+        return ZStack(alignment: .topLeading) {
+            Rectangle()
+                .fill(Color.orange.opacity(0.1))
+                .frame(width: offset, height: lanesHeight)
+                .offset(y: axisHeight)
+            Rectangle()
+                .fill(Color.orange)
+                .frame(width: 3, height: lanesHeight + axisHeight - pillHeight)
+                .offset(x: offset - 1.5, y: pillHeight)
+            Text(Self.clock.string(from: viewModel.now))
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .foregroundStyle(.black)
+                .frame(width: pillWidth, height: pillHeight)
+                .background(Color.orange, in: Capsule())
+                .offset(x: max(0, offset - pillWidth / 2))
+        }
+        .opacity(inWindow ? 1 : 0)
+        .allowsHitTesting(false)
     }
 
     // MARK: - Actions
@@ -291,18 +316,31 @@ struct ChannelGuideView: View {
         f.dateFormat = "h:mm"
         return f
     }()
+
+    private static let clockWithPeriod: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f
+    }()
+
+    private static let day: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMM d"
+        return f
+    }()
 }
 
-/// Poster art for the detail banner, falling back to the channel emoji for
-/// items the scanner never matched (extras carry no artwork at all).
-struct GuidePosterView: View {
-    let posterPath: String?
+/// Backdrop art for the detail banner, in the spot a cable box puts its
+/// picture window. Falls back to the channel emoji for items the scanner never
+/// matched (extras carry no artwork at all).
+struct GuideBackdropView: View {
+    let backdropPath: String?
     let fallback: String
 
     var body: some View {
         Group {
-            if let posterPath, !posterPath.isEmpty,
-               let url = URL(string: "https://image.tmdb.org/t/p/w185\(posterPath)") {
+            if let backdropPath, !backdropPath.isEmpty,
+               let url = URL(string: "https://image.tmdb.org/t/p/w780\(backdropPath)") {
                 AsyncImage(url: url) { image in
                     image.resizable().aspectRatio(contentMode: .fill)
                 } placeholder: {
@@ -312,14 +350,14 @@ struct GuidePosterView: View {
                 placeholder
             }
         }
-        .frame(width: 100, height: 150)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .frame(width: 302, height: 170)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private var placeholder: some View {
         ZStack {
             Color.gray.opacity(0.25)
-            Text(fallback).font(.system(size: 40))
+            Text(fallback).font(.system(size: 56))
         }
     }
 }
