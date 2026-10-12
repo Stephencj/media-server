@@ -14,12 +14,30 @@ type MovieFileFacts struct {
 	Title   string
 	Year    int // 0 when the name carries none
 	Runtime int // minutes, 0 when unknown
+	// FolderTitle is the folder's fuller name for the same film, "" when the
+	// folder adds nothing. See MovieFolderTitle.
+	FolderTitle string
 }
 
 // FactsForMovie reads the evidence from a movie's path and duration.
 func FactsForMovie(media *db.Media) MovieFileFacts {
 	title, year := MovieNameFromPath(media.FilePath)
-	return MovieFileFacts{Title: title, Year: year, Runtime: runtimeMinutes(media.Duration)}
+	return MovieFileFacts{
+		Title:       title,
+		Year:        year,
+		Runtime:     runtimeMinutes(media.Duration),
+		FolderTitle: MovieFolderTitle(media.FilePath),
+	}
+}
+
+// MatchMovieFile finds the TMDB film for a file: by the title in its name,
+// and failing that by its folder's fuller title.
+func MatchMovieFile(client *tmdb.Client, facts MovieFileFacts) (*tmdb.MovieDetails, error) {
+	details, err := client.MatchMovie(facts.Title, facts.Year, facts.Runtime)
+	if err != nil || details != nil || facts.FolderTitle == "" {
+		return details, err
+	}
+	return client.MatchMovie(facts.FolderTitle, facts.Year, facts.Runtime)
 }
 
 // ReviewMovieMatch re-runs matching for a movie already in the library and
@@ -30,7 +48,7 @@ func FactsForMovie(media *db.Media) MovieFileFacts {
 // says why in a sentence or two.
 func ReviewMovieMatch(client *tmdb.Client, media *db.Media) (suggested *tmdb.MovieDetails, reason string, flagged bool, err error) {
 	facts := FactsForMovie(media)
-	suggested, err = client.MatchMovie(facts.Title, facts.Year, facts.Runtime)
+	suggested, err = MatchMovieFile(client, facts)
 	if err != nil {
 		return nil, "", false, err
 	}
@@ -57,7 +75,10 @@ func judgeMatch(media *db.Media, facts MovieFileFacts, suggested *tmdb.MovieDeta
 	}
 
 	var concerns []string
-	if !tmdb.TitlesAgree(facts.Title, media.Title) && !tmdb.TitlesAgree(facts.Title, media.OriginalTitle) {
+	titleFits := func(title string) bool {
+		return title != "" && (tmdb.TitlesAgree(title, media.Title) || tmdb.TitlesAgree(title, media.OriginalTitle))
+	}
+	if !titleFits(facts.Title) && !titleFits(facts.FolderTitle) {
 		concerns = append(concerns, fmt.Sprintf("The file is named %q.", facts.Title))
 	}
 	if facts.Year > 0 && media.Year > 0 && absInt(facts.Year-media.Year) > 1 {

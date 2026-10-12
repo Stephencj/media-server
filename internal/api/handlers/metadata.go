@@ -151,8 +151,7 @@ func (h *MetadataHandler) RefreshMetadata(c *gin.Context) {
 	}
 
 	if media.Type == db.MediaTypeMovie {
-		title, year := library.MovieNameFromPath(media.FilePath)
-		details, err := h.tmdb.MatchMovie(title, year, (media.Duration+30)/60)
+		details, err := library.MatchMovieFile(h.tmdb, library.FactsForMovie(media))
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reach TMDB"})
 			return

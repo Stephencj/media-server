@@ -83,6 +83,12 @@ func TestPickMovie(t *testing.T) {
 		{"a wrong year in the name is forgiven when the running time agrees", detours, "Detour", 1946, 68, 2},
 		{"a matching name with the wrong length is not the film", catalogue{{1, "Detour", "2016-11-26", 25, 97}}, "Detour", 0, 68, 0},
 		{"no results", nil, "Charade", 1963, 113, 0},
+		{"a title split differently is the same title", catalogue{{1, "Beetlejuice", "1988-03-30", 40, 92}}, "Beetle Juice", 0, 92, 1},
+		{"the same words in another order are another film", catalogue{{1, "Hard Road", "1988-01-01", 2, 95}}, "Road Hard", 0, 97, 0},
+		{"a sequel with a near-identical length is still the sequel", catalogue{
+			{1, "Daddy's Home 2", "2017-11-09", 40, 100},
+			{2, "Daddy's Home", "2015-12-25", 30, 96},
+		}, "Daddy's Home", 0, 96, 2},
 	}
 
 	for _, tt := range tests {
@@ -140,6 +146,14 @@ func TestMovieTitleSimilarity(t *testing.T) {
 		{"Alien", "Alien 3", 0.5},
 		{"Blade Runner", "Blade Runner 2049", 2.0 / 3.0},
 		{"Night of Living Dead", "Night of the Living Dead", 1.0},
+		{"Beetle Juice", "Beetlejuice", 1.0},
+		{"Ghost Busters", "Ghostbusters", 1.0},
+		{"Scream2", "Scream 2", 1.0},
+		{"Road Hard", "Hard Road", 0.5},
+		{"Friday", "Freaky Friday", 0.5},
+		{"Rambo II", "Rambo III", 0.5},
+		{"Willy Wonka & the Chocolate Facto", "Willy Wonka & the Chocolate Factory", 0.8},
+		{"Sweeney Todd_ The Demon Barber of", "Sweeney Todd: The Demon Barber of Fleet Street", 0.75},
 		{"Charade", "Avengers: Endgame", 0},
 		{"", "Charade", 0},
 	}

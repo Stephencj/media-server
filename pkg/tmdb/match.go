@@ -54,6 +54,16 @@ func (c *Client) MatchMovie(title string, year, runtimeMinutes int) (*MovieDetai
 		}
 	}
 
+	// A title split differently from TMDB's ("Beetle Juice", "Ghost Busters")
+	// may not come back at all. Ask again with the words run together.
+	if joined := strings.Join(titleTokens(title), ""); len(rankMovieCandidates(results, title, year)) == 0 &&
+		strings.Contains(strings.TrimSpace(title), " ") && joined != "" {
+		results, err = c.SearchMovieWithResults(joined, 0)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return pickMovie(results, title, year, runtimeMinutes, c.GetMovieDetails)
 }
 
@@ -169,40 +179,50 @@ func runtimeScore(fileMinutes, tmdbMinutes int) float64 {
 // movieTitleSimilarity compares a title parsed from a file name with a TMDB
 // title:
 //
-//	1.0   the same once punctuation, case, accents and articles are ignored
+//	1.0   the same once punctuation, case, accents, articles and word
+//	      breaks are ignored ("Beetle Juice" is "Beetlejuice")
 //	0.75  the TMDB title is the file's title plus a subtitle
-//	else  the share of words the two have in common, 0 when there are none
+//	else  the share of words the two have in common, in the same order,
+//	      0 when there are none ("Road Hard" is not "Hard Road")
 func movieTitleSimilarity(search, candidate string) float64 {
 	a := titleTokens(search)
 	b := titleTokens(candidate)
 	if len(a) == 0 || len(b) == 0 {
 		return 0
 	}
-	if strings.Join(a, " ") == strings.Join(b, " ") {
+	if strings.Join(a, "") == strings.Join(b, "") {
 		return 1.0
 	}
 	if isSubtitled(a, b) {
 		return 0.75
 	}
 
-	inA := make(map[string]bool, len(a))
-	for _, token := range a {
-		inA[token] = true
+	longer := len(a)
+	if len(b) > longer {
+		longer = len(b)
 	}
-	inB := make(map[string]bool, len(b))
-	shared := 0
-	for _, token := range b {
-		if inA[token] && !inB[token] {
-			shared++
-		}
-		inB[token] = true
-	}
+	return float64(commonInOrder(a, b)) / float64(longer)
+}
 
-	longer := len(inA)
-	if len(inB) > longer {
-		longer = len(inB)
+// commonInOrder is the length of the longest run of words, not necessarily
+// adjacent, that appears in both titles in the same order.
+func commonInOrder(a, b []string) int {
+	prev := make([]int, len(b)+1)
+	for _, wordA := range a {
+		curr := make([]int, len(b)+1)
+		for j, wordB := range b {
+			switch {
+			case wordA == wordB:
+				curr[j+1] = prev[j] + 1
+			case prev[j+1] >= curr[j]:
+				curr[j+1] = prev[j+1]
+			default:
+				curr[j+1] = curr[j]
+			}
+		}
+		prev = curr
 	}
-	return float64(shared) / float64(longer)
+	return prev[len(b)]
 }
 
 // isSubtitled reports whether full is short followed by a subtitle, as in

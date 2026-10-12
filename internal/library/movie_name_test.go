@@ -46,6 +46,16 @@ func TestMovieNameFromPath(t *testing.T) {
 		{"/m/The Final Cut (2004).mkv", "The Final Cut", 2004},
 		{"/m/The Final Cut.mkv", "The Final Cut", 0},
 
+		// Marks of a second copy of the same film.
+		{"/m/The Wizard of Oz v4.mp4", "The Wizard of Oz", 0},
+		{"/m/Shrek 2 T00.mp4", "Shrek 2", 0},
+		{"/m/Shrek 2 HD.m4v", "Shrek 2", 0},
+		{"/m/Trilogy/Compressed/The Two Towers Compressed.mp4", "The Two Towers", 0},
+		{"/m/01 Trolls (1080p HD)(1).m4v", "Trolls", 0},
+		{"/m/Ted (Unrated) (HD).mp4", "Ted", 0},
+		{"/m/Star.Wars.1977.Despecialized.720p.x264.AC3.5.1.mp4", "Star Wars", 1977},
+		{"/m/04 How to Train Your Dragon (1080p H.m4v", "How to Train Your Dragon", 0},
+
 		// A year that leads the name in brackets is still the year.
 		{"/m/(1963) Charade.mkv", "Charade", 1963},
 
@@ -77,5 +87,70 @@ func TestParseFilenameRouting(t *testing.T) {
 	title, _, mediaType, season, episode = parseFilename("/tv/Breaking.Bad.S01E02.720p.mkv")
 	if title != "Breaking Bad" || mediaType != "tvshow" || season != 1 || episode != 2 {
 		t.Errorf("episode parsed as %q, %q, S%dE%d", title, mediaType, season, episode)
+	}
+}
+
+func TestIsMovieFeature(t *testing.T) {
+	tests := []struct {
+		source, path string
+		want         bool
+	}{
+		{"/media/Movies", "/media/Movies/Gremlins/Gremlins.m4v", true},
+		{"/media/Movies", "/media/Movies/Charade (1963).mkv", true},
+		{"/media/Movies", "/media/Movies/Edward Scissor Hands/Edward Scissor Hands v1.m4v", true},
+		{"/media/Movies", "/media/Movies/Trailer Park Boys The Movie.mkv", true},
+		{"/media/Movies", "/media/Movies/The Interview (2014).mkv", true},
+		{"/media/Movies", "/media/Movies/A Series of Unfortunate Events/A Series of Unfortunate Events.mkv", true},
+		{"/media/Movies", "/media/Movies/Comanche Station (1960).mkv", true},
+		{"/media/Movies", "/media/Movies/Showboat/Showboat.m4v", true},
+
+		// Commentary tracks kept beside the film.
+		{"/media/Movies", "/media/Movies/Gremlins/Gremlins Commentary 2.m4v", false},
+		{"/media/Movies", "/media/Movies/Best in Show/Best In Show Commentary.m4v", false},
+		{"/media/Movies", "/media/Movies/Shaun Of The Dead/Shaun Of The Dead Com1.m4v", false},
+		{"/media/Movies", "/media/Movies/Austin Powers/ComAustin Powers2.m4v", false},
+		{"/media/Movies", "/media/Movies/Scream 2/Scream2 Commentary (HD).m4v", false},
+
+		// Bonus clips kept beside the film.
+		{"/media/Movies", "/media/Movies/Aladdin (1992)/Aladdin (1992) - Deleted.mkv", false},
+		{"/media/Movies", "/media/Movies/Aladdin (1992)/Aladdin (1992) - Featurette.mkv", false},
+		{"/media/Movies", "/media/Movies/Showboat/Showboat theatrical Trailer.m4v", false},
+		{"/media/Movies", "/media/Movies/Futurama/The Goonies_preview.m4v", false},
+
+		// Sources and folders that aren't film collections.
+		{"/media/TV Shows", "/media/TV Shows/Taskmaster/Series 04/01 A Fat Bald White Man (1080p HD).m4v", false},
+		{"/media/TV Shows", "/media/TV Shows/Wilfred AU/01 There Is a Dog.mp4", false},
+		{"/media/Stage Shows/Archive", "/media/Stage Shows/Archive/Grand Hotel.mp4", false},
+		{"/media/Movie Special Features", "/media/Movie Special Features/Dracula/Dracula Archives.m4v", false},
+		{"/media", "/media/TV Shows/Wilfred AU/01 There Is a Dog.mp4", false},
+		{"/media", "/media/Movies/Gremlins/Gremlins.m4v", true},
+	}
+
+	for _, tt := range tests {
+		if got := IsMovieFeature(tt.source, tt.path); got != tt.want {
+			t.Errorf("IsMovieFeature(%q, %q) = %v, want %v", tt.source, tt.path, got, tt.want)
+		}
+	}
+}
+
+func TestMovieFolderTitle(t *testing.T) {
+	tests := []struct{ path, want string }{
+		// The folder says more about the same film.
+		{"/m/Scott Pilgrim vs the World/Scott Pilgrim.m4v", "Scott Pilgrim vs the World"},
+		{"/m/The Super Mario Bros Movie (2023)/Super Mario.m4v", "The Super Mario Bros Movie"},
+		// The folder says the same, or less.
+		{"/m/Gremlins/Gremlins.m4v", ""},
+		{"/m/Rambo/Rambo II.m4v", ""},
+		// The folder is a collection or a different name altogether.
+		{"/m/Harry Potter/Harry Potter and the Goblet of Fire.m4v", ""},
+		{"/m/Alfred Hitchcock/Blackmail.m4v", ""},
+		{"/m/Pop Star/Popstar.m4v", ""},
+		{"/Movies/Charade.mkv", ""},
+	}
+
+	for _, tt := range tests {
+		if got := MovieFolderTitle(tt.path); got != tt.want {
+			t.Errorf("MovieFolderTitle(%q) = %q, want %q", tt.path, got, tt.want)
+		}
 	}
 }

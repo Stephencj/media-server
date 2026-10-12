@@ -26,8 +26,32 @@ var (
 	leadingOrderRegx = regexp.MustCompile(`^0\d\s+`)
 	spacesRegex      = regexp.MustCompile(`\s+`)
 
-	// Edition names that trail a title when the name has no year to cut at.
-	editionRegex = regexp.MustCompile(`(?i)\s+(?:(?:the\s+)?(?:director'?s|extended|final|theatrical|unrated|uncut|special|collector'?s|ultimate|anniversary)\s+(?:cut|edition)|extended|unrated|remastered|uncut|imax|proper|repack|limited)$`)
+	// Edition names that trail a title when the name has no year to cut at,
+	// and the marks of a second copy of the same film ("v4", "T00",
+	// "Compressed").
+	editionRegex = regexp.MustCompile(`(?i)\s+(?:(?:the\s+)?(?:director'?s|extended|final|theatrical|unrated|uncut|special|collector'?s|ultimate|anniversary)\s+(?:cut|edition)|extended|unrated|remastered|uncut|imax|proper|repack|limited|compressed|v\d+|t\d{2})$`)
+
+	// A commentary track kept beside its film: "Gremlins Commentary 2",
+	// "Shaun Of The Dead Com1", "ComAustin Powers2".
+	commentaryRegex       = regexp.MustCompile(`(?i)\bcommentary\b|[\s._-]com\s*\d*$`)
+	commentaryPrefixRegex = regexp.MustCompile(`^Com\d*[A-Z]`)
+
+	// A bonus clip kept beside its film: "Aladdin (1992) - Deleted",
+	// "Showboat theatrical Trailer", "..._preview". Only at the end of the
+	// name, so "Trailer Park Boys" stays a film.
+	bonusClipRegex = regexp.MustCompile(`(?i)[\s._-](?:deleted(?:\s+scenes?)?|featurettes?|(?:theatrical\s+)?trailer|bloopers?|gag\s+reel|behind\s+the\s+scenes|preview)$`)
+
+	// Top-level folders that hold television, whatever the source is called.
+	tvFolderNames = map[string]bool{
+		"tv": true, "tv shows": true, "tv show": true, "tv series": true,
+		"television": true, "shows": true, "series": true,
+	}
+	// Words in a source's own path that say it isn't a film collection.
+	nonMovieSourceWords = map[string]bool{
+		"tv": true, "television": true, "show": true, "shows": true,
+		"series": true, "episodes": true,
+	}
+	wordSplitRegex = regexp.MustCompile(`[^a-z0-9]+`)
 
 	// Names a disc ripper gives a file, which say nothing about the film.
 	genericNameRegex = regexp.MustCompile(`(?i)^(?:title|movie|feature|main|video|disc|dvd|bluray)?[\s._\-]*t?\d*$`)
@@ -65,6 +89,78 @@ func MovieNameFromPath(filePath string) (title string, year int) {
 		title = name
 	}
 	return title, year
+}
+
+// MovieFolderTitle returns the title of the folder a movie file sits in, when
+// that folder names the film more fully than the file does: "Scott Pilgrim vs
+// the World/Scott Pilgrim.m4v". It is "" otherwise, including for folders that
+// hold a collection ("Harry Potter/...") or name something else entirely,
+// since the file is then the better guide.
+func MovieFolderTitle(filePath string) string {
+	fileTitle, _ := MovieNameFromPath(filePath)
+	folderTitle, _ := parseMovieName(filepath.Base(filepath.Dir(filePath)))
+
+	fileWords := titleWords(fileTitle)
+	folderWords := titleWords(folderTitle)
+	if len(fileWords) == 0 || len(folderWords) <= len(fileWords) {
+		return ""
+	}
+	inFolder := make(map[string]bool, len(folderWords))
+	for _, word := range folderWords {
+		inFolder[word] = true
+	}
+	for _, word := range fileWords {
+		if !inFolder[word] {
+			return ""
+		}
+	}
+	return folderTitle
+}
+
+// IsMovieFeature reports whether a file is a film in its own right, going by
+// where it is and what it is called. It is false for anything in a television
+// or extras source, anything under a top-level TV folder, and commentary
+// tracks and bonus clips kept in a film's folder. Such files should never be
+// matched to a film: the best they can do is borrow the wrong poster.
+func IsMovieFeature(sourcePath, filePath string) bool {
+	if isExtrasSource(sourcePath) {
+		return false
+	}
+	// The source's own name, and the folder it sits in.
+	for _, part := range []string{filepath.Base(sourcePath), filepath.Base(filepath.Dir(sourcePath))} {
+		for _, word := range titleWords(part) {
+			if nonMovieSourceWords[word] {
+				return false
+			}
+		}
+	}
+
+	if rel, err := filepath.Rel(sourcePath, filePath); err == nil {
+		if top := strings.SplitN(filepath.ToSlash(rel), "/", 2); len(top) == 2 && tvFolderNames[strings.ToLower(top[0])] {
+			return false
+		}
+	}
+
+	name := strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
+	// Quality tags trail the name and would hide a marker in front of them.
+	if loc := movieTagRegex.FindStringIndex(name); loc != nil && loc[0] > 0 {
+		name = name[:loc[0]]
+	}
+	name = strings.TrimSpace(bracketedRegex.ReplaceAllString(name, " "))
+
+	return !commentaryRegex.MatchString(name) &&
+		!commentaryPrefixRegex.MatchString(name) &&
+		!bonusClipRegex.MatchString(name)
+}
+
+func titleWords(title string) []string {
+	var words []string
+	for _, word := range wordSplitRegex.Split(strings.ToLower(title), -1) {
+		if word != "" {
+			words = append(words, word)
+		}
+	}
+	return words
 }
 
 // parseMovieName parses a file or folder name with its extension removed.

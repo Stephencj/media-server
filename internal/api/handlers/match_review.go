@@ -155,8 +155,30 @@ func (h *MatchReviewHandler) checkAll() {
 	h.run.Total = len(movies)
 	h.mu.Unlock()
 
+	// Only films are checked. A library's "movies" also hold episodes with no
+	// episode marker, commentary tracks and bonus clips, and those have no
+	// right answer to suggest.
+	sourcePaths := map[int64]string{}
+	isFeature := func(media *db.Media) bool {
+		path, known := sourcePaths[media.SourceID]
+		if !known {
+			if source, err := h.db.GetMediaSourceByID(media.SourceID); err == nil {
+				path = source.Path
+			}
+			sourcePaths[media.SourceID] = path
+		}
+		return library.IsMovieFeature(path, media.FilePath)
+	}
+
 	failures := 0
 	for _, media := range movies {
+		if !isFeature(media) {
+			h.db.DeleteMatchReview(media.ID)
+			h.mu.Lock()
+			h.run.Checked++
+			h.mu.Unlock()
+			continue
+		}
 		if err := h.checkOne(media); err != nil {
 			failures++
 			log.Printf("Match check failed for %s: %v", media.FilePath, err)

@@ -181,7 +181,7 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 	// Check if already in database (for movies)
 	if existing, err := s.db.GetMediaByFilePath(filePath); err == nil {
 		// Already exists - check if we should refresh metadata
-		if s.tmdb.IsConfigured() && existing.TMDbID == 0 {
+		if s.tmdb.IsConfigured() && existing.TMDbID == 0 && IsMovieFeature(source.Path, filePath) {
 			// Has no TMDB data yet, refresh it
 			s.refreshMetadata(existing)
 		}
@@ -206,8 +206,12 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 	}
 	media.SourceID = source.ID
 
-	// Enrich with TMDB metadata if available
-	s.enrichWithTMDB(media, title, year, mediaType)
+	// Enrich with TMDB metadata if available. Episodes that reached here for
+	// want of an episode marker, commentary tracks and bonus clips are not
+	// films, and matching them only borrows some film's poster.
+	if IsMovieFeature(source.Path, filePath) {
+		s.enrichWithTMDB(media, title, year, mediaType)
+	}
 
 	created, err := s.db.CreateMedia(media)
 	if err != nil {
@@ -417,8 +421,7 @@ func (s *Scanner) refreshMetadata(media *db.Media) {
 	if media.Type == db.MediaTypeMovie {
 		// Match from the file itself. The stored title and year are whatever
 		// an earlier scan made of the name, which is not evidence.
-		fileTitle, fileYear := MovieNameFromPath(media.FilePath)
-		details, err := s.tmdb.MatchMovie(fileTitle, fileYear, runtimeMinutes(media.Duration))
+		details, err := MatchMovieFile(s.tmdb, FactsForMovie(media))
 		if err != nil || details == nil {
 			return
 		}
@@ -488,7 +491,7 @@ func (s *Scanner) enrichWithTMDB(media *db.Media, title string, year int, mediaT
 	}
 
 	if mediaType == db.MediaTypeMovie {
-		details, err := s.tmdb.MatchMovie(title, year, runtimeMinutes(media.Duration))
+		details, err := MatchMovieFile(s.tmdb, FactsForMovie(media))
 		if err != nil {
 			log.Printf("TMDB match failed for %s: %v", title, err)
 			return
