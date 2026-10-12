@@ -189,6 +189,16 @@ private struct SeekFlashView: View {
 struct AVPlayerView: UIViewControllerRepresentable {
     let player: AVPlayer?
 
+    /// Called with the vertical distance of a drag as it moves, and once when
+    /// it ends. For swiping between channels.
+    ///
+    /// This is a UIKit recogniser on the player's own view, not a SwiftUI
+    /// gesture around it. Once AVKit's controls are on screen their
+    /// recognisers take the touch and a SwiftUI gesture never hears of it;
+    /// a recogniser that asks to run alongside them still does.
+    var onVerticalDrag: ((CGFloat) -> Void)? = nil
+    var onVerticalDragEnded: (() -> Void)? = nil
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
@@ -201,6 +211,16 @@ struct AVPlayerView: UIViewControllerRepresentable {
         controller.canStartPictureInPictureAutomaticallyFromInline = true
         controller.videoGravity = .resizeAspect
         controller.delegate = context.coordinator
+
+        context.coordinator.onVerticalDrag = onVerticalDrag
+        context.coordinator.onVerticalDragEnded = onVerticalDragEnded
+        if onVerticalDrag != nil || onVerticalDragEnded != nil {
+            let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
+            pan.delegate = context.coordinator
+            // AVKit still gets every touch; this only listens in.
+            pan.cancelsTouchesInView = false
+            controller.view.addGestureRecognizer(pan)
+        }
         return controller
     }
 
@@ -208,9 +228,38 @@ struct AVPlayerView: UIViewControllerRepresentable {
         if uiViewController.player !== player {
             uiViewController.player = player
         }
+        context.coordinator.onVerticalDrag = onVerticalDrag
+        context.coordinator.onVerticalDragEnded = onVerticalDragEnded
     }
 
-    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate, UIGestureRecognizerDelegate {
+        var onVerticalDrag: ((CGFloat) -> Void)?
+        var onVerticalDragEnded: (() -> Void)?
+        private var isVertical = false
+
+        @objc func handlePan(_ pan: UIPanGestureRecognizer) {
+            switch pan.state {
+            case .began:
+                // Sideways drags belong to the scrubber.
+                let velocity = pan.velocity(in: pan.view)
+                isVertical = abs(velocity.y) > abs(velocity.x)
+            case .changed:
+                if isVertical { onVerticalDrag?(pan.translation(in: pan.view).y) }
+            case .ended, .cancelled, .failed:
+                if isVertical { onVerticalDragEnded?() }
+                isVertical = false
+            default:
+                break
+            }
+        }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            true
+        }
+
         // Required for the user to be able to tap the floating PiP window
         // and return to the full player UI.
         func playerViewController(

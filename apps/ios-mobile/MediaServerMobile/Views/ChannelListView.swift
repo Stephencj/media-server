@@ -8,8 +8,7 @@ enum ChannelViewMode: String, CaseIterable {
 struct ChannelListView: View {
     @StateObject private var viewModel = ChannelViewModel()
     @State private var viewMode: ChannelViewMode = .guide
-    @State private var showPlayer = false
-    @State private var selectedIndex = 0
+    @State private var selectedChannelIndex: Int? = nil
 
     private let columns = [
         GridItem(.adaptive(minimum: 160), spacing: 16)
@@ -51,8 +50,7 @@ struct ChannelListView: View {
                         LazyVGrid(columns: columns, spacing: 16) {
                             ForEach(Array(viewModel.channels.enumerated()), id: \.element.id) { index, channel in
                                 Button {
-                                    selectedIndex = index
-                                    showPlayer = true
+                                    selectedChannelIndex = index
                                 } label: {
                                     VStack(spacing: 8) {
                                         Text(channel.icon)
@@ -75,17 +73,16 @@ struct ChannelListView: View {
 
                 case .guide:
                     ChannelGuideView(channels: viewModel.channels) { _, index in
-                        selectedIndex = index
-                        showPlayer = true
+                        selectedChannelIndex = index
                     }
                 }
             }
         }
         .navigationTitle("Channels")
-        .fullScreenCover(isPresented: $showPlayer) {
+        .fullScreenCover(item: $selectedChannelIndex) { index in
             ChannelPlayerView(
                 channels: viewModel.channels,
-                startIndex: selectedIndex
+                startIndex: index
             )
         }
         .task {
@@ -103,4 +100,8 @@ struct ChannelListView: View {
     }
     .environmentObject(AuthService.shared)
     .environmentObject(AppState.shared)
+}
+
+extension Int: @retroactive Identifiable {
+    public var id: Int { self }
 }

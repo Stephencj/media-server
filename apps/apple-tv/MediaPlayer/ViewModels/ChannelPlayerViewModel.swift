@@ -120,8 +120,14 @@ class ChannelPlayerViewModel: ObservableObject {
 
         print("[ChannelPlayer] Playing: \(url)")
 
-        let playerItem = AVPlayerItem(url: url)
-        player = AVPlayer(playerItem: playerItem)
+        let asset = AVURLAsset(url: url, options: [
+            "AVURLAssetHTTPHeaderFieldsKey": ["Connection": "keep-alive"]
+        ])
+        let playerItem = AVPlayerItem(asset: asset)
+        playerItem.preferredForwardBufferDuration = 60
+        let newPlayer = AVPlayer(playerItem: playerItem)
+        newPlayer.automaticallyWaitsToMinimizeStalling = true
+        player = newPlayer
 
         setupObservers()
 

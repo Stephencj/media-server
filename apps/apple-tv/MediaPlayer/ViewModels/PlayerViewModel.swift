@@ -38,8 +38,14 @@ class PlayerViewModel: ObservableObject {
             return
         }
 
-        let playerItem = AVPlayerItem(url: url)
+        let asset = AVURLAsset(url: url, options: [
+            "AVURLAssetHTTPHeaderFieldsKey": ["Connection": "keep-alive"]
+        ])
+        let playerItem = AVPlayerItem(asset: asset)
+        // 60s forward buffer absorbs WAN jitter; direct-play stalls with the default.
+        playerItem.preferredForwardBufferDuration = 60
         player.replaceCurrentItem(with: playerItem)
+        player.automaticallyWaitsToMinimizeStalling = true
 
         if startPosition > 0 {
             await player.seek(to: CMTime(seconds: Double(startPosition), preferredTimescale: CMTimeScale(NSEC_PER_SEC)))

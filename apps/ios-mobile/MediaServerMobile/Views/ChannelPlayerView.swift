@@ -38,7 +38,11 @@ struct ChannelPlayerView: View {
             // Video Player — uses the same AVPlayerViewController wrapper
             // as VOD playback so we get PiP, AirPlay, and Apple's controls.
             if viewModel.player != nil {
-                AVPlayerView(player: viewModel.player)
+                AVPlayerView(
+                    player: viewModel.player,
+                    onVerticalDrag: { trackSwipe($0) },
+                    onVerticalDragEnded: { commitSwipe() }
+                )
                     .ignoresSafeArea()
                     .opacity(viewModel.isLoading ? 0.4 : 1.0)
                     .animation(.easeInOut(duration: 0.2), value: viewModel.isLoading)
@@ -159,21 +163,6 @@ struct ChannelPlayerView: View {
         .simultaneousGesture(
             TapGesture().onEnded { showInfoBriefly() }
         )
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 30)
-                .onChanged { value in
-                    guard channels.count > 1, !viewModel.isLoading else { return }
-                    dragOffset = value.translation.height
-                    if dragOffset < -30, currentIndex + 1 < channels.count {
-                        pendingTarget = channels[currentIndex + 1]
-                    } else if dragOffset > 30, currentIndex > 0 {
-                        pendingTarget = channels[currentIndex - 1]
-                    } else {
-                        pendingTarget = nil
-                    }
-                }
-                .onEnded { _ in commitSwipe() }
-        )
         .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
             if let player = viewModel.player,
                notification.object as? AVPlayerItem === player.currentItem {
@@ -225,6 +214,21 @@ struct ChannelPlayerView: View {
             try? await Task.sleep(nanoseconds: infoAutoHideDelay)
             guard !Task.isCancelled else { return }
             infoVisible = false
+        }
+    }
+
+    /// Follows a vertical drag on the player: up for the next channel, down
+    /// for the previous one. The drag comes from `AVPlayerView`, which can
+    /// hear it even while AVKit's controls are showing.
+    private func trackSwipe(_ translation: CGFloat) {
+        guard channels.count > 1, !viewModel.isLoading else { return }
+        dragOffset = translation
+        if dragOffset < -30, currentIndex + 1 < channels.count {
+            pendingTarget = channels[currentIndex + 1]
+        } else if dragOffset > 30, currentIndex > 0 {
+            pendingTarget = channels[currentIndex - 1]
+        } else {
+            pendingTarget = nil
         }
     }
 

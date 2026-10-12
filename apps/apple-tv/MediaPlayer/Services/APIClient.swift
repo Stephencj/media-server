@@ -95,7 +95,8 @@ class APIClient: ObservableObject {
         _ endpoint: String,
         method: String,
         body: B?,
-        authenticated: Bool
+        authenticated: Bool,
+        retryOnAuthFailure: Bool = true
     ) async throws -> T {
         guard let url = URL(string: baseURL + endpoint) else {
             throw APIError.invalidURL
@@ -121,6 +122,10 @@ class APIClient: ObservableObject {
             }
 
             if httpResponse.statusCode == 401 {
+                if authenticated, retryOnAuthFailure {
+                    try await AuthService.shared.refreshToken()
+                    return try await self.request(endpoint, method: method, body: body, authenticated: authenticated, retryOnAuthFailure: false)
+                }
                 throw APIError.unauthorized
             }
 

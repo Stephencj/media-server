@@ -36,8 +36,11 @@ class AuthService: ObservableObject {
     /// Silently exchanges the embedded device key for a JWT, retrying on
     /// transient network errors. Surfaces the failure cause via
     /// `lastAuthError` so the connect-failure UI can show what happened.
+    private static let refreshWindow: TimeInterval = 24 * 60 * 60
+
     func ensureAuthenticated() async {
-        if isAuthenticated, token != nil, let expiration = tokenExpiration, Date() < expiration {
+        if isAuthenticated, token != nil, let expiration = tokenExpiration,
+           Date() < expiration.addingTimeInterval(-Self.refreshWindow) {
             return
         }
 
@@ -64,6 +67,13 @@ class AuthService: ObservableObject {
                 try? await Task.sleep(nanoseconds: delay)
             }
         }
+    }
+
+    /// Forces a fresh device-key exchange regardless of cached token state.
+    /// Called by APIClient after a 401 so a stale-but-not-yet-expired token
+    /// can recover without surfacing the failure to the user.
+    func refreshToken() async throws {
+        try await exchangeDeviceKey()
     }
 
     private func exchangeDeviceKey() async throws {
