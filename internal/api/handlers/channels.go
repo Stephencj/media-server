@@ -34,11 +34,9 @@ type AddSourceRequest struct {
 	Options     *db.ChannelSourceOptions `json:"options"` // Filtering options for shows
 }
 
-// ListChannels returns all channels for the current user
+// ListChannels returns all channels
 func (h *ChannelHandler) ListChannels(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-
-	channels, err := h.db.GetUserChannels(userID)
+	channels, err := h.db.GetAllChannels()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channels"})
 		return
@@ -116,7 +114,6 @@ func (h *ChannelHandler) CreateChannel(c *gin.Context) {
 
 // GetChannel returns a specific channel
 func (h *ChannelHandler) GetChannel(c *gin.Context) {
-	userID := c.GetInt64("user_id")
 	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
@@ -133,36 +130,22 @@ func (h *ChannelHandler) GetChannel(c *gin.Context) {
 		return
 	}
 
-	// Verify ownership
-	if channel.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
-		return
-	}
-
 	c.JSON(http.StatusOK, channel)
 }
 
 // UpdateChannel updates a channel's details
 func (h *ChannelHandler) UpdateChannel(c *gin.Context) {
-	userID := c.GetInt64("user_id")
 	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
 		return
 	}
 
-	// Verify ownership
-	existing, err := h.db.GetChannelByID(channelID)
-	if err == db.ErrNotFound {
+	if _, err := h.db.GetChannelByID(channelID); err == db.ErrNotFound {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
 		return
-	}
-	if err != nil {
+	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channel"})
-		return
-	}
-	if existing.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -183,25 +166,17 @@ func (h *ChannelHandler) UpdateChannel(c *gin.Context) {
 
 // DeleteChannel deletes a channel
 func (h *ChannelHandler) DeleteChannel(c *gin.Context) {
-	userID := c.GetInt64("user_id")
 	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
 		return
 	}
 
-	// Verify ownership
-	existing, err := h.db.GetChannelByID(channelID)
-	if err == db.ErrNotFound {
+	if _, err := h.db.GetChannelByID(channelID); err == db.ErrNotFound {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
 		return
-	}
-	if err != nil {
+	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channel"})
-		return
-	}
-	if existing.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -215,25 +190,17 @@ func (h *ChannelHandler) DeleteChannel(c *gin.Context) {
 
 // AddSource adds a content source to a channel
 func (h *ChannelHandler) AddSource(c *gin.Context) {
-	userID := c.GetInt64("user_id")
 	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
 		return
 	}
 
-	// Verify ownership
-	existing, err := h.db.GetChannelByID(channelID)
-	if err == db.ErrNotFound {
+	if _, err := h.db.GetChannelByID(channelID); err == db.ErrNotFound {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
 		return
-	}
-	if err != nil {
+	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channel"})
-		return
-	}
-	if existing.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -273,25 +240,9 @@ func (h *ChannelHandler) AddSource(c *gin.Context) {
 
 // GetSources returns all sources for a channel
 func (h *ChannelHandler) GetSources(c *gin.Context) {
-	userID := c.GetInt64("user_id")
 	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
-		return
-	}
-
-	// Verify ownership
-	existing, err := h.db.GetChannelByID(channelID)
-	if err == db.ErrNotFound {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
-		return
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channel"})
-		return
-	}
-	if existing.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -310,7 +261,6 @@ func (h *ChannelHandler) GetSources(c *gin.Context) {
 
 // DeleteSource removes a source from a channel
 func (h *ChannelHandler) DeleteSource(c *gin.Context) {
-	userID := c.GetInt64("user_id")
 	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
@@ -319,21 +269,6 @@ func (h *ChannelHandler) DeleteSource(c *gin.Context) {
 	sourceID, err := strconv.ParseInt(c.Param("sourceId"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid source ID"})
-		return
-	}
-
-	// Verify channel ownership
-	existing, err := h.db.GetChannelByID(channelID)
-	if err == db.ErrNotFound {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
-		return
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channel"})
-		return
-	}
-	if existing.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -358,25 +293,17 @@ func (h *ChannelHandler) DeleteSource(c *gin.Context) {
 
 // RegenerateSchedule regenerates the channel's schedule
 func (h *ChannelHandler) RegenerateSchedule(c *gin.Context) {
-	userID := c.GetInt64("user_id")
 	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
 		return
 	}
 
-	// Verify ownership
-	existing, err := h.db.GetChannelByID(channelID)
-	if err == db.ErrNotFound {
+	if _, err := h.db.GetChannelByID(channelID); err == db.ErrNotFound {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
 		return
-	}
-	if err != nil {
+	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channel"})
-		return
-	}
-	if existing.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -390,25 +317,9 @@ func (h *ChannelHandler) RegenerateSchedule(c *gin.Context) {
 
 // GetNowPlaying returns what's currently playing on a channel
 func (h *ChannelHandler) GetNowPlaying(c *gin.Context) {
-	userID := c.GetInt64("user_id")
 	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
-		return
-	}
-
-	// Verify ownership
-	existing, err := h.db.GetChannelByID(channelID)
-	if err == db.ErrNotFound {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
-		return
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channel"})
-		return
-	}
-	if existing.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -430,25 +341,9 @@ func (h *ChannelHandler) GetNowPlaying(c *gin.Context) {
 
 // GetSchedule returns the full schedule for a channel
 func (h *ChannelHandler) GetSchedule(c *gin.Context) {
-	userID := c.GetInt64("user_id")
 	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
-		return
-	}
-
-	// Verify ownership
-	existing, err := h.db.GetChannelByID(channelID)
-	if err == db.ErrNotFound {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
-		return
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channel"})
-		return
-	}
-	if existing.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -479,7 +374,6 @@ func (h *ChannelHandler) GetSchedule(c *gin.Context) {
 
 // GetShowOptions returns available options for a TV show source
 func (h *ChannelHandler) GetShowOptions(c *gin.Context) {
-	userID := c.GetInt64("user_id")
 	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid channel ID"})
@@ -491,18 +385,11 @@ func (h *ChannelHandler) GetShowOptions(c *gin.Context) {
 		return
 	}
 
-	// Verify channel ownership
-	existing, err := h.db.GetChannelByID(channelID)
-	if err == db.ErrNotFound {
+	if _, err := h.db.GetChannelByID(channelID); err == db.ErrNotFound {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Channel not found"})
 		return
-	}
-	if err != nil {
+	} else if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch channel"})
-		return
-	}
-	if existing.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 

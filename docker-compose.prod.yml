@@ -10,7 +10,7 @@ services:
     volumes:
       - ./data:/data
       - ./backups:/data/backups
-      - /media/stephencjuliano/Media3/Videos:/media/Videos:ro
+      - ${MEDIA_PATH:-/media/stephencjuliano/Media5}:/media:ro
       - ./web:/app/web:ro  # Mount web folder for live frontend updates
     environment:
       - MEDIA_SERVER_DB_PATH=/data/media-server.db

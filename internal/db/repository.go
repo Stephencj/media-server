@@ -2077,6 +2077,39 @@ func (db *DB) GetChannelByID(id int64) (*Channel, error) {
 	return channel, nil
 }
 
+// GetAllChannels retrieves all channels across all users
+func (db *DB) GetAllChannels() ([]Channel, error) {
+	rows, err := db.conn.Query(
+		`SELECT c.id, c.user_id, c.name, c.description, c.icon, COALESCE(c.channel_number, 0),
+			c.created_at, c.updated_at,
+			COALESCE(s.item_count, 0) as item_count,
+			COALESCE(s.total_duration, 0) as total_duration
+		FROM channels c
+		LEFT JOIN (
+			SELECT channel_id, COUNT(*) as item_count, SUM(duration) as total_duration
+			FROM channel_schedule
+			WHERE cycle_number = 1
+			GROUP BY channel_id
+		) s ON c.id = s.channel_id
+		ORDER BY c.channel_number, c.id`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var channels []Channel
+	for rows.Next() {
+		var ch Channel
+		if err := rows.Scan(&ch.ID, &ch.UserID, &ch.Name, &ch.Description, &ch.Icon, &ch.ChannelNumber, &ch.CreatedAt, &ch.UpdatedAt, &ch.ItemCount, &ch.TotalDuration); err != nil {
+			continue
+		}
+		channels = append(channels, ch)
+	}
+
+	return channels, rows.Err()
+}
+
 // GetUserChannels retrieves all channels for a user
 func (db *DB) GetUserChannels(userID int64) ([]Channel, error) {
 	// Use a single query with LEFT JOIN to get channel data and schedule stats together
@@ -2830,8 +2863,9 @@ func (db *DB) getChannelCycle(channelID int64) (items []ChannelScheduleItem, tot
 // A channel has no stored air times; its position is derived from how long it
 // has existed: position = (now - created_at) % cycleDuration. Projecting that
 // forward is what turns a cycle into a guide, and it wraps for free.
-func (db *DB) GetChannelGuide(userID int64, start, end time.Time) (*ChannelGuide, error) {
-	channels, err := db.GetUserChannels(userID)
+func (db *DB) GetChannelGuide(_ int64, start, end time.Time) (*ChannelGuide, error) {
+	// Single-user system — ignore the userID filter and return every channel.
+	channels, err := db.GetAllChannels()
 	if err != nil {
 		return nil, err
 	}

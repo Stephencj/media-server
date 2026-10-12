@@ -11,7 +11,7 @@ database_path: "/data/media-server.db"
 # JWT Authentication
 # IMPORTANT: Change this to a secure random string in production!
 jwt_secret: "your-secret-key-change-me-in-production"
-jwt_expiration_hours: 168  # 7 days
+jwt_expiration_hours: 8760  # 1 year — sideloaded apps refresh silently via device-key exchange
 
 # Media Sources
 # Add your media directories here
