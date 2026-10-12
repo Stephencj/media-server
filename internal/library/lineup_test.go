@@ -125,3 +125,63 @@ func TestApplyLineup(t *testing.T) {
 		t.Errorf("Mixed airs %d kinds of thing, want episodes and a commentary", kinds)
 	}
 }
+
+// A show limited to some seasons is limited everywhere, and its commentaries
+// with it.
+func TestLineupShowSeasons(t *testing.T) {
+	_, database, _ := newMisfiledLibrary(t)
+	seedUser(t, database)
+
+	conn := database.Conn()
+	exec := func(query string, args ...any) int64 {
+		t.Helper()
+		result, err := conn.Exec(query, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, _ := result.LastInsertId()
+		return id
+	}
+	created, err := database.CreateTVShow(&db.TVShow{Title: "Futurama"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	show := created.ID
+	for season := 1; season <= 3; season++ {
+		seasonID := exec(`INSERT INTO seasons (tv_show_id, season_number, name) VALUES (?, ?, ?)`, show, season, "Season")
+		for episode := 1; episode <= 2; episode++ {
+			exec(`INSERT INTO episodes (tv_show_id, season_id, season_number, episode_number, title, duration, file_path)
+				VALUES (?, ?, ?, ?, 'Episode', 1320, ?)`, show, seasonID, season, episode, "/tv/f"+string(rune('0'+season))+string(rune('0'+episode)))
+		}
+		exec(`INSERT INTO extras (title, category, tv_show_id, season_number, episode_number, duration, file_path)
+			VALUES ('Commentary', 'commentary', ?, ?, 1, 1320, ?)`, show, season, "/tv/c"+string(rune('0'+season)))
+	}
+
+	spec := LineupSpec{
+		ShowSeasons: map[string][]int{"Futurama": {1, 2}},
+		Channels: []LineupChannel{
+			{Name: "Episodes", Sources: []LineupSource{{Show: "Futurama"}}},
+			{Name: "Marathon", Sources: []LineupSource{{Show: "Futurama", Version: "both"}}},
+			{Name: "Override", Sources: []LineupSource{{Show: "Futurama", Seasons: []int{3}}}},
+		},
+	}
+	if _, err := ApplyLineup(database, spec, true); err != nil {
+		t.Fatal(err)
+	}
+
+	distinct := func(channel, kind string) int {
+		var n int
+		conn.QueryRow(`SELECT count(DISTINCT s.media_id) FROM channel_schedule s JOIN channels c ON c.id = s.channel_id
+			WHERE c.name = ? AND s.media_type = ?`, channel, kind).Scan(&n)
+		return n
+	}
+	if got := distinct("Episodes", "episode"); got != 4 {
+		t.Errorf("Episodes airs %d episodes, want the 4 from seasons 1 and 2", got)
+	}
+	if episodes, commentaries := distinct("Marathon", "episode"), distinct("Marathon", "extra"); episodes != 4 || commentaries != 2 {
+		t.Errorf("Marathon airs %d episodes and %d commentaries, want 4 and 2", episodes, commentaries)
+	}
+	if got := distinct("Override", "episode"); got != 2 {
+		t.Errorf("Override airs %d episodes, want the 2 from season 3 it asked for", got)
+	}
+}

@@ -223,14 +223,19 @@ struct ChannelPlayerView: View {
     private func trackSwipe(_ translation: CGFloat) {
         guard channels.count > 1, !viewModel.isLoading else { return }
         dragOffset = translation
-        if dragOffset < -30, currentIndex + 1 < channels.count {
-            pendingTarget = channels[currentIndex + 1]
-        } else if dragOffset > 30, currentIndex > 0 {
-            pendingTarget = channels[currentIndex - 1]
+        if dragOffset < -30 {
+            pendingTarget = channels[nextIndex]
+        } else if dragOffset > 30 {
+            pendingTarget = channels[previousIndex]
         } else {
             pendingTarget = nil
         }
     }
+
+    // The lineup is a loop, as on a television: past the last channel is the
+    // first, and before the first is the last.
+    private var nextIndex: Int { (currentIndex + 1) % channels.count }
+    private var previousIndex: Int { (currentIndex - 1 + channels.count) % channels.count }
 
     private func commitSwipe() {
         defer {
@@ -240,12 +245,12 @@ struct ChannelPlayerView: View {
         }
         guard channels.count > 1, !viewModel.isLoading else { return }
 
-        if dragOffset <= -80, currentIndex + 1 < channels.count {
+        if dragOffset <= -80 {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            currentIndex += 1
-        } else if dragOffset >= 80, currentIndex > 0 {
+            currentIndex = nextIndex
+        } else if dragOffset >= 80 {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            currentIndex -= 1
+            currentIndex = previousIndex
         }
 
         // Keep the preview visible briefly as confirmation, then clear.

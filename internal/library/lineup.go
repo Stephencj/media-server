@@ -24,8 +24,12 @@ import (
 type LineupSpec struct {
 	// Timezone is where the clock that dayparts follow is, as an IANA name
 	// ("America/New_York"). Empty means the server's own.
-	Timezone string          `json:"timezone,omitempty"`
-	Channels []LineupChannel `json:"channels"`
+	Timezone string `json:"timezone,omitempty"`
+	// ShowSeasons limits a show to these seasons everywhere it appears in
+	// the lineup, unless a source says otherwise. For a show with a run
+	// that should never air.
+	ShowSeasons map[string][]int `json:"show_seasons,omitempty"`
+	Channels    []LineupChannel  `json:"channels"`
 }
 
 // LineupChannel is one channel. It has either Sources, a single mix that
@@ -198,7 +202,7 @@ type resolvedShow struct {
 
 // resolveSources turns a list of sources into the shows and items they name,
 // noting on the report what was found and what matched nothing.
-func resolveSources(database *db.DB, sources []LineupSource, films []*db.Media, today time.Time, report *LineupReport) (resolved, error) {
+func resolveSources(database *db.DB, spec LineupSpec, sources []LineupSource, films []*db.Media, today time.Time, report *LineupReport) (resolved, error) {
 	var out resolved
 	seen := map[string]bool{}
 	add := func(item db.LineupItem) bool {
@@ -253,16 +257,36 @@ func resolveSources(database *db.DB, sources []LineupSource, films []*db.Media, 
 				report.Problems = append(report.Problems, fmt.Sprintf("no show called %q", source.Show))
 				continue
 			}
+			seasons := source.Seasons
+			if len(seasons) == 0 {
+				seasons = spec.ShowSeasons[source.Show]
+			}
 			var options *db.ChannelSourceOptions
-			if len(source.Seasons) > 0 || source.Version != "" || len(source.Extras) > 0 {
+			if len(seasons) > 0 || source.Version != "" || len(source.Extras) > 0 {
 				options = &db.ChannelSourceOptions{
-					Seasons: source.Seasons, VersionMode: source.Version, ExtrasCategories: source.Extras,
+					Seasons: seasons, VersionMode: source.Version, ExtrasCategories: source.Extras,
 				}
 			}
-			out.shows = append(out.shows, resolvedShow{show.ID, options})
-			out.everything = append(out.everything, database.LineupShowItems(show.ID, options)...)
+			items, err := database.LineupShowItems(show.ID, options)
+			if err != nil {
+				return out, err
+			}
 			if !listed(report.Shows, show.Title) {
 				report.Shows = append(report.Shows, show.Title)
+			}
+
+			// A show source limits its episodes to the seasons asked for
+			// but not its commentaries or bonus clips. Where both a season
+			// limit and bonus material are wanted, the items are chosen
+			// here and aired from the channel's playlist instead.
+			wantsBonus := len(source.Extras) > 0 || (source.Version != "" && source.Version != db.VersionModeMain)
+			if len(seasons) > 0 && wantsBonus {
+				for _, item := range items {
+					add(item)
+				}
+			} else {
+				out.shows = append(out.shows, resolvedShow{show.ID, options})
+				out.everything = append(out.everything, items...)
 			}
 
 		case source.Films != nil:
@@ -355,7 +379,7 @@ func ApplyLineupAt(database *db.DB, spec LineupSpec, apply bool, now time.Time, 
 		for _, part := range channel.Dayparts {
 			sources = append(sources, part.Sources...)
 		}
-		all, err := resolveSources(database, sources, films, now, &report)
+		all, err := resolveSources(database, spec, sources, films, now, &report)
 		if err != nil {
 			return nil, err
 		}
@@ -371,7 +395,7 @@ func ApplyLineupAt(database *db.DB, spec LineupSpec, apply bool, now time.Time, 
 					continue
 				}
 				// Problems were already noted against the whole channel.
-				pool, err := resolveSources(database, part.Sources, films, now, &LineupReport{})
+				pool, err := resolveSources(database, spec, part.Sources, films, now, &LineupReport{})
 				if err != nil {
 					return nil, err
 				}

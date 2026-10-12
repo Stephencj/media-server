@@ -1,5 +1,14 @@
 {
   "timezone": "America/New_York",
+  "show_seasons": {
+    "Futurama": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
   "channels": [
     {
       "name": "Channel One",
@@ -647,14 +656,7 @@
           "to": "20:00",
           "sources": [
             {
-              "show": "Futurama",
-              "seasons": [
-                1,
-                2,
-                3,
-                4,
-                5
-              ]
+              "show": "Futurama"
             },
             {
               "show": "BeetleJuice Cartoon"
@@ -715,14 +717,7 @@
               "show": "Dragon Ball Z Abridged"
             },
             {
-              "show": "Futurama",
-              "seasons": [
-                1,
-                2,
-                3,
-                4,
-                5
-              ]
+              "show": "Futurama"
             }
           ]
         }

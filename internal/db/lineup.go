@@ -143,15 +143,76 @@ func (db *DB) ChannelScheduleTotals(channelID int64) (items, seconds int, err er
 }
 
 // LineupShowItems returns what a show contributes to a channel under the
-// given options (seasons, commentaries, bonus clips): the same items a show
-// source would schedule.
-func (db *DB) LineupShowItems(showID int64, options *ChannelSourceOptions) []LineupItem {
-	inputs := db.getMediaFromSource(ChannelSource{SourceType: ChannelSourceShow, SourceID: &showID, Options: options})
-	items := make([]LineupItem, 0, len(inputs))
-	for _, input := range inputs {
-		items = append(items, LineupItem{ID: input.MediaID, Type: input.MediaType, Title: input.Title, Duration: input.Duration})
+// given options: its episodes, and with them its commentaries and bonus clips
+// when asked for.
+//
+// A season limit applies to all of it. A show source on its own limits only
+// the episodes, and lets commentaries on every other season through.
+func (db *DB) LineupShowItems(showID int64, options *ChannelSourceOptions) ([]LineupItem, error) {
+	mode := VersionModeMain
+	var seasons []int
+	var categories []string
+	if options != nil {
+		mode = options.GetEffectiveVersionMode()
+		seasons = options.Seasons
+		categories = append(categories, options.ExtrasCategories...)
 	}
-	return items
+	if mode == VersionModeCommentary || mode == VersionModeBoth {
+		categories = append(categories, string(ExtraCategoryCommentary))
+	}
+
+	inSeasons := func(column string) (string, []any) {
+		if len(seasons) == 0 {
+			return "", nil
+		}
+		args := make([]any, len(seasons))
+		for i, season := range seasons {
+			args[i] = season
+		}
+		return " AND " + column + " IN (?" + strings.Repeat(", ?", len(seasons)-1) + ")", args
+	}
+
+	var items []LineupItem
+	collect := func(kind MediaType, query string, args ...any) error {
+		rows, err := db.conn.Query(query, args...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			item := LineupItem{Type: kind}
+			if err := rows.Scan(&item.ID, &item.Title, &item.Duration); err != nil {
+				return err
+			}
+			items = append(items, item)
+		}
+		return rows.Err()
+	}
+
+	if mode == VersionModeMain || mode == VersionModeBoth {
+		clause, args := inSeasons("season_number")
+		if err := collect(MediaTypeEpisode,
+			`SELECT id, title, duration FROM episodes WHERE tv_show_id = ? AND duration > 0`+clause+
+				` ORDER BY season_number, episode_number`,
+			append([]any{showID}, args...)...); err != nil {
+			return nil, err
+		}
+	}
+	if len(categories) > 0 {
+		// Bonus material filed under no season cannot be placed, so a
+		// season limit leaves it out rather than guess.
+		clause, args := inSeasons("season_number")
+		query := `SELECT id, title, duration FROM extras WHERE tv_show_id = ? AND duration > 0
+			AND category IN (?` + strings.Repeat(", ?", len(categories)-1) + `)` + clause + ` ORDER BY season_number, episode_number, title`
+		params := []any{showID}
+		for _, category := range categories {
+			params = append(params, category)
+		}
+		if err := collect(MediaTypeExtra, query, append(params, args...)...); err != nil {
+			return nil, err
+		}
+	}
+	return items, nil
 }
 
 // ReplaceChannelSchedule gives a channel exactly this cycle, in order, and
