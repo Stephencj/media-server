@@ -40,6 +40,10 @@ struct PlayerView: View {
             // Double-tap-to-seek catchers on the leading + trailing 30%
             // of the player. Center 40% stays clear so AVKit's tap-to-toggle
             // works naturally.
+            //
+            // They stop short of the top and bottom of the screen. AVKit puts
+            // its own buttons there, the audio and subtitle menu among them,
+            // and a catcher laid over a button swallows the tap meant for it.
             GeometryReader { geo in
                 HStack(spacing: 0) {
                     sideTapCatcher(side: .backward)
@@ -48,6 +52,8 @@ struct PlayerView: View {
                     sideTapCatcher(side: .forward)
                         .frame(width: geo.size.width * 0.30)
                 }
+                .padding(.top, max(90, geo.size.height * 0.22))
+                .padding(.bottom, max(120, geo.size.height * 0.30))
                 .frame(width: geo.size.width, height: geo.size.height)
             }
             .ignoresSafeArea()
