@@ -71,6 +71,8 @@ func main() {
 //	tidy-plan    what the next scan will move out of Movies (changes nothing)
 //	scan         scan every source now
 //	file-health  files that look like a bad rip or conversion
+//	relink-plan  entries whose file was replaced by a conversion (changes nothing)
+//	relink       point those entries at their new files
 func runCommand(name string, database *db.DB, cfg *config.Config) error {
 	out := json.NewEncoder(os.Stdout)
 	out.SetIndent("", "  ")
@@ -90,8 +92,17 @@ func runCommand(name string, database *db.DB, cfg *config.Config) error {
 			return err
 		}
 		return out.Encode(issues)
+	case "relink-plan", "relink":
+		relinks, err := library.NewScanner(database, cfg).RelinkMovedFiles(name == "relink")
+		if err != nil {
+			return err
+		}
+		if relinks == nil {
+			relinks = []library.Relink{}
+		}
+		return out.Encode(relinks)
 	default:
-		return fmt.Errorf("unknown command (want tidy-plan, scan or file-health)")
+		return fmt.Errorf("unknown command (want tidy-plan, scan, file-health, relink-plan or relink)")
 	}
 }
 

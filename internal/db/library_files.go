@@ -1,5 +1,7 @@
 package db
 
+import "fmt"
+
 // GetMoviesInFolder returns the movie rows whose file sits directly in dir.
 func (db *DB) GetMoviesInFolder(dir string) ([]*Media, error) {
 	prefix := dir + "/"
@@ -126,4 +128,26 @@ func (db *DB) ListLibraryFiles() ([]LibraryFile, error) {
 		files = append(files, f)
 	}
 	return files, rows.Err()
+}
+
+// UpdateFileDetails points a movie, episode or extra at a file and records
+// that file's technical details. For when a file has been replaced by a
+// conversion of itself: the row, and everything that refers to it, stays.
+func (db *DB) UpdateFileDetails(kind MediaType, id int64, f *MediaFile) error {
+	table := map[MediaType]string{
+		MediaTypeMovie:   "media",
+		MediaTypeEpisode: "episodes",
+		MediaTypeExtra:   "extras",
+	}[kind]
+	if table == "" {
+		return fmt.Errorf("no files are stored for %q", kind)
+	}
+	_, err := db.conn.Exec(
+		`UPDATE `+table+` SET file_path = ?, file_size = ?, duration = ?, video_codec = ?, audio_codec = ?,
+			resolution = ?, audio_tracks = ?, subtitle_tracks = ?, updated_at = CURRENT_TIMESTAMP
+		 WHERE id = ?`,
+		f.FilePath, f.FileSize, f.Duration, f.VideoCodec, f.AudioCodec,
+		f.Resolution, f.AudioTracks, f.SubtitleTracks, id,
+	)
+	return err
 }
