@@ -188,6 +188,10 @@ struct MediaDetailView: View {
                         }
                     }
 
+                    if media.type == .movie {
+                        MovieBonusSection(media: media)
+                    }
+
                     // Technical details
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Details")
