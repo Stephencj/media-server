@@ -54,7 +54,10 @@ def make_subtitles(host, src_path, srt_remote, recogniser, workdir):
     sup = os.path.join(workdir, "track.sup")
     srt = os.path.join(workdir, "track.srt")
     with open(sup, "wb") as out:
-        pulled = remote(host, ["ffmpeg", "-nostdin", "-v", "error", "-i", src_path,
+        # -copyts keeps the subtitles' own clock. Without it ffmpeg restarts
+        # an input's timestamps at zero, and a track cut out on its own then
+        # loses the gap before its first line: every subtitle shows early.
+        pulled = remote(host, ["ffmpeg", "-nostdin", "-v", "error", "-copyts", "-i", src_path,
                                "-map", "0:s:0", "-c", "copy", "-f", "sup", "pipe:1"],
                         stdout=out, stderr=subprocess.PIPE)
     if pulled.returncode != 0 or os.path.getsize(sup) == 0:

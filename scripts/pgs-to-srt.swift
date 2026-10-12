@@ -8,8 +8,11 @@
 // writes an .srt with the original timings. Nothing needs installing, which is
 // why it is a Mac script and not part of the server.
 //
-// To get a .sup out of a saved subtitle track:
-//     ffmpeg -i "Episode.eng.1.mks" -map 0:0 -c copy subtitles.sup
+// To get a .sup out of a film or a saved subtitle track:
+//     ffmpeg -copyts -i "Episode.mkv" -map 0:s:0 -c copy subtitles.sup
+// The -copyts matters. Without it ffmpeg starts the track's clock at its first
+// subtitle, and every line then shows early by however long the film ran
+// before anyone spoke.
 
 import CoreGraphics
 import Foundation
