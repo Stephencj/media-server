@@ -186,3 +186,10 @@ func (db *DB) ReplaceChannelSchedule(channelID int64, items []LineupItem, anchor
 	}
 	return tx.Commit()
 }
+
+// SetChannelNumber gives a channel its number in the guide, which is also
+// its place in the order.
+func (db *DB) SetChannelNumber(channelID int64, number int) error {
+	_, err := db.conn.Exec(`UPDATE channels SET channel_number = ? WHERE id = ?`, number, channelID)
+	return err
+}

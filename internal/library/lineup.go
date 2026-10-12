@@ -35,7 +35,11 @@ type LineupChannel struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description,omitempty"`
 	Icon        string         `json:"icon,omitempty"`
-	Sources     []LineupSource `json:"sources,omitempty"`
+	// Number is the channel's number in the guide, which also orders it.
+	// Left out, a new channel takes the next free number and an existing
+	// one keeps its own.
+	Number  int            `json:"number,omitempty"`
+	Sources []LineupSource `json:"sources,omitempty"`
 
 	Dayparts []LineupDaypart `json:"dayparts,omitempty"`
 	// Days is how long a dayparted channel runs before it repeats. Longer
@@ -300,6 +304,11 @@ func ApplyLineup(database *db.DB, spec LineupSpec, apply bool) ([]LineupReport, 
 		if target == nil {
 			target, err = database.CreateChannel(owner, channel.Name, channel.Description, channel.Icon)
 			if err != nil {
+				return nil, err
+			}
+		}
+		if channel.Number > 0 && target.ChannelNumber != channel.Number {
+			if err := database.SetChannelNumber(target.ID, channel.Number); err != nil {
 				return nil, err
 			}
 		}

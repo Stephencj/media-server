@@ -45,7 +45,7 @@ func TestApplyLineup(t *testing.T) {
 	spec := LineupSpec{Channels: []LineupChannel{
 		{Name: "Fright Night", Sources: []LineupSource{{Films: &FilmFilter{Genres: []string{"horror"}}}}},
 		{Name: "Golden Age", Sources: []LineupSource{{Films: &FilmFilter{YearTo: 1969, MinMinutes: 60}}}},
-		{Name: "Hand Picked", Sources: []LineupSource{{Films: &FilmFilter{Titles: []string{"charade"}}}}},
+		{Name: "Hand Picked", Number: 100, Sources: []LineupSource{{Films: &FilmFilter{Titles: []string{"charade"}}}}},
 		{Name: "Movie Night", Sources: []LineupSource{{Films: &FilmFilter{MinMinutes: 60}}}},
 		{Name: "Mixed", Sources: []LineupSource{
 			{Show: "Taskmaster"},
@@ -103,6 +103,10 @@ func TestApplyLineup(t *testing.T) {
 	}
 	if _, err := database.FindChannelByName("Empty"); err != db.ErrNotFound {
 		t.Error("a channel with nothing to air was created")
+	}
+
+	if picked, _ := database.FindChannelByName("Hand Picked"); picked.ChannelNumber != 100 {
+		t.Errorf("Hand Picked is channel %d, want the 100 the file gives it", picked.ChannelNumber)
 	}
 
 	fright, _ := database.FindChannelByName("Fright Night")

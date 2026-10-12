@@ -4,6 +4,7 @@
     {
       "name": "Channel One",
       "icon": "1️⃣",
+      "number": 100,
       "description": "A day of television: cartoons in the morning, sitcoms after lunch, dramas and a film at night, the strange stuff after eleven",
       "days": 14,
       "dayparts": [
@@ -524,6 +525,135 @@
           "version": "both",
           "extras": [
             "deleted_scene"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Animation",
+      "description": "Cartoons for everyone by day, for grown-ups after eight",
+      "days": 14,
+      "dayparts": [
+        {
+          "name": "Daytime",
+          "from": "06:00",
+          "to": "20:00",
+          "sources": [
+            {
+              "show": "Futurama",
+              "seasons": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            {
+              "show": "BeetleJuice Cartoon"
+            },
+            {
+              "show": "Dragon Ball Z Kai"
+            },
+            {
+              "films": {
+                "genres": [
+                  "Animation"
+                ],
+                "not_genres": [
+                  "Horror",
+                  "TV Movie"
+                ],
+                "min_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "name": "After Eight",
+          "from": "20:00",
+          "to": "06:00",
+          "sources": [
+            {
+              "show": "The Venture Brothers"
+            },
+            {
+              "show": "Dragon Ball Z Abridged"
+            },
+            {
+              "show": "Futurama",
+              "seasons": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Comedy",
+      "description": "Sitcoms through the day, the ruder stuff after ten",
+      "days": 14,
+      "dayparts": [
+        {
+          "name": "Daytime",
+          "from": "06:00",
+          "to": "22:00",
+          "sources": [
+            {
+              "show": "The Office"
+            },
+            {
+              "show": "Parks and Recreation"
+            },
+            {
+              "show": "The IT Crowd"
+            },
+            {
+              "show": "Toast of London"
+            },
+            {
+              "show": "Con Man"
+            },
+            {
+              "show": "Futurama"
+            },
+            {
+              "show": "Taskmaster",
+              "seasons": [
+                19
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Late",
+          "from": "22:00",
+          "to": "06:00",
+          "sources": [
+            {
+              "show": "Chappelle's Show"
+            },
+            {
+              "show": "The Venture Brothers"
+            },
+            {
+              "films": {
+                "genres": [
+                  "Comedy"
+                ],
+                "not_genres": [
+                  "Family",
+                  "Animation",
+                  "TV Movie"
+                ],
+                "min_minutes": 60
+              }
+            }
           ]
         }
       ]
