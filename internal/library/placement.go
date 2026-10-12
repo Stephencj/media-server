@@ -73,6 +73,8 @@ var (
 		{regexp.MustCompile(`^(\d{1,3})[\s._-]+`), false},                                                 // 01 Title
 	}
 
+	aboutEpisodeRegex = regexp.MustCompile(`(?i)\bepisode\s*\d+`)
+
 	tvSourceWords = map[string]bool{
 		"tv": true, "television": true, "show": true, "shows": true,
 		"series": true, "episodes": true,
@@ -171,6 +173,17 @@ func placeShowFile(folders []string, name string) Placement {
 				title = ""
 			}
 		}
+		// A piece about an episode, numbered in among the episodes by a
+		// season pass: "S0502 Inside Breaking Bad: Episode 501". Episodes
+		// are not named after their own show and another episode's number.
+		if aboutEpisodeRegex.MatchString(title) && strings.Contains(lettersOnly(title), lettersOnly(p.ShowTitle)) {
+			p.Episode = 0
+			p.Kind = PlaceShowBonus
+			p.Title = title
+			p.Category = db.ExtraCategoryBehindTheScenes
+			return p
+		}
+
 		p.Kind = PlaceEpisode
 		p.EpisodeTitle = title
 		return p

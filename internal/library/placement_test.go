@@ -45,6 +45,9 @@ func TestPlaceFile(t *testing.T) {
 		{tv, tv + "/Breaking Bad/Breaking Bad/S05103 Season 5 Sneak Peak (HD).mp4",
 			Placement{Kind: PlaceShowBonus, ShowTitle: "Breaking Bad", Season: 1, Title: "S05103 Season 5 Sneak Peak", Category: db.ExtraCategoryOther}},
 
+		{tv, tv + "/Breaking Bad/Breaking Bad/S0502 Inside Breaking Bad_ Episode 501.mp4",
+			Placement{Kind: PlaceShowBonus, ShowTitle: "Breaking Bad", Season: 5, Title: "Inside Breaking Bad Episode 501", Category: db.ExtraCategoryBehindTheScenes}},
+
 		// A source that holds everything, with a TV folder at the top.
 		{all, all + "/TV Shows/Wilfred AU/02 Dog Day Afterglow.mp4",
 			Placement{Kind: PlaceEpisode, ShowTitle: "Wilfred AU", Season: 1, Episode: 2, EpisodeTitle: "Dog Day Afterglow"}},
