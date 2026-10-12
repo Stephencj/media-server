@@ -32,9 +32,9 @@ type LineupSpec struct {
 // plays round the clock, or Dayparts, a different mix for each part of the
 // day.
 type LineupChannel struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	Icon        string         `json:"icon,omitempty"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	Icon        string `json:"icon,omitempty"`
 	// Number is the channel's number in the guide, which also orders it.
 	// Left out, a new channel takes the next free number and an existing
 	// one keeps its own.
