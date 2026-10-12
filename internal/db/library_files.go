@@ -80,8 +80,11 @@ type LibraryFile struct {
 	MatchedYear    int
 	MatchedRuntime int // minutes
 	TMDbID         int
-	// MatchInDoubt is set while a movie waits in the check-matches queue:
-	// its match may be the wrong film.
+	// MatchInDoubt is set while a movie waits in the check-matches queue
+	// with another film suggested for it: its match may be the wrong film.
+	// A queued movie with no better film on offer is not in doubt in that
+	// sense. Its title fits and only its length does not, which points at
+	// the file.
 	MatchInDoubt bool
 }
 
@@ -91,7 +94,8 @@ func (db *DB) ListLibraryFiles() ([]LibraryFile, error) {
 		`SELECT 'movie', id, title, COALESCE(source_id, 0), COALESCE(file_path, ''), COALESCE(file_size, 0),
 			COALESCE(duration, 0), COALESCE(video_codec, ''), COALESCE(resolution, ''),
 			title, COALESCE(year, 0), COALESCE(runtime, 0), COALESCE(tmdb_id, 0),
-			EXISTS(SELECT 1 FROM match_reviews r WHERE r.media_id = media.id AND r.status = 'pending')
+			EXISTS(SELECT 1 FROM match_reviews r WHERE r.media_id = media.id AND r.status = 'pending'
+				AND r.suggested_tmdb_id != 0)
 		 FROM media WHERE type = 'movie'
 		 UNION ALL
 		 SELECT 'episode', id, title, COALESCE(source_id, 0), COALESCE(file_path, ''), COALESCE(file_size, 0),
