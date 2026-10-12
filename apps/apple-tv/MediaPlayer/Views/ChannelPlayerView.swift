@@ -13,7 +13,10 @@ struct ChannelPlayerView: View {
     @State private var overlayTimer: Timer?
     @State private var showSwitchOverlay = false
     @State private var showSleepOptions = false
-    @State private var switchDirection: ChannelSwitchDirection = .up
+    /// Counts channel changes, so only the latest one's timer takes the
+    /// banner down.
+    @State private var bannerToken = 0
+    @State private var showSpinner = false
 
     init(channels: [Channel], startIndex: Int) {
         self.channels = channels
@@ -28,16 +31,18 @@ struct ChannelPlayerView: View {
 
     var body: some View {
         ZStack {
-            // Video Player
+            Color.black.ignoresSafeArea()
+
+            // The picture and nothing else. Channels are live television:
+            // there is no scrubbing, so AVKit's transport bar and its
+            // chapters panel have no business appearing on a channel change.
             if let player = viewModel.player {
-                AVPlayerView(player: player)
+                ChannelVideoSurface(player: player)
                     .ignoresSafeArea()
-            } else {
-                Color.black.ignoresSafeArea()
             }
 
-            // Loading indicator
-            if viewModel.isBuffering || viewModel.isLoading {
+            // Only once a channel is taking long enough to wonder about.
+            if showSpinner {
                 ProgressView()
                     .scaleEffect(2)
             }
@@ -147,19 +152,27 @@ struct ChannelPlayerView: View {
                 .padding(40)
             }
 
-            // Channel Switch Overlay
+            // Channel banner: up the instant the channel changes.
             if showSwitchOverlay, let channel = currentChannel {
                 VStack {
                     Spacer()
-                    ChannelSwitchOverlay(
-                        channel: channel,
-                        nowPlaying: viewModel.nowPlaying,
-                        direction: switchDirection
-                    )
-                    Spacer()
+                    HStack {
+                        ChannelBanner(channel: channel, nowPlaying: viewModel.nowPlaying)
+                        Spacer()
+                    }
                 }
+                .padding(60)
                 .transition(.opacity)
             }
+        }
+        // With no AVKit controller inside, something has to hold focus for
+        // the remote's presses to arrive.
+        .focusable()
+        .task(id: viewModel.isLoading || viewModel.isBuffering) {
+            showSpinner = false
+            guard viewModel.isLoading || viewModel.isBuffering else { return }
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            if !Task.isCancelled { showSpinner = true }
         }
         .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
             // Check if this notification is for our current player
@@ -170,7 +183,7 @@ struct ChannelPlayerView: View {
         }
         .task {
             if let channel = currentChannel {
-                await viewModel.loadChannel(channelId: channel.id)
+                viewModel.tune(to: channel, neighbours: neighbours(of: currentIndex), immediately: true)
             }
             startOverlayTimer()
         }
@@ -214,35 +227,37 @@ struct ChannelPlayerView: View {
 
     private func switchToNextChannel() {
         guard channels.count > 1 else { return }
-
-        let newIndex = (currentIndex + 1) % channels.count
-        switchToChannel(at: newIndex, direction: .up)
+        switchToChannel(at: (currentIndex + 1) % channels.count)
     }
 
     private func switchToPreviousChannel() {
         guard channels.count > 1 else { return }
-
-        let newIndex = currentIndex == 0 ? channels.count - 1 : currentIndex - 1
-        switchToChannel(at: newIndex, direction: .down)
+        switchToChannel(at: currentIndex == 0 ? channels.count - 1 : currentIndex - 1)
     }
 
-    private func switchToChannel(at index: Int, direction: ChannelSwitchDirection) {
+    /// The channels one press away in either direction.
+    private func neighbours(of index: Int) -> [Channel] {
+        guard channels.count > 1 else { return [] }
+        let next = (index + 1) % channels.count
+        let previous = (index - 1 + channels.count) % channels.count
+        return next == previous ? [channels[next]] : [channels[next], channels[previous]]
+    }
+
+    private func switchToChannel(at index: Int) {
         currentIndex = index
-        switchDirection = direction
 
-        withAnimation {
-            showSwitchOverlay = true
-        }
+        // Banner and cut first, with no animation to wait through; the
+        // picture follows as soon as it can.
+        showOverlay = false
+        showSwitchOverlay = true
+        viewModel.tune(to: channels[index], neighbours: neighbours(of: index))
 
+        bannerToken += 1
+        let token = bannerToken
         Task {
-            await viewModel.switchToChannel(channelId: channels[index].id)
-        }
-
-        // Auto-dismiss switch overlay after 2 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation {
-                showSwitchOverlay = false
-            }
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            guard token == bannerToken else { return }
+            withAnimation { showSwitchOverlay = false }
         }
     }
 
@@ -259,6 +274,71 @@ struct ChannelPlayerView: View {
         overlayTimer?.invalidate()
         overlayTimer = nil
     }
+}
+
+/// The strip a television shows on a channel change: number, name, and what
+/// is on, at the bottom of the screen where it doesn't cover the picture.
+private struct ChannelBanner: View {
+    let channel: Channel
+    let nowPlaying: ChannelScheduleItem?
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 28) {
+            Text("\(channel.displayNumber)")
+                .font(.system(size: 64, weight: .bold, design: .rounded))
+                .monospacedDigit()
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
+                    Text(channel.icon)
+                    Text(channel.name)
+                        .fontWeight(.semibold)
+                }
+                .font(.title3)
+
+                Text(programme)
+                    .font(.headline)
+                    .foregroundColor(.white.opacity(0.75))
+                    .lineLimit(1)
+            }
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 36)
+        .padding(.vertical, 24)
+        .background(Color.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var programme: String {
+        guard let nowPlaying else { return " " }
+        if let showTitle = nowPlaying.showTitle, !showTitle.isEmpty {
+            return "\(showTitle) · \(nowPlaying.title)"
+        }
+        return nowPlaying.title
+    }
+}
+
+/// A bare video layer: the player's picture with none of AVKit's interface.
+struct ChannelVideoSurface: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> PlayerLayerView {
+        let view = PlayerLayerView()
+        view.backgroundColor = .black
+        view.playerLayer.videoGravity = .resizeAspect
+        view.playerLayer.player = player
+        return view
+    }
+
+    func updateUIView(_ view: PlayerLayerView, context: Context) {
+        if view.playerLayer.player !== player {
+            view.playerLayer.player = player
+        }
+    }
+}
+
+final class PlayerLayerView: UIView {
+    override class var layerClass: AnyClass { AVPlayerLayer.self }
+    var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 }
 
 struct UpNextItemRow: View {

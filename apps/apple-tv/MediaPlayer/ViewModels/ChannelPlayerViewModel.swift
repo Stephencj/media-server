@@ -41,7 +41,86 @@ class ChannelPlayerViewModel: ObservableObject {
 
     var isSleepTimerArmed: Bool { sleepFiresAt != nil }
 
-    func loadChannel(channelId: Int64) async {
+    // MARK: - Tuning
+
+    /// What a channel was airing when last asked, so that flipping to it can
+    /// show its name and start its picture without waiting on the server.
+    private struct TunedIn {
+        let response: ChannelNowPlayingResponse
+        let fetchedAt: Date
+    }
+
+    private var tunedIn: [Int64: TunedIn] = [:]
+    private var tuneTask: Task<Void, Never>?
+    /// Bumped on every tune, so a slow answer for a channel since flipped
+    /// past can be recognised and dropped.
+    private var tuneGeneration = 0
+
+    /// How long to wait after a press before loading the channel. Holding the
+    /// button to surf then loads only where it stops, not every channel on
+    /// the way.
+    private let tuneDelay: UInt64 = 250_000_000
+    private let tunedInLifetime: TimeInterval = 120
+
+    /// What is known about a channel, if it is recent and its programme is
+    /// still on.
+    private func remembered(_ channelId: Int64) -> TunedIn? {
+        guard let entry = tunedIn[channelId], let item = entry.response.nowPlaying else { return nil }
+        let age = Date().timeIntervalSince(entry.fetchedAt)
+        guard age < tunedInLifetime, Double(entry.response.elapsed) + age < Double(item.duration) - 2 else {
+            return nil
+        }
+        return entry
+    }
+
+    /// Changes channel the way a television does: the picture and sound cut
+    /// at once and the new channel's name is up before anything has loaded.
+    /// `neighbours` are the channels a further press would reach; they are
+    /// looked up afterwards so the next flip is as quick.
+    func tune(to target: Channel, neighbours: [Channel], immediately: Bool = false) {
+        tuneTask?.cancel()
+        tuneGeneration += 1
+        let generation = tuneGeneration
+
+        player?.pause()
+        player?.replaceCurrentItem(with: nil)
+        errorMessage = nil
+        channel = target
+        let known = remembered(target.id)
+        nowPlaying = known?.response.nowPlaying
+        upNext = known?.response.upNext ?? []
+        isLoading = true
+
+        tuneTask = Task { [weak self] in
+            if !immediately {
+                try? await Task.sleep(nanoseconds: self?.tuneDelay ?? 0)
+            }
+            guard let self, !Task.isCancelled, generation == self.tuneGeneration else { return }
+
+            if let known = self.remembered(target.id), let item = known.response.nowPlaying {
+                await AuthService.shared.ensureAuthenticated()
+                guard generation == self.tuneGeneration else { return }
+                // The channel has moved on by however long ago it was asked.
+                let elapsed = known.response.elapsed + Int(Date().timeIntervalSince(known.fetchedAt))
+                self.elapsed = elapsed
+                self.setupPlayer(for: item, seekTo: elapsed, serverStreamUrl: known.response.streamUrl)
+                self.startRefreshTask()
+                self.isLoading = false
+            } else {
+                await self.loadChannel(channelId: target.id, generation: generation)
+            }
+
+            for neighbour in neighbours {
+                guard !Task.isCancelled, generation == self.tuneGeneration else { return }
+                if self.remembered(neighbour.id) == nil,
+                   let response = try? await self.api.getChannelNowPlaying(channelId: neighbour.id) {
+                    self.tunedIn[neighbour.id] = TunedIn(response: response, fetchedAt: Date())
+                }
+            }
+        }
+    }
+
+    func loadChannel(channelId: Int64, generation: Int? = nil) async {
         isLoading = true
         errorMessage = nil
 
@@ -52,6 +131,10 @@ class ChannelPlayerViewModel: ObservableObject {
 
         do {
             let response = try await api.getChannelNowPlaying(channelId: channelId)
+            // Flipped past this channel while it was loading: let it go.
+            if let generation, generation != tuneGeneration { return }
+            tunedIn[channelId] = TunedIn(response: response, fetchedAt: Date())
+
             channel = response.channel
             nowPlaying = response.nowPlaying
             upNext = response.upNext
@@ -72,6 +155,7 @@ class ChannelPlayerViewModel: ObservableObject {
                 print("[ChannelPlayer] ERROR: No nowPlaying item in response")
             }
         } catch {
+            if let generation, generation != tuneGeneration { return }
             errorMessage = "Load failed: \(error.localizedDescription) [server: \(AppState.shared.serverURL)]"
             print("[ChannelPlayer] ERROR loading channel: \(error)")
         }
@@ -125,11 +209,18 @@ class ChannelPlayerViewModel: ObservableObject {
         ])
         let playerItem = AVPlayerItem(asset: asset)
         playerItem.preferredForwardBufferDuration = 60
-        let newPlayer = AVPlayer(playerItem: playerItem)
-        newPlayer.automaticallyWaitsToMinimizeStalling = true
-        player = newPlayer
 
-        setupObservers()
+        // One player for the whole session, handed a new item each time.
+        // Building a player per programme rebuilt the video view with it,
+        // which is slower and flashes on every change.
+        if let player {
+            player.replaceCurrentItem(with: playerItem)
+        } else {
+            let newPlayer = AVPlayer(playerItem: playerItem)
+            newPlayer.automaticallyWaitsToMinimizeStalling = true
+            player = newPlayer
+            setupObservers()
+        }
 
         // Seek to the elapsed position after player is ready, then play
         if elapsed > 0 {
@@ -258,6 +349,9 @@ class ChannelPlayerViewModel: ObservableObject {
             return
         }
 
+        // What was remembered about this channel is now a programme behind.
+        if let channelId = channel?.id { tunedIn[channelId] = nil }
+
         let nextItem = upNext.removeFirst()
         nowPlaying = nextItem
         elapsed = 0
@@ -355,20 +449,24 @@ class ChannelPlayerViewModel: ObservableObject {
         player?.pause()
     }
 
-    /// Tears down the player only. Safe to call between programs.
+    /// Stops what is playing but keeps the player, ready for the next item.
+    /// Safe to call between programs.
     private func teardownPlayer() {
-        if let observer = timeObserver, let player = player {
-            player.removeTimeObserver(observer)
-            timeObserver = nil
-        }
         player?.pause()
-        player = nil
-        cancellables.removeAll()
+        player?.replaceCurrentItem(with: nil)
     }
 
     /// Full teardown, for leaving the player entirely.
     func cleanup() {
+        tuneTask?.cancel()
+        tuneTask = nil
         teardownPlayer()
+        if let observer = timeObserver, let player = player {
+            player.removeTimeObserver(observer)
+            timeObserver = nil
+        }
+        player = nil
+        cancellables.removeAll()
         refreshTask?.cancel()
         refreshTask = nil
         cancelSleepTimer()
