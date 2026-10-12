@@ -14,6 +14,7 @@
 		A10000000000000000000096 /* QRLoginScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000096 /* QRLoginScannerView.swift */; };
 		A10000000000000000000094 /* AudioSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000094 /* AudioSessionManager.swift */; };
 		A10000000000000000000005 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* AuthService.swift */; };
+		A10000000000000000000000E5 /* ServerLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000000E5 /* ServerLocator.swift */; };
 		A10000000000000000000007 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* User.swift */; };
 		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* Assets.xcassets */; };
 		A10000000000000000000020 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* APIClient.swift */; };
@@ -58,6 +59,7 @@
 		A20000000000000000000096 /* QRLoginScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRLoginScannerView.swift; sourceTree = "<group>"; };
 		A20000000000000000000094 /* AudioSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSessionManager.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		A20000000000000000000000E5 /* ServerLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerLocator.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000000000000000000010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -167,6 +169,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000005 /* AuthService.swift */,
+				A20000000000000000000000E5 /* ServerLocator.swift */,
 				A20000000000000000000020 /* APIClient.swift */,
 				A20000000000000000000094 /* AudioSessionManager.swift */,
 			);
@@ -288,6 +291,7 @@
 				A10000000000000000000096 /* QRLoginScannerView.swift in Sources */,
 				A10000000000000000000094 /* AudioSessionManager.swift in Sources */,
 				A10000000000000000000005 /* AuthService.swift in Sources */,
+				A10000000000000000000000E5 /* ServerLocator.swift in Sources */,
 				A10000000000000000000007 /* User.swift in Sources */,
 				A10000000000000000000020 /* APIClient.swift in Sources */,
 				A10000000000000000000021 /* Channel.swift in Sources */,

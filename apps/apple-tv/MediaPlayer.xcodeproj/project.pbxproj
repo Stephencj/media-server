@@ -25,6 +25,7 @@
 		A10000000000000000000017 /* Progress.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* Progress.swift */; };
 		A10000000000000000000018 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* APIClient.swift */; };
 		A10000000000000000000019 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* AuthService.swift */; };
+		A10000000000000000000000E5 /* ServerLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000000E5 /* ServerLocator.swift */; };
 		A10000000000000000000020 /* MediaCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* MediaCardView.swift */; };
 		A10000000000000000000021 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* Assets.xcassets */; };
 		A10000000000000000000022 /* Playlist.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* Playlist.swift */; };
@@ -69,6 +70,7 @@
 		A20000000000000000000017 /* Progress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Progress.swift; sourceTree = "<group>"; };
 		A20000000000000000000018 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		A20000000000000000000019 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		A20000000000000000000000E5 /* ServerLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerLocator.swift; sourceTree = "<group>"; };
 		A20000000000000000000020 /* MediaCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaCardView.swift; sourceTree = "<group>"; };
 		A20000000000000000000021 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000000000000000000022 /* Playlist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Playlist.swift; sourceTree = "<group>"; };
@@ -195,6 +197,7 @@
 			children = (
 				A20000000000000000000018 /* APIClient.swift */,
 				A20000000000000000000019 /* AuthService.swift */,
+				A20000000000000000000000E5 /* ServerLocator.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -312,6 +315,7 @@
 				A10000000000000000000028 /* Section.swift in Sources */,
 				A10000000000000000000018 /* APIClient.swift in Sources */,
 				A10000000000000000000019 /* AuthService.swift in Sources */,
+				A10000000000000000000000E5 /* ServerLocator.swift in Sources */,
 				A10000000000000000000020 /* MediaCardView.swift in Sources */,
 				A10000000000000000000025 /* AddToPlaylistSheet.swift in Sources */,
 				A10000000000000000000029 /* Channel.swift in Sources */,

@@ -39,6 +39,10 @@ class AuthService: ObservableObject {
     private static let refreshWindow: TimeInterval = 24 * 60 * 60
 
     func ensureAuthenticated() async {
+        // Before anything is sent anywhere: on the home network, talk to
+        // the server directly.
+        await ServerLocator.choose()
+
         if isAuthenticated, token != nil, let expiration = tokenExpiration,
            Date() < expiration.addingTimeInterval(-Self.refreshWindow) {
             return
