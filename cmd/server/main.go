@@ -73,6 +73,8 @@ func main() {
 //	file-health  files that look like a bad rip or conversion
 //	relink-plan  entries whose file was replaced by a conversion (changes nothing)
 //	relink       point those entries at their new files
+//	lineup-plan  what a channel lineup, read from stdin, would create (changes nothing)
+//	lineup       create or refresh the channels in a lineup read from stdin
 func runCommand(name string, database *db.DB, cfg *config.Config) error {
 	out := json.NewEncoder(os.Stdout)
 	out.SetIndent("", "  ")
@@ -101,8 +103,18 @@ func runCommand(name string, database *db.DB, cfg *config.Config) error {
 			relinks = []library.Relink{}
 		}
 		return out.Encode(relinks)
+	case "lineup-plan", "lineup":
+		var spec library.LineupSpec
+		if err := json.NewDecoder(os.Stdin).Decode(&spec); err != nil {
+			return fmt.Errorf("reading the lineup from stdin: %w", err)
+		}
+		reports, err := library.ApplyLineup(database, spec, name == "lineup")
+		if err != nil {
+			return err
+		}
+		return out.Encode(reports)
 	default:
-		return fmt.Errorf("unknown command (want tidy-plan, scan, file-health, relink-plan or relink)")
+		return fmt.Errorf("unknown command (want tidy-plan, scan, file-health, relink-plan, relink, lineup-plan or lineup)")
 	}
 }
 

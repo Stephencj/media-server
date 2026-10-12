@@ -1,0 +1,162 @@
+{
+  "channels": [
+    {
+      "name": "Toonami",
+      "icon": "⚡",
+      "description": "Action animation: Dragon Ball Z Kai, DBZ Abridged, The Venture Brothers",
+      "sources": [
+        { "show": "Dragon Ball Z Kai" },
+        { "show": "Dragon Ball Z Abridged" },
+        { "show": "The Venture Brothers" }
+      ]
+    },
+    {
+      "name": "Movie Night",
+      "icon": "🍿",
+      "description": "Every film in the library, and nothing else",
+      "sources": [
+        { "films": { "min_minutes": 60 } }
+      ]
+    },
+    {
+      "name": "British",
+      "icon": "🇬🇧",
+      "description": "Taskmaster, The IT Crowd, Toast of London, Doctor Who, Black Pool",
+      "sources": [
+        { "show": "Taskmaster" },
+        { "show": "The IT Crowd" },
+        { "show": "Toast of London" },
+        { "show": "Doctor Who" },
+        { "show": "Black Pool" }
+      ]
+    },
+    {
+      "name": "Mystery & Crime",
+      "icon": "🔍",
+      "description": "Psych, Breaking Bad, and the films with a body in them",
+      "sources": [
+        { "show": "Psych" },
+        { "show": "Breaking Bad" },
+        { "films": { "genres": ["Mystery", "Crime", "Thriller"], "not_genres": ["Horror"], "min_minutes": 60 } }
+      ]
+    },
+    {
+      "name": "Fright Night",
+      "icon": "🩸",
+      "description": "Horror and horror-comedy, all year",
+      "sources": [
+        { "films": { "genres": ["Horror"], "min_minutes": 60 } },
+        { "show": "Penny Dreadful" }
+      ]
+    },
+    {
+      "name": "Burton & Gothic",
+      "icon": "🦇",
+      "description": "Tim Burton and his neighbours",
+      "sources": [
+        { "films": { "titles": ["Beetlejuice", "Edward Scissorhands", "Nightmare Before Christmas", "Sweeney Todd", "Addams Family", "Bride of Frankenstein", "Dracula"] } },
+        { "show": "Penny Dreadful" }
+      ]
+    },
+    {
+      "name": "Epics",
+      "icon": "⚔️",
+      "description": "Long sittings: Middle-earth, Hogwarts, a galaxy far away",
+      "sources": [
+        { "films": { "titles": ["Lord of the Rings", "Harry Potter", "Star Wars", "Empire Strikes Back", "Inception", "Princess Bride", "NeverEnding Story", "Mask of Zorro"] } }
+      ]
+    },
+    {
+      "name": "Family Matinee",
+      "icon": "🎈",
+      "description": "Animated features and family adventures",
+      "sources": [
+        { "films": { "genres": ["Family"], "not_genres": ["Horror"] } }
+      ]
+    },
+    {
+      "name": "Golden Age",
+      "icon": "🎞️",
+      "description": "Films from before 1970",
+      "sources": [
+        { "films": { "year_to": 1969, "min_minutes": 60 } }
+      ]
+    },
+    {
+      "name": "Showtunes",
+      "icon": "🎭",
+      "description": "Musicals, old and new",
+      "sources": [
+        { "films": { "genres": ["Music"], "titles": ["Sweeney Todd", "Seven Brides", "Showboat"], "min_minutes": 60 } }
+      ]
+    },
+    {
+      "name": "Mockumentary",
+      "icon": "🎤",
+      "description": "The Office, Parks and Recreation, and the Christopher Guest shelf",
+      "sources": [
+        { "show": "The Office" },
+        { "show": "Parks and Recreation" },
+        { "films": { "titles": ["Best in Show", "Waiting for Guffman", "Popstar"] } }
+      ]
+    },
+    {
+      "name": "Cutting Room Floor",
+      "icon": "✂️",
+      "description": "Deleted scenes from everything",
+      "sources": [
+        { "bonus": { "categories": ["deleted_scene"] } }
+      ]
+    },
+    {
+      "name": "Director's Chair",
+      "icon": "🎬",
+      "description": "Film commentaries: the whole film with the people who made it talking",
+      "sources": [
+        { "bonus": { "categories": ["commentary"], "parent": "film", "min_minutes": 60 } }
+      ]
+    },
+    {
+      "name": "Shorts",
+      "icon": "⏱️",
+      "description": "Nothing over a quarter of an hour",
+      "sources": [
+        { "show": "Con Man" },
+        { "show": "BeetleJuice Cartoon" },
+        { "bonus": { "categories": ["featurette", "music_video", "gag_reel", "interview", "behind_the_scenes"], "max_minutes": 15 } }
+      ]
+    },
+    {
+      "name": "Psych Marathon",
+      "icon": "🍍",
+      "description": "Every episode, deleted scene and blooper",
+      "sources": [
+        { "show": "Psych", "extras": ["deleted_scene", "gag_reel"] }
+      ]
+    },
+    {
+      "name": "The Office Marathon",
+      "icon": "📎",
+      "description": "Episodes, commentaries, deleted scenes and bloopers",
+      "sources": [
+        { "show": "The Office", "version": "both", "extras": ["deleted_scene", "gag_reel"] }
+      ]
+    },
+    {
+      "name": "Parks Marathon",
+      "icon": "🌳",
+      "description": "Episodes, commentaries, deleted scenes and bloopers",
+      "sources": [
+        { "show": "Parks and Recreation", "version": "both", "extras": ["deleted_scene", "gag_reel"] }
+      ]
+    },
+    {
+      "name": "Futurama Marathon",
+      "icon": "🚀",
+      "description": "Episodes, commentaries and deleted scenes",
+      "sources": [
+        { "show": "Futurama", "version": "both", "extras": ["deleted_scene"] }
+      ]
+    }
+  ]
+}

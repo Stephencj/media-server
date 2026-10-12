@@ -411,18 +411,28 @@ func (db *DB) Migrate() error {
 		`ALTER TABLE channel_sources ADD COLUMN options TEXT`,
 		// Add guide channel numbers for existing databases
 		`ALTER TABLE channels ADD COLUMN channel_number INTEGER`,
+		// Playlists are read with this column, which older databases gained
+		// by hand and a new one never got
+		`ALTER TABLE playlists ADD COLUMN is_public BOOLEAN DEFAULT 0`,
 	}
 
-	for _, migration := range optionalMigrations {
-		// Ignore errors (column may already exist)
-		db.conn.Exec(migration)
+	// Before the main list, because it backfills columns these add; and
+	// after it, because on a new database the tables these alter do not
+	// exist until the main list has created them.
+	runOptional := func() {
+		for _, migration := range optionalMigrations {
+			// Ignore errors (column may already exist)
+			db.conn.Exec(migration)
+		}
 	}
 
+	runOptional()
 	for _, migration := range migrations {
 		if _, err := db.conn.Exec(migration); err != nil {
 			return fmt.Errorf("migration failed: %w", err)
 		}
 	}
+	runOptional()
 
 	return nil
 }
