@@ -59,8 +59,19 @@ type LineupDaypart struct {
 }
 
 // LineupSource is one thing a channel draws on. Set exactly one of Show,
-// Films and Bonus.
+// Films, Bonus and Playlist.
 type LineupSource struct {
+	// When limits the source to part of the year: Christmas films in
+	// December. Out of season the source is as good as absent.
+	When *DateWindow `json:"when,omitempty"`
+	// Repeat puts the source's items into a daypart's pool this many times,
+	// so a handful of seasonal things are not lost among hundreds of
+	// episodes. It has no effect on a channel without dayparts.
+	Repeat int `json:"repeat,omitempty"`
+
+	// Playlist is the name of an existing playlist to air.
+	Playlist string `json:"playlist,omitempty"`
+
 	// Show is a show's title. Seasons narrows it; Version is "main" (the
 	// default), "commentary" or "both"; Extras adds the show's bonus clips
 	// of those kinds.
@@ -71,6 +82,59 @@ type LineupSource struct {
 
 	Films *FilmFilter  `json:"films,omitempty"`
 	Bonus *BonusFilter `json:"bonus,omitempty"`
+}
+
+// DateWindow is a stretch of the calendar that comes round every year, from
+// one "MM-DD" to another, both included. "12-20" to "01-02" runs over the new
+// year.
+type DateWindow struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+// includes reports whether a date falls in the window. A nil window is the
+// whole year, and so is one that cannot be read: a typo should not take a
+// source off the air.
+func (w *DateWindow) includes(date time.Time) bool {
+	if w == nil {
+		return true
+	}
+	from, errFrom := time.Parse("01-02", w.From)
+	to, errTo := time.Parse("01-02", w.To)
+	if errFrom != nil || errTo != nil {
+		return true
+	}
+	day := int(date.Month())*100 + date.Day()
+	start := int(from.Month())*100 + from.Day()
+	end := int(to.Month())*100 + to.Day()
+	if start <= end {
+		return day >= start && day <= end
+	}
+	return day >= start || day <= end
+}
+
+// seasonSignature says which of a channel's seasonal sources are in season on
+// a date. It changes exactly when the channel needs rebuilding for the time
+// of year.
+func seasonSignature(channel LineupChannel, date time.Time) string {
+	var signature strings.Builder
+	mark := func(sources []LineupSource) {
+		for _, source := range sources {
+			if source.When == nil {
+				continue
+			}
+			if source.When.includes(date) {
+				signature.WriteByte('1')
+			} else {
+				signature.WriteByte('0')
+			}
+		}
+	}
+	mark(channel.Sources)
+	for _, part := range channel.Dayparts {
+		mark(part.Sources)
+	}
+	return signature.String()
 }
 
 // FilmFilter picks films. A film is in if its title is named in Titles, or
@@ -134,7 +198,7 @@ type resolvedShow struct {
 
 // resolveSources turns a list of sources into the shows and items they name,
 // noting on the report what was found and what matched nothing.
-func resolveSources(database *db.DB, sources []LineupSource, films []*db.Media, report *LineupReport) (resolved, error) {
+func resolveSources(database *db.DB, sources []LineupSource, films []*db.Media, today time.Time, report *LineupReport) (resolved, error) {
 	var out resolved
 	seen := map[string]bool{}
 	add := func(item db.LineupItem) bool {
@@ -157,7 +221,32 @@ func resolveSources(database *db.DB, sources []LineupSource, films []*db.Media, 
 	}
 
 	for _, source := range sources {
+		if !source.When.includes(today) {
+			continue
+		}
+		// Whatever this source adds to the pool is added Repeat times.
+		before := len(out.everything)
+		repeat := func() {
+			added := append([]db.LineupItem{}, out.everything[before:]...)
+			for i := 1; i < source.Repeat; i++ {
+				out.everything = append(out.everything, added...)
+			}
+		}
+
 		switch {
+		case source.Playlist != "":
+			items, found, err := database.LineupPlaylistItems(source.Playlist)
+			if err != nil {
+				return out, err
+			}
+			if !found {
+				report.Problems = append(report.Problems, fmt.Sprintf("no playlist called %q", source.Playlist))
+				continue
+			}
+			for _, item := range items {
+				add(item)
+			}
+
 		case source.Show != "":
 			show, err := database.GetTVShowByTitle(source.Show)
 			if err != nil || show == nil {
@@ -215,6 +304,7 @@ func resolveSources(database *db.DB, sources []LineupSource, films []*db.Media, 
 		default:
 			report.Problems = append(report.Problems, "a source with nothing in it")
 		}
+		repeat()
 	}
 	return out, nil
 }
@@ -222,6 +312,13 @@ func resolveSources(database *db.DB, sources []LineupSource, films []*db.Media, 
 // ApplyLineup works out each channel in the spec and, with apply set, creates
 // or refreshes it. Channels not in the spec are never touched.
 func ApplyLineup(database *db.DB, spec LineupSpec, apply bool) ([]LineupReport, error) {
+	return ApplyLineupAt(database, spec, apply, time.Now(), nil)
+}
+
+// ApplyLineupAt is ApplyLineup as of a given moment, which decides what is
+// in season and where midnight is. With only set, just the channels it names
+// are worked on.
+func ApplyLineupAt(database *db.DB, spec LineupSpec, apply bool, now time.Time, only map[string]bool) ([]LineupReport, error) {
 	films, err := lineupFilms(database)
 	if err != nil {
 		return nil, err
@@ -237,9 +334,13 @@ func ApplyLineup(database *db.DB, spec LineupSpec, apply bool) ([]LineupReport, 
 		}
 	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	now = now.In(location)
 
 	var reports []LineupReport
 	for _, channel := range spec.Channels {
+		if only != nil && !only[channel.Name] {
+			continue
+		}
 		report := LineupReport{Channel: channel.Name, Action: "create"}
 		existing, err := database.FindChannelByName(channel.Name)
 		if err == nil {
@@ -254,7 +355,7 @@ func ApplyLineup(database *db.DB, spec LineupSpec, apply bool) ([]LineupReport, 
 		for _, part := range channel.Dayparts {
 			sources = append(sources, part.Sources...)
 		}
-		all, err := resolveSources(database, sources, films, &report)
+		all, err := resolveSources(database, sources, films, now, &report)
 		if err != nil {
 			return nil, err
 		}
@@ -270,7 +371,7 @@ func ApplyLineup(database *db.DB, spec LineupSpec, apply bool) ([]LineupReport, 
 					continue
 				}
 				// Problems were already noted against the whole channel.
-				pool, err := resolveSources(database, part.Sources, films, &LineupReport{})
+				pool, err := resolveSources(database, part.Sources, films, now, &LineupReport{})
 				if err != nil {
 					return nil, err
 				}
@@ -338,7 +439,6 @@ func ApplyLineup(database *db.DB, spec LineupSpec, apply bool) ([]LineupReport, 
 		if cycle != nil {
 			// Anchored at today's midnight where the viewer is, so the
 			// blocks land on the hours the file gives them.
-			now := time.Now().In(location)
 			midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, location)
 			if err := database.ReplaceChannelSchedule(target.ID, cycle, midnight); err != nil {
 				return nil, err
@@ -354,6 +454,20 @@ func ApplyLineup(database *db.DB, spec LineupSpec, apply bool) ([]LineupReport, 
 		report.Items = items
 		report.Hours = float64(seconds/360) / 10
 		reports = append(reports, report)
+
+		// What the server needs to keep this channel current on its own.
+		state := db.LineupChannelState{
+			ChannelID: target.ID,
+			Signature: seasonSignature(channel, now),
+			AppliedOn: now.Format("2006-01-02"),
+		}
+		if cycle != nil {
+			state.Timezone = location.String()
+			state.CycleDays = seconds / daySeconds
+		}
+		if err := database.SetLineupChannelState(state); err != nil {
+			return nil, err
+		}
 	}
 	return reports, nil
 }

@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stephencjuliano/media-server/internal/api"
@@ -51,6 +53,21 @@ func main() {
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
+
+	// Keep the channel lineup on the clock and the calendar: blocks at their
+	// hours when the clocks change, fresh cycles, seasonal sources in season.
+	go func() {
+		for {
+			actions, err := library.KeepLineupCurrent(database, time.Now())
+			for _, action := range actions {
+				log.Printf("[lineup] %s", action)
+			}
+			if err != nil {
+				log.Printf("[lineup] %v", err)
+			}
+			time.Sleep(5 * time.Minute)
+		}
+	}()
 
 	// Initialize router
 	router := api.NewRouter(database, cfg)
@@ -104,13 +121,27 @@ func runCommand(name string, database *db.DB, cfg *config.Config) error {
 		}
 		return out.Encode(relinks)
 	case "lineup-plan", "lineup":
+		raw, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("reading the lineup from stdin: %w", err)
+		}
 		var spec library.LineupSpec
-		if err := json.NewDecoder(os.Stdin).Decode(&spec); err != nil {
+		if err := json.Unmarshal(raw, &spec); err != nil {
 			return fmt.Errorf("reading the lineup from stdin: %w", err)
 		}
 		reports, err := library.ApplyLineup(database, spec, name == "lineup")
 		if err != nil {
 			return err
+		}
+		if name == "lineup" {
+			// Kept so the server can re-apply it as the calendar turns.
+			if err := database.SaveLineupSpec(string(raw)); err != nil {
+				return err
+			}
+			// Applying is itself today's refresh.
+			if _, err := library.KeepLineupCurrent(database, time.Now()); err != nil {
+				return err
+			}
 		}
 		return out.Encode(reports)
 	default:

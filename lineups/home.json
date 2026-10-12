@@ -29,6 +29,33 @@
                   "TV Movie"
                 ]
               }
+            },
+            {
+              "films": {
+                "titles": [
+                  "Great Pumpkin"
+                ]
+              },
+              "when": {
+                "from": "10-01",
+                "to": "10-31"
+              },
+              "repeat": 4
+            },
+            {
+              "films": {
+                "titles": [
+                  "Frosty",
+                  "Rudolph",
+                  "Santa Claus",
+                  "Little Drummer Boy"
+                ]
+              },
+              "when": {
+                "from": "12-01",
+                "to": "12-25"
+              },
+              "repeat": 3
             }
           ]
         },
@@ -48,6 +75,22 @@
             },
             {
               "show": "Taskmaster"
+            },
+            {
+              "playlist": "Halloween TV Episodes",
+              "when": {
+                "from": "10-01",
+                "to": "10-31"
+              },
+              "repeat": 4
+            },
+            {
+              "playlist": "Christmas TV Episodes",
+              "when": {
+                "from": "12-01",
+                "to": "12-25"
+              },
+              "repeat": 3
             }
           ]
         },
@@ -71,6 +114,22 @@
                 ],
                 "min_minutes": 60
               }
+            },
+            {
+              "playlist": "Halloween Movies",
+              "when": {
+                "from": "10-01",
+                "to": "10-31"
+              },
+              "repeat": 3
+            },
+            {
+              "playlist": "Christmas Movies",
+              "when": {
+                "from": "12-01",
+                "to": "12-25"
+              },
+              "repeat": 4
             }
           ]
         },
@@ -182,6 +241,14 @@
                 ],
                 "min_minutes": 60
               }
+            },
+            {
+              "playlist": "Christmas Movies",
+              "when": {
+                "from": "12-01",
+                "to": "12-25"
+              },
+              "repeat": 4
             }
           ]
         },
@@ -200,6 +267,14 @@
                 ],
                 "min_minutes": 60
               }
+            },
+            {
+              "playlist": "Halloween Movies",
+              "when": {
+                "from": "10-01",
+                "to": "10-31"
+              },
+              "repeat": 2
             }
           ]
         }
@@ -357,6 +432,38 @@
               "Horror",
               "TV Movie"
             ]
+          }
+        },
+        {
+          "playlist": "Christmas Movies",
+          "when": {
+            "from": "12-01",
+            "to": "12-25"
+          }
+        },
+        {
+          "films": {
+            "titles": [
+              "Frosty",
+              "Rudolph",
+              "Santa Claus",
+              "Little Drummer Boy"
+            ]
+          },
+          "when": {
+            "from": "12-01",
+            "to": "12-25"
+          }
+        },
+        {
+          "films": {
+            "titles": [
+              "Great Pumpkin"
+            ]
+          },
+          "when": {
+            "from": "10-01",
+            "to": "10-31"
           }
         }
       ]
@@ -566,6 +673,33 @@
                 ],
                 "min_minutes": 60
               }
+            },
+            {
+              "films": {
+                "titles": [
+                  "Great Pumpkin"
+                ]
+              },
+              "when": {
+                "from": "10-01",
+                "to": "10-31"
+              },
+              "repeat": 4
+            },
+            {
+              "films": {
+                "titles": [
+                  "Frosty",
+                  "Rudolph",
+                  "Santa Claus",
+                  "Little Drummer Boy"
+                ]
+              },
+              "when": {
+                "from": "12-01",
+                "to": "12-25"
+              },
+              "repeat": 3
             }
           ]
         },
@@ -627,6 +761,22 @@
               "seasons": [
                 19
               ]
+            },
+            {
+              "playlist": "Halloween TV Episodes",
+              "when": {
+                "from": "10-01",
+                "to": "10-31"
+              },
+              "repeat": 4
+            },
+            {
+              "playlist": "Christmas TV Episodes",
+              "when": {
+                "from": "12-01",
+                "to": "12-25"
+              },
+              "repeat": 3
             }
           ]
         },

@@ -193,3 +193,100 @@ func (db *DB) SetChannelNumber(channelID int64, number int) error {
 	_, err := db.conn.Exec(`UPDATE channels SET channel_number = ? WHERE id = ?`, number, channelID)
 	return err
 }
+
+// LineupPlaylistItems returns what a playlist holds, by the playlist's name,
+// whoever owns it. found is false when there is no playlist of that name.
+func (db *DB) LineupPlaylistItems(name string) (items []LineupItem, found bool, err error) {
+	var playlistID int64
+	err = db.conn.QueryRow(`SELECT id FROM playlists WHERE name = ? ORDER BY id LIMIT 1`, name).Scan(&playlistID)
+	if err == sql.ErrNoRows {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	for _, input := range db.getMediaFromSource(ChannelSource{SourceType: ChannelSourcePlaylist, SourceID: &playlistID}) {
+		items = append(items, LineupItem{ID: input.MediaID, Type: input.MediaType, Title: input.Title, Duration: input.Duration})
+	}
+	return items, true, nil
+}
+
+// SaveLineupSpec remembers the lineup as applied, so it can be re-applied
+// without the file.
+func (db *DB) SaveLineupSpec(spec string) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO lineup_state (id, spec) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET spec = excluded.spec`, spec)
+	return err
+}
+
+// LoadLineupSpec returns the remembered lineup and the date it was last
+// refreshed ("2006-01-02", empty if never). spec is empty when none has been
+// applied.
+func (db *DB) LoadLineupSpec() (spec, refreshedOn string, err error) {
+	err = db.conn.QueryRow(`SELECT spec, refreshed_on FROM lineup_state WHERE id = 1`).Scan(&spec, &refreshedOn)
+	if err == sql.ErrNoRows {
+		return "", "", nil
+	}
+	return spec, refreshedOn, err
+}
+
+// MarkLineupRefreshed records the date of the daily refresh.
+func (db *DB) MarkLineupRefreshed(date string) error {
+	_, err := db.conn.Exec(`UPDATE lineup_state SET refreshed_on = ? WHERE id = 1`, date)
+	return err
+}
+
+// LineupChannelState is what the lineup last did for a channel.
+type LineupChannelState struct {
+	ChannelID int64
+	Name      string
+	Anchor    time.Time // the channel's created_at, which its cycle counts from
+	// Timezone is set for a channel with dayparts: the clock its blocks
+	// follow.
+	Timezone string
+	// Signature says which of the channel's seasonal sources were in
+	// season when it was applied.
+	Signature string
+	CycleDays int
+	AppliedOn string // "2006-01-02"
+}
+
+// SetLineupChannelState records how a channel was just applied.
+func (db *DB) SetLineupChannelState(state LineupChannelState) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO lineup_channels (channel_id, timezone, signature, cycle_days, applied_on) VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(channel_id) DO UPDATE SET timezone = excluded.timezone, signature = excluded.signature,
+		 cycle_days = excluded.cycle_days, applied_on = excluded.applied_on`,
+		state.ChannelID, state.Timezone, state.Signature, state.CycleDays, state.AppliedOn,
+	)
+	return err
+}
+
+// ListLineupChannelStates returns the state of every channel the lineup
+// manages.
+func (db *DB) ListLineupChannelStates() ([]LineupChannelState, error) {
+	rows, err := db.conn.Query(
+		`SELECT l.channel_id, c.name, c.created_at, l.timezone, l.signature, l.cycle_days, l.applied_on
+		 FROM lineup_channels l JOIN channels c ON c.id = l.channel_id ORDER BY c.channel_number`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var states []LineupChannelState
+	for rows.Next() {
+		var s LineupChannelState
+		if err := rows.Scan(&s.ChannelID, &s.Name, &s.Anchor, &s.Timezone, &s.Signature, &s.CycleDays, &s.AppliedOn); err != nil {
+			return nil, err
+		}
+		states = append(states, s)
+	}
+	return states, rows.Err()
+}
+
+// SetChannelAnchor moves the moment a channel's cycle counts from, which
+// slides what is airing by the same amount.
+func (db *DB) SetChannelAnchor(channelID int64, anchor time.Time) error {
+	_, err := db.conn.Exec(`UPDATE channels SET created_at = ? WHERE id = ?`, anchor.UTC(), channelID)
+	return err
+}

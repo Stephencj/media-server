@@ -238,6 +238,24 @@ func (db *DB) Migrate() error {
 			FOREIGN KEY (media_id) REFERENCES media(id) ON DELETE CASCADE
 		)`,
 
+		// The channel lineup as last applied, so the server can keep it
+		// current by itself.
+		`CREATE TABLE IF NOT EXISTS lineup_state (
+			id INTEGER PRIMARY KEY CHECK (id = 1),
+			spec TEXT NOT NULL,
+			refreshed_on TEXT NOT NULL DEFAULT ''
+		)`,
+
+		// What the lineup last did for each channel it manages.
+		`CREATE TABLE IF NOT EXISTS lineup_channels (
+			channel_id INTEGER PRIMARY KEY,
+			timezone TEXT NOT NULL DEFAULT '',
+			signature TEXT NOT NULL DEFAULT '',
+			cycle_days INTEGER NOT NULL DEFAULT 0,
+			applied_on TEXT NOT NULL DEFAULT '',
+			FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE
+		)`,
+
 		`CREATE TABLE IF NOT EXISTS sections (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
