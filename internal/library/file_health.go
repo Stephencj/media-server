@@ -45,6 +45,7 @@ const starvedKbps = 400
 // definite ones first. sourcePaths maps a source ID to its root folder.
 func CheckFileHealth(files []db.LibraryFile, sourcePaths map[int64]string) []FileIssue {
 	copies := countCopies(files, sourcePaths)
+	usual := usualEpisodeMinutes(files)
 
 	var issues []FileIssue
 	for _, f := range files {
@@ -89,6 +90,14 @@ func CheckFileHealth(files []db.LibraryFile, sourcePaths map[int64]string) []Fil
 				potential(fmt.Sprintf("Runs %s, well over the film's %s. It may hold more than the film.",
 					FormatMinutes(minutes), FormatMinutes(f.MatchedRuntime)))
 			}
+		}
+
+		// An episode far shorter than the rest of its folder. There is no
+		// trustworthy running time to compare episodes with, but a season's
+		// episodes run alike, and one at a tenth of the length did not rip.
+		if typical := usual[filepath.Dir(f.FilePath)]; f.Kind == db.MediaTypeEpisode && typical > 0 && minutes > 0 && minutes*2 < typical {
+			definite(fmt.Sprintf("Runs %s; the other episodes in its folder run about %s.",
+				FormatMinutes(minutes), FormatMinutes(typical)))
 		}
 
 		if strings.Count(name, "(") > strings.Count(name, ")") {
@@ -155,6 +164,27 @@ func countCopies(files []db.LibraryFile, sourcePaths map[int64]string) map[strin
 		}
 	}
 	return copies
+}
+
+// usualEpisodeMinutes returns, for each folder holding at least five
+// episodes, the median length of an episode in it.
+func usualEpisodeMinutes(files []db.LibraryFile) map[string]int {
+	byFolder := map[string][]int{}
+	for _, f := range files {
+		if f.Kind == db.MediaTypeEpisode && f.Duration > 0 {
+			dir := filepath.Dir(f.FilePath)
+			byFolder[dir] = append(byFolder[dir], runtimeMinutes(f.Duration))
+		}
+	}
+	usual := make(map[string]int, len(byFolder))
+	for dir, minutes := range byFolder {
+		if len(minutes) < 5 {
+			continue
+		}
+		sort.Ints(minutes)
+		usual[dir] = minutes[len(minutes)/2]
+	}
+	return usual
 }
 
 // LibraryFileHealth runs CheckFileHealth over the whole library.

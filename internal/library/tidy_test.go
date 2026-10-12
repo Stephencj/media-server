@@ -1,6 +1,7 @@
 package library
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -204,6 +205,14 @@ func TestCheckFileHealth(t *testing.T) {
 		{Kind: db.MediaTypeExtra, SourceID: 2, FilePath: "/media/TV Shows/Some Show/Thing_preview.m4v", Duration: 60, VideoCodec: "h264", FileSize: 5 * mb},
 		{Kind: db.MediaTypeEpisode, SourceID: 2, FilePath: "/media/TV Shows/Some Show/S01E03 - Starved.m4v", Duration: 1300, VideoCodec: "h264", FileSize: 20 * mb},
 	}
+	// A season whose episodes run alike, bar one that stopped after two
+	// minutes and a double-length finale that is fine.
+	for i, minutes := range []int{23, 23, 24, 23, 2, 23, 46} {
+		files = append(files, db.LibraryFile{
+			Kind: db.MediaTypeEpisode, SourceID: 2, VideoCodec: "h264", Duration: minutes * 60, FileSize: int64(minutes) * 30 * mb,
+			FilePath: fmt.Sprintf("/media/TV Shows/Long Show/Season 1/S01E%02d - Episode.mkv", i+1),
+		})
+	}
 
 	got := map[string]FileIssue{}
 	for _, issue := range CheckFileHealth(files, sources) {
@@ -222,6 +231,7 @@ func TestCheckFileHealth(t *testing.T) {
 		"S01D01 Play All.mkv":                      SeverityPotential,
 		"Thing_preview.m4v":                        SeverityPotential,
 		"S01E03 - Starved.m4v":                     SeverityPotential,
+		"S01E05 - Episode.mkv":                     SeverityDefinite, // a tenth the length of its season
 	}
 	for name, severity := range want {
 		if got[name].Severity != severity {
