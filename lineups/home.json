@@ -37,7 +37,7 @@
       "sources": [
         { "show": "Psych" },
         { "show": "Breaking Bad" },
-        { "films": { "genres": ["Mystery", "Crime", "Thriller"], "not_genres": ["Horror"], "min_minutes": 60 } }
+        { "films": { "genres": ["Mystery", "Crime"], "not_genres": ["Horror"], "min_minutes": 60 } }
       ]
     },
     {
@@ -71,7 +71,7 @@
       "icon": "🎈",
       "description": "Animated features and family adventures",
       "sources": [
-        { "films": { "genres": ["Family"], "not_genres": ["Horror"] } }
+        { "films": { "genres": ["Family"], "not_genres": ["Horror", "TV Movie"] } }
       ]
     },
     {
