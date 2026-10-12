@@ -15,7 +15,7 @@ type DB struct {
 
 // New creates a new database connection
 func New(path string) (*DB, error) {
-	conn, err := sql.Open("sqlite3", path+"?_journal_mode=WAL&_foreign_keys=ON")
+	conn, err := sql.Open("sqlite3", path+"?_journal_mode=WAL&_foreign_keys=ON&_busy_timeout=5000")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}

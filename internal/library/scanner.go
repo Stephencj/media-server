@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -156,6 +157,12 @@ func (s *Scanner) ScanSource(source *db.MediaSource) error {
 
 	log.Printf("Found %d video files in %s", len(files), source.Name)
 
+	// Films and episodes first, so the bonus files kept beside them have
+	// something to attach to.
+	sort.SliceStable(files, func(a, b int) bool {
+		return !isBonusPlacement(PlaceFile(source.Path, files[a])) && isBonusPlacement(PlaceFile(source.Path, files[b]))
+	})
+
 	// Process each file
 	for _, file := range files {
 		if err := s.processFile(file, source); err != nil {
@@ -170,20 +177,39 @@ func (s *Scanner) ScanSource(source *db.MediaSource) error {
 }
 
 func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
+	// Where a file sits says what it is before its name does. Episodes take
+	// their show from the folder, and commentary tracks and bonus clips kept
+	// beside a film or in a show's folder are extras, not films.
+	switch place := PlaceFile(source.Path, filePath); place.Kind {
+	case PlaceEpisode:
+		return s.processTVEpisode(filePath, source, place.ShowTitle, 0, place.Season, place.Episode, place.EpisodeTitle)
+	case PlaceFilmBonus, PlaceShowBonus:
+		return s.processBonusFile(filePath, source, place)
+	}
+
 	// Parse filename to extract title, year, and season/episode info
 	title, year, mediaType, seasonNum, episodeNum := parseFilename(filePath)
 
 	// If it's a TV episode with season/episode info, use the TV episode processor
 	if mediaType == db.MediaTypeTVShow && seasonNum > 0 && episodeNum > 0 {
-		return s.processTVEpisode(filePath, source, title, year, seasonNum, episodeNum)
+		return s.processTVEpisode(filePath, source, title, year, seasonNum, episodeNum, "")
 	}
 
 	// Check if already in database (for movies)
 	if existing, err := s.db.GetMediaByFilePath(filePath); err == nil {
 		// Already exists - check if we should refresh metadata
-		if s.tmdb.IsConfigured() && existing.TMDbID == 0 && IsMovieFeature(source.Path, filePath) {
+		isFeature := IsMovieFeature(source.Path, filePath)
+		if s.tmdb.IsConfigured() && existing.TMDbID == 0 && isFeature {
 			// Has no TMDB data yet, refresh it
 			s.refreshMetadata(existing)
+		}
+		if existing.Type == db.MediaTypeMovie && existing.TMDbID != 0 && !isFeature {
+			// A recording that is not a film was given one's poster by an
+			// earlier scan. It keeps its place but not the borrowed details.
+			ClearMovieMatch(existing)
+			if err := s.db.UpdateMedia(existing); err != nil {
+				log.Printf("Could not clear the match on %s: %v", filePath, err)
+			}
 		}
 		return nil
 	}
@@ -227,15 +253,16 @@ func (s *Scanner) processFile(filePath string, source *db.MediaSource) error {
 	return nil
 }
 
-// processTVEpisode handles TV show episode files with proper hierarchy
-func (s *Scanner) processTVEpisode(filePath string, source *db.MediaSource, showTitle string, year, seasonNum, episodeNum int) error {
+// processTVEpisode handles TV show episode files with proper hierarchy.
+// fileTitle is the episode's title as its file names it, "" when unknown.
+func (s *Scanner) processTVEpisode(filePath string, source *db.MediaSource, showTitle string, year, seasonNum, episodeNum int, fileTitle string) error {
 	// Check if episode already exists by file path
-	if _, err := s.db.GetEpisodeByFilePath(filePath); err == nil {
+	if existing, err := s.db.GetEpisodeByFilePath(filePath); err == nil {
+		s.retireStaleMovie(filePath, existing.ID, db.MediaTypeEpisode)
 		return nil // Already exists
 	}
 
-	// Extract file metadata using the metadata extractor
-	mediaFile, err := s.metadataExtractor.ExtractFileMetadata(filePath)
+	mediaFile, err := s.fileMetadata(filePath)
 	if err != nil {
 		log.Printf("Error extracting metadata for episode %s: %v", filePath, err)
 		return err
@@ -368,6 +395,16 @@ func (s *Scanner) processTVEpisode(filePath string, source *db.MediaSource, show
 		}
 	}
 
+	// Hand-numbered libraries don't always count the way TMDB does (a season
+	// pass numbers its bonus tracks in with the episodes). When the file
+	// names an episode and TMDB's episode of that number is called something
+	// else, the file is right and TMDB's details belong to another episode.
+	if fileTitle != "" && !tmdb.TitlesAgree(fileTitle, episodeTitle) {
+		episodeTitle = fileTitle
+		episodeOverview, episodeStillPath, episodeAirDate = "", "", ""
+		episodeRuntime, episodeRating = 0, 0
+	}
+
 	if episodeTitle == "" {
 		episodeTitle = "Episode " + strconv.Itoa(episodeNum)
 	}
@@ -388,14 +425,122 @@ func (s *Scanner) processTVEpisode(filePath string, source *db.MediaSource, show
 	}
 	episode.SourceID = source.ID
 
-	_, err = s.db.CreateEpisode(episode)
+	created, err := s.db.CreateEpisode(episode)
 	if err != nil {
 		log.Printf("Failed to create episode S%02dE%02d for %s: %v", seasonNum, episodeNum, show.Title, err)
 		return err
 	}
+	s.retireStaleMovie(filePath, created.ID, db.MediaTypeEpisode)
 
 	log.Printf("Added episode: %s S%02dE%02d - %s", show.Title, seasonNum, episodeNum, episodeTitle)
 	return nil
+}
+
+// processBonusFile stores a commentary track or bonus clip found beside a
+// film or in a show's folder as an extra of that film or show.
+func (s *Scanner) processBonusFile(filePath string, source *db.MediaSource, place Placement) error {
+	if existing, err := s.db.GetExtraByFilePath(filePath); err == nil {
+		s.retireStaleMovie(filePath, existing.ID, db.MediaTypeExtra)
+		return nil
+	}
+
+	mediaFile, err := s.fileMetadata(filePath)
+	if err != nil {
+		log.Printf("Error extracting metadata for extra %s: %v", filePath, err)
+		return err
+	}
+
+	extra := &db.Extra{
+		Title:     place.Title,
+		Category:  place.Category,
+		MediaFile: *mediaFile,
+	}
+	extra.SourceID = source.ID
+
+	if place.Kind == PlaceShowBonus {
+		if show, err := s.db.GetTVShowByTitle(place.ShowTitle); err == nil && show != nil {
+			extra.TVShowID = &show.ID
+		}
+	} else if film := s.filmForBonus(source.Path, filePath); film != nil {
+		extra.MovieID = &film.ID
+	}
+
+	created, err := s.db.CreateExtra(extra)
+	if err != nil {
+		return err
+	}
+	s.retireStaleMovie(filePath, created.ID, db.MediaTypeExtra)
+
+	log.Printf("Added extra: %s [%s]", created.Title, created.Category)
+	return nil
+}
+
+// filmForBonus finds the film a bonus file belongs to: the one in the same
+// folder, or in a folder that holds several, the one the file is named after.
+func (s *Scanner) filmForBonus(sourcePath, filePath string) *db.Media {
+	movies, err := s.db.GetMoviesInFolder(filepath.Dir(filePath))
+	if err != nil {
+		return nil
+	}
+
+	bonusName := lettersOnly(strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath)))
+	var named, only *db.Media
+	namedLength, distinct := 0, map[string]bool{}
+	for _, movie := range movies {
+		// Other bonus files in the folder may not have been moved yet.
+		if !IsMovieFeature(sourcePath, movie.FilePath) {
+			continue
+		}
+		title, _ := MovieNameFromPath(movie.FilePath)
+		key := lettersOnly(title)
+		if key == "" {
+			continue
+		}
+		if !distinct[key] {
+			distinct[key] = true
+			only = movie
+		}
+		if strings.Contains(bonusName, key) && len(key) > namedLength {
+			named, namedLength = movie, len(key)
+		}
+	}
+
+	if named != nil {
+		return named
+	}
+	if len(distinct) == 1 {
+		return only
+	}
+	return nil
+}
+
+// fileMetadata returns a file's technical details. A file already in the
+// library as a movie keeps the details read then, which saves probing it
+// again when it is only being moved to where it belongs.
+func (s *Scanner) fileMetadata(filePath string) (*db.MediaFile, error) {
+	if stale, err := s.db.GetMediaByFilePath(filePath); err == nil && stale.Type == db.MediaTypeMovie {
+		mediaFile := stale.MediaFile
+		return &mediaFile, nil
+	}
+	return s.metadataExtractor.ExtractFileMetadata(filePath)
+}
+
+// retireStaleMovie removes the movie row an earlier scan made for a file that
+// is really an episode or an extra, carrying over whatever pointed at it.
+func (s *Scanner) retireStaleMovie(filePath string, newID int64, newType db.MediaType) {
+	stale, err := s.db.GetMediaByFilePath(filePath)
+	if err != nil || stale.Type != db.MediaTypeMovie {
+		return
+	}
+	if err := s.db.RetireMovieRow(stale.ID, newID, newType); err != nil {
+		log.Printf("Could not retire movie row for %s: %v", filePath, err)
+		return
+	}
+	log.Printf("Moved out of Movies: %s (now %s)", filePath, newType)
+}
+
+func isBonusPlacement(place Placement) bool {
+	return place.Kind == PlaceFilmBonus || place.Kind == PlaceShowBonus
 }
 
 // refreshMetadata updates an existing media item with TMDB data

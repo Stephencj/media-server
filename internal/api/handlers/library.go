@@ -138,6 +138,25 @@ func (h *LibraryHandler) TriggerScan(c *gin.Context) {
 	})
 }
 
+// GetFileHealth lists files that look like a bad rip or conversion.
+// GET /api/library/file-health
+func (h *LibraryHandler) GetFileHealth(c *gin.Context) {
+	issues, err := library.LibraryFileHealth(h.db)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check files"})
+		return
+	}
+	if issues == nil {
+		issues = []library.FileIssue{}
+	}
+
+	counts := map[string]int{library.SeverityDefinite: 0, library.SeverityPotential: 0}
+	for _, issue := range issues {
+		counts[issue.Severity]++
+	}
+	c.JSON(http.StatusOK, gin.H{"counts": counts, "items": issues})
+}
+
 // GetStats returns library statistics
 func (h *LibraryHandler) GetStats(c *gin.Context) {
 	stats, err := h.db.GetLibraryStats()

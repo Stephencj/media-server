@@ -420,7 +420,7 @@ func (h *MatchReviewHandler) loadReview(c *gin.Context) (*db.Media, *db.MatchRev
 // queue makes no network calls.
 func (h *MatchReviewHandler) applySuggestion(media *db.Media, review *db.MatchReview) error {
 	if review.SuggestedTMDbID == 0 {
-		clearMovieMatch(media)
+		library.ClearMovieMatch(media)
 	} else {
 		var details tmdb.MovieDetails
 		if err := json.Unmarshal([]byte(review.SuggestedJSON), &details); err != nil {
@@ -433,23 +433,6 @@ func (h *MatchReviewHandler) applySuggestion(media *db.Media, review *db.MatchRe
 		return err
 	}
 	return h.db.DeleteMatchReview(media.ID)
-}
-
-// clearMovieMatch returns a movie to what its file says, for when no film is
-// a confident match.
-func clearMovieMatch(media *db.Media) {
-	facts := library.FactsForMovie(media)
-	media.Title = facts.Title
-	media.Year = facts.Year
-	media.OriginalTitle = ""
-	media.Overview = ""
-	media.PosterPath = ""
-	media.BackdropPath = ""
-	media.Rating = 0
-	media.Runtime = 0
-	media.Genres = ""
-	media.TMDbID = 0
-	media.IMDbID = ""
 }
 
 func buildReviewItem(media *db.Media, review *db.MatchReview) matchReviewItem {

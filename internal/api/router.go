@@ -90,6 +90,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 				library.GET("/recent", libraryHandler.GetRecent)
 				library.GET("/stats", libraryHandler.GetStats)
 				library.POST("/scan", libraryHandler.TriggerScan)
+				library.GET("/file-health", libraryHandler.GetFileHealth)
 
 				// Check matches: movies whose TMDB match looks wrong
 				library.GET("/match-review", matchReviewHandler.List)

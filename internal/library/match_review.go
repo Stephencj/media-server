@@ -103,6 +103,24 @@ func judgeMatch(media *db.Media, facts MovieFileFacts, suggested *tmdb.MovieDeta
 	return "", false
 }
 
+// ClearMovieMatch returns a movie to what its file says: its own title and
+// year and nothing from TMDB. For when no film is a confident match, and for
+// files that were never films.
+func ClearMovieMatch(media *db.Media) {
+	facts := FactsForMovie(media)
+	media.Title = facts.Title
+	media.Year = facts.Year
+	media.OriginalTitle = ""
+	media.Overview = ""
+	media.PosterPath = ""
+	media.BackdropPath = ""
+	media.Rating = 0
+	media.Runtime = 0
+	media.Genres = ""
+	media.TMDbID = 0
+	media.IMDbID = ""
+}
+
 // FormatMinutes renders a running time the way the apps show it: "1h 8m".
 func FormatMinutes(minutes int) string {
 	if minutes <= 0 {
