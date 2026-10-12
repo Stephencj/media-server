@@ -80,6 +80,9 @@ type LibraryFile struct {
 	MatchedYear    int
 	MatchedRuntime int // minutes
 	TMDbID         int
+	// MatchInDoubt is set while a movie waits in the check-matches queue:
+	// its match may be the wrong film.
+	MatchInDoubt bool
 }
 
 // ListLibraryFiles returns every movie, episode and extra file.
@@ -87,15 +90,16 @@ func (db *DB) ListLibraryFiles() ([]LibraryFile, error) {
 	rows, err := db.conn.Query(
 		`SELECT 'movie', id, title, COALESCE(source_id, 0), COALESCE(file_path, ''), COALESCE(file_size, 0),
 			COALESCE(duration, 0), COALESCE(video_codec, ''), COALESCE(resolution, ''),
-			title, COALESCE(year, 0), COALESCE(runtime, 0), COALESCE(tmdb_id, 0)
+			title, COALESCE(year, 0), COALESCE(runtime, 0), COALESCE(tmdb_id, 0),
+			EXISTS(SELECT 1 FROM match_reviews r WHERE r.media_id = media.id AND r.status = 'pending')
 		 FROM media WHERE type = 'movie'
 		 UNION ALL
 		 SELECT 'episode', id, title, COALESCE(source_id, 0), COALESCE(file_path, ''), COALESCE(file_size, 0),
-			COALESCE(duration, 0), COALESCE(video_codec, ''), COALESCE(resolution, ''), '', 0, 0, 0
+			COALESCE(duration, 0), COALESCE(video_codec, ''), COALESCE(resolution, ''), '', 0, 0, 0, 0
 		 FROM episodes
 		 UNION ALL
 		 SELECT 'extra', id, title, COALESCE(source_id, 0), COALESCE(file_path, ''), COALESCE(file_size, 0),
-			COALESCE(duration, 0), COALESCE(video_codec, ''), COALESCE(resolution, ''), '', 0, 0, 0
+			COALESCE(duration, 0), COALESCE(video_codec, ''), COALESCE(resolution, ''), '', 0, 0, 0, 0
 		 FROM extras
 		 ORDER BY 5`,
 	)
@@ -109,7 +113,7 @@ func (db *DB) ListLibraryFiles() ([]LibraryFile, error) {
 		var f LibraryFile
 		if err := rows.Scan(&f.Kind, &f.ID, &f.Title, &f.SourceID, &f.FilePath, &f.FileSize,
 			&f.Duration, &f.VideoCodec, &f.Resolution,
-			&f.MatchedTitle, &f.MatchedYear, &f.MatchedRuntime, &f.TMDbID); err != nil {
+			&f.MatchedTitle, &f.MatchedYear, &f.MatchedRuntime, &f.TMDbID, &f.MatchInDoubt); err != nil {
 			return nil, err
 		}
 		if f.FilePath == "" {

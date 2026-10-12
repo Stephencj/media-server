@@ -40,17 +40,55 @@ func (h *LibraryHandler) GetMovies(c *gin.Context) {
 		limit = 100
 	}
 
-	movies, err := h.db.GetMediaByType(db.MediaTypeMovie, limit, offset)
+	// Every file, folded so that a film with several copies is one entry,
+	// then paged. Paging the files themselves would split a film's copies
+	// across pages.
+	all, err := h.db.GetMediaByType(db.MediaTypeMovie, 1_000_000, 0)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch movies"})
 		return
 	}
+	movies, _ := library.GroupMovieCopies(all)
+
+	total := len(movies)
+	if offset > total {
+		offset = total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	page := movies[offset:end]
+	if page == nil {
+		page = []*db.Media{}
+	}
 
 	c.JSON(http.StatusOK, PaginatedResponse{
-		Items:  movies,
+		Items:  page,
+		Total:  total,
 		Limit:  limit,
 		Offset: offset,
 	})
+}
+
+// GetMovieCopies returns the other files the library holds of the same film.
+// GET /api/media/:id/copies
+func (h *LibraryHandler) GetMovieCopies(c *gin.Context) {
+	mediaID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid media ID"})
+		return
+	}
+	all, err := h.db.GetMediaByType(db.MediaTypeMovie, 1_000_000, 0)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch movies"})
+		return
+	}
+	copies := library.MovieCopies(all, mediaID)
+	if copies == nil {
+		copies = []*db.Media{}
+	}
+	c.JSON(http.StatusOK, gin.H{"items": copies})
 }
 
 // GetShows returns all TV shows in the library

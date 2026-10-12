@@ -104,6 +104,7 @@ func NewRouter(database *db.DB, cfg *config.Config) *gin.Engine {
 
 			// Media
 			protected.GET("/media/:id", libraryHandler.GetMedia)
+			protected.GET("/media/:id/copies", libraryHandler.GetMovieCopies)
 
 			// Metadata management
 			protected.POST("/media/:id/metadata/search", metadataHandler.SearchTMDB)

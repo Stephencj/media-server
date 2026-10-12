@@ -149,6 +149,8 @@ func TestMovieTitleSimilarity(t *testing.T) {
 		{"Beetle Juice", "Beetlejuice", 1.0},
 		{"Ghost Busters", "Ghostbusters", 1.0},
 		{"Scream2", "Scream 2", 1.0},
+		{"The Two Towers", "The Lord of the Rings: The Two Towers", 0.75},
+		{"Returns", "Batman Returns", 0.5},
 		{"Road Hard", "Hard Road", 0.5},
 		{"Friday", "Freaky Friday", 0.5},
 		{"Rambo II", "Rambo III", 0.5},
@@ -183,5 +185,24 @@ func TestRuntimeScore(t *testing.T) {
 		if got := runtimeScore(tt.file, tt.tmdb); got != tt.want {
 			t.Errorf("runtimeScore(%d, %d) = %v, want %v", tt.file, tt.tmdb, got, tt.want)
 		}
+	}
+}
+
+func TestRejoinedTitles(t *testing.T) {
+	got := rejoinedTitles("Edward Scissor Hands")
+	want := []string{"EdwardScissorHands", "EdwardScissor Hands", "Edward ScissorHands"}
+	if len(got) != len(want) {
+		t.Fatalf("rejoinedTitles = %q, want %q", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("rejoinedTitles[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+	if got := rejoinedTitles("Beetle Juice"); len(got) != 1 || got[0] != "BeetleJuice" {
+		t.Errorf("rejoinedTitles(two words) = %q", got)
+	}
+	if got := rejoinedTitles("Gremlins"); got != nil {
+		t.Errorf("rejoinedTitles(one word) = %q, want none", got)
 	}
 }

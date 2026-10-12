@@ -145,6 +145,11 @@ func (s *Scanner) ScanSource(source *db.MediaSource) error {
 			return nil
 		}
 
+		// "._Name.mp4" is a macOS sidecar, not a video.
+		if strings.HasPrefix(info.Name(), "._") {
+			return nil
+		}
+
 		ext := strings.ToLower(filepath.Ext(path))
 		if videoExtensions[ext] {
 			files = append(files, path)

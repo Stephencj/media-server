@@ -126,8 +126,13 @@ func CheckFileHealth(files []db.LibraryFile, sourcePaths map[int64]string) []Fil
 }
 
 // matchIsSound reports whether a movie's TMDB match agrees with its file's
-// name and year, so that its running time can be held against the file.
+// name and year and is not waiting in the check-matches queue, so that its
+// running time can be held against the file. Run the check first: a film
+// matched to a longer namesake otherwise reads as a file that stops early.
 func matchIsSound(f db.LibraryFile) bool {
+	if f.MatchInDoubt {
+		return false
+	}
 	title, year := MovieNameFromPath(f.FilePath)
 	if !tmdb.TitlesAgree(title, f.MatchedTitle) && !tmdb.TitlesAgree(MovieFolderTitle(f.FilePath), f.MatchedTitle) {
 		return false

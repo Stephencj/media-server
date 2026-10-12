@@ -103,6 +103,10 @@ type Media struct {
 	Runtime      int       `json:"runtime,omitempty"`
 	SeasonCount  int       `json:"season_count,omitempty"`
 	EpisodeCount int       `json:"episode_count,omitempty"`
+
+	// CopyCount is how many other files of the same film the library holds.
+	// Set by listings that fold copies into one entry; not stored.
+	CopyCount int `json:"copy_count,omitempty"`
 }
 
 // TVShow represents a TV series (parent of episodes)

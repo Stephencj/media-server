@@ -54,17 +54,43 @@ func (c *Client) MatchMovie(title string, year, runtimeMinutes int) (*MovieDetai
 		}
 	}
 
-	// A title split differently from TMDB's ("Beetle Juice", "Ghost Busters")
-	// may not come back at all. Ask again with the words run together.
-	if joined := strings.Join(titleTokens(title), ""); len(rankMovieCandidates(results, title, year)) == 0 &&
-		strings.Contains(strings.TrimSpace(title), " ") && joined != "" {
-		results, err = c.SearchMovieWithResults(joined, 0)
-		if err != nil {
-			return nil, err
+	// A title split differently from TMDB's ("Beetle Juice", "Edward Scissor
+	// Hands") may not come back at all. Ask again with words run together:
+	// all of them, then each neighbouring pair.
+	if len(rankMovieCandidates(results, title, year)) == 0 {
+		for _, query := range rejoinedTitles(title) {
+			results, err = c.SearchMovieWithResults(query, 0)
+			if err != nil {
+				return nil, err
+			}
+			if len(rankMovieCandidates(results, title, year)) > 0 {
+				break
+			}
 		}
 	}
 
 	return pickMovie(results, title, year, runtimeMinutes, c.GetMovieDetails)
+}
+
+// rejoinedTitles returns a title's words run together in the ways worth
+// searching for: "Edward Scissor Hands" gives "EdwardScissorHands", "EdwardScissor
+// Hands" and "Edward ScissorHands". Long titles are left alone; a missing
+// space is a short-title problem.
+func rejoinedTitles(title string) []string {
+	words := strings.Fields(title)
+	if len(words) < 2 || len(words) > 5 {
+		return nil
+	}
+	queries := []string{strings.Join(words, "")}
+	if len(words) > 2 {
+		for i := 0; i+1 < len(words); i++ {
+			joined := append([]string{}, words[:i]...)
+			joined = append(joined, words[i]+words[i+1])
+			joined = append(joined, words[i+2:]...)
+			queries = append(queries, strings.Join(joined, " "))
+		}
+	}
+	return queries
 }
 
 // pickMovie chooses among search results. fetch is c.GetMovieDetails outside
@@ -193,7 +219,7 @@ func movieTitleSimilarity(search, candidate string) float64 {
 	if strings.Join(a, "") == strings.Join(b, "") {
 		return 1.0
 	}
-	if isSubtitled(a, b) {
+	if isSubtitled(a, b) || isSeriesPrefixed(a, b) {
 		return 0.75
 	}
 
@@ -243,6 +269,22 @@ func isSubtitled(short, full []string) bool {
 		}
 	}
 	return false
+}
+
+// isSeriesPrefixed reports whether full is short with a series name in front,
+// as in "The Two Towers" and "The Lord of the Rings: The Two Towers". One
+// word is too little to go on: "Returns" is not "Batman Returns".
+func isSeriesPrefixed(short, full []string) bool {
+	if len(short) < 2 || len(full) <= len(short) {
+		return false
+	}
+	offset := len(full) - len(short)
+	for i, token := range short {
+		if full[offset+i] != token {
+			return false
+		}
+	}
+	return true
 }
 
 func isNumber(token string) bool {
