@@ -159,8 +159,11 @@ def verify(src_info, dst, p):
     """Returns why the output is not acceptable, or None when it is."""
     try:
         out = probe(dst)
-    except (subprocess.CalledProcessError, ValueError):
-        return "output could not be read back"
+    except subprocess.CalledProcessError as e:
+        why = ((e.stderr or "").strip().splitlines() or ["ffprobe exited %d" % e.returncode])[-1]
+        return "output could not be read back: %s" % why
+    except ValueError as e:
+        return "output could not be read back: %s" % e
     kinds = [s["codec_type"] for s in out["streams"]]
     if kinds.count("video") != 1:
         return "output has no video"
@@ -196,15 +199,22 @@ def convert(src, dst):
                 os.remove(path)
 
     try:
-        subprocess.run(ffmpeg_args(src, partial, p, [(sub, path + ".partial") for sub, path in sidecars], srts),
-                       check=True, capture_output=True, text=True)
+        ran = subprocess.run(ffmpeg_args(src, partial, p, [(sub, path + ".partial") for sub, path in sidecars], srts),
+                             check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
         discard()
         return "failed", ((e.stderr or "").strip().splitlines() or ["ffmpeg failed"])[-1]
 
     problem = verify(info, partial, p)
     if problem:
-        discard()
+        # ffmpeg can exit 0 having failed to finish the file. Whatever it
+        # said on the way is the only account of why.
+        said = " | ".join((ran.stderr or "").strip().splitlines()[-3:])
+        if said:
+            problem += " [ffmpeg: %s]" % said
+        # REMUX_KEEP_FAILED=1 leaves the rejected output in place to look at.
+        if not os.environ.get("REMUX_KEEP_FAILED"):
+            discard()
         return "failed", problem
 
     # The MP4 goes last: it is what marks the file as converted.
