@@ -20,6 +20,14 @@ Text subtitles are carried over. Picture subtitles (Blu-ray PGS, DVD) cannot
 live in an MP4, so each is saved beside the output as "b.<lang>.<n>.mks", a
 lossless copy to turn into text later.
 
+Once those have been turned into text (scripts/pgs-to-srt.swift), put each
+result beside its MP4 as "b.<lang>.srt" and run:
+
+    remux-for-streaming.py --add-subtitles DIR
+
+which adds every such .srt to its MP4 as a subtitle track the player can turn
+on. An MP4 that already has subtitles is left alone.
+
 Needs ffmpeg and ffprobe. Prints one line per file and a summary; exits 1 if
 any file failed.
 """
@@ -90,12 +98,15 @@ def plan(info):
     return {"video": video, "audio": audio, "text_subs": text_subs, "picture_subs": picture_subs}, None
 
 
-def ffmpeg_args(src, dst, p, sidecars=()):
+def ffmpeg_args(src, dst, p, sidecars=(), srts=()):
     """One ffmpeg run that reads the source once and writes the MP4 and any
-    subtitle sidecars together. sidecars is (stream, path) pairs."""
-    args = ["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src,
-            "-map", "0:%d" % p["video"]["index"], "-c:v", "copy",
-            "-tag:v", VIDEO_TAGS[p["video"]["codec_name"]]]
+    subtitle sidecars together. sidecars is (stream, path) pairs; srts is
+    (language, path) pairs of text subtitles to put in the MP4."""
+    args = ["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src]
+    for _, path in srts:
+        args += ["-i", path]
+    args += ["-map", "0:%d" % p["video"]["index"], "-c:v", "copy",
+             "-tag:v", VIDEO_TAGS[p["video"]["codec_name"]]]
 
     for i, track in enumerate(p["audio"]):
         args += ["-map", "0:%d" % track["source"], "-c:a:%d" % i, track["codec"]]
@@ -112,6 +123,11 @@ def ffmpeg_args(src, dst, p, sidecars=()):
         args += ["-map", "0:%d" % sub["index"], "-c:s:%d" % i, "mov_text",
                  "-metadata:s:s:%d" % i, "language=%s" % language(sub),
                  "-disposition:s:%d" % i, "0"]
+
+    for j, (lang, _) in enumerate(srts):
+        i = len(p["text_subs"]) + j
+        args += ["-map", "%d:0" % (j + 1), "-c:s:%d" % i, "mov_text",
+                 "-metadata:s:s:%d" % i, "language=%s" % lang, "-disposition:s:%d" % i, "0"]
 
     # faststart puts the index at the front, so playback can begin before the
     # whole file has been fetched.
@@ -170,6 +186,9 @@ def convert(src, dst):
     partial = dst + ".partial"
     sidecars = sidecar_paths(dst_stem, p)
     written = [partial] + [path + ".partial" for _, path in sidecars]
+    # Text subtitles already waiting beside the destination go in during this
+    # same pass, which saves rewriting the whole file to add them later.
+    srts = srts_beside(dst)
 
     def discard():
         for path in written:
@@ -177,7 +196,7 @@ def convert(src, dst):
                 os.remove(path)
 
     try:
-        subprocess.run(ffmpeg_args(src, partial, p, [(sub, path + ".partial") for sub, path in sidecars]),
+        subprocess.run(ffmpeg_args(src, partial, p, [(sub, path + ".partial") for sub, path in sidecars], srts),
                        check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
         discard()
@@ -195,7 +214,65 @@ def convert(src, dst):
 
     tracks = ", ".join("%s %s" % (t["language"], t["title"].lower()) for t in p["audio"])
     extras = "; %d picture subtitle track(s) saved beside it" % len(p["picture_subs"]) if p["picture_subs"] else ""
+    if srts:
+        extras += "; subtitles: %s" % ", ".join(lang for lang, _ in srts)
     return "done", "audio: %s%s" % (tracks, extras)
+
+
+def srts_beside(mp4):
+    """The "<name>.<lang>.srt" files beside an MP4, as (language, path)."""
+    stem = os.path.splitext(mp4)[0]
+    folder = os.path.dirname(mp4) or "."
+    prefix = os.path.basename(stem) + "."
+    srts = []
+    if not os.path.isdir(folder):
+        return srts
+    for name in sorted(os.listdir(folder)):
+        # Nothing with a longer name that merely starts the same way.
+        middle = name[len(prefix):-4] if name.startswith(prefix) and name.endswith(".srt") else ""
+        if re.fullmatch(r"[a-z]{2,3}", middle):
+            srts.append((middle, os.path.join(folder, name)))
+    return srts
+
+
+def add_subtitles(mp4):
+    """Adds the .srt files beside an MP4 to it. Returns (status, detail)."""
+    srts = srts_beside(mp4)
+    if not srts:
+        return "skipped", "no .srt beside it"
+
+    info = probe(mp4)
+    if any(s["codec_type"] == "subtitle" for s in info["streams"]):
+        return "skipped", "already has subtitles"
+
+    args = ["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", mp4]
+    for _, path in srts:
+        args += ["-i", path]
+    args += ["-map", "0:v", "-map", "0:a"]
+    for i, (lang, _) in enumerate(srts):
+        args += ["-map", "%d:0" % (i + 1), "-metadata:s:s:%d" % i, "language=%s" % lang,
+                 "-disposition:s:%d" % i, "0"]
+    partial = mp4 + ".partial"
+    args += ["-c", "copy", "-c:s", "mov_text", "-map_metadata", "0", "-map_chapters", "0",
+             "-movflags", "+faststart", "-f", "mp4", partial]
+
+    try:
+        subprocess.run(args, check=True, capture_output=True, text=True)
+        out = probe(partial)
+    except (subprocess.CalledProcessError, ValueError) as e:
+        if os.path.exists(partial):
+            os.remove(partial)
+        return "failed", ((getattr(e, "stderr", "") or "").strip().splitlines() or ["could not add subtitles"])[-1]
+
+    kinds = [s["codec_type"] for s in out["streams"]]
+    before = [s["codec_type"] for s in info["streams"]]
+    if (kinds.count("video"), kinds.count("audio")) != (before.count("video"), before.count("audio")) \
+            or kinds.count("subtitle") != len(srts) or abs(duration(out) - duration(info)) > 2.0:
+        os.remove(partial)
+        return "failed", "the result did not match the original"
+
+    os.replace(partial, mp4)
+    return "done", "added %s" % ", ".join(lang for lang, _ in srts)
 
 
 def describe(src):
@@ -210,14 +287,32 @@ def describe(src):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("src_dir")
-    parser.add_argument("out_dir")
+    parser.add_argument("src_dir", nargs="?")
+    parser.add_argument("out_dir", nargs="?")
+    parser.add_argument("--add-subtitles", metavar="DIR",
+                        help="add each '<name>.<lang>.srt' in DIR to the MP4 it sits beside")
     parser.add_argument("--match", help="only files whose name matches this regular expression")
     parser.add_argument("--limit", type=int, help="stop after converting this many files")
     parser.add_argument("--dry-run", action="store_true", help="say what would be done and change nothing")
     args = parser.parse_args()
 
     pattern = re.compile(args.match) if args.match else None
+
+    if args.add_subtitles:
+        counts = {"done": 0, "skipped": 0, "failed": 0}
+        for root, _, names in os.walk(args.add_subtitles):
+            for name in sorted(names):
+                if not name.lower().endswith(".mp4") or (pattern and not pattern.search(name)):
+                    continue
+                status, detail = add_subtitles(os.path.join(root, name))
+                counts[status] += 1
+                if status != "skipped":
+                    print("%-7s %s (%s)" % (status, name, detail), flush=True)
+        print("%d given subtitles, %d left alone, %d failed" % (counts["done"], counts["skipped"], counts["failed"]), flush=True)
+        sys.exit(1 if counts["failed"] else 0)
+
+    if not args.src_dir or not args.out_dir:
+        parser.error("SRC_DIR and OUT_DIR are required unless --add-subtitles is given")
     sources = []
     for root, _, names in os.walk(args.src_dir):
         for name in names:
