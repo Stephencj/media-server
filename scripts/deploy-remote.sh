@@ -66,7 +66,21 @@ git merge --ff-only "$REF"
 
 # Build before stopping anything, so a build failure leaves the old server up.
 echo "--- Building"
-docker compose build --build-arg GIT_COMMIT="$COMMIT"
+# The first name lookup for Docker Hub regularly times out on this machine and
+# the next one succeeds, so a failed build gets two more tries.
+built=""
+for attempt in 1 2 3; do
+    if docker compose build --build-arg GIT_COMMIT="$COMMIT"; then
+        built=yes
+        break
+    fi
+    echo "    build attempt ${attempt} failed" >&2
+    sleep 5
+done
+if [ -z "$built" ]; then
+    echo "The build failed three times. The old server is still running." >&2
+    exit 1
+fi
 
 echo "--- Restarting"
 docker compose up -d
