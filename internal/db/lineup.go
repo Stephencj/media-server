@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"strings"
+	"time"
 )
 
 // LineupItem is one thing a channel can air.
@@ -139,4 +140,49 @@ func (db *DB) ChannelScheduleTotals(channelID int64) (items, seconds int, err er
 		`SELECT count(*), COALESCE(sum(duration), 0) FROM channel_schedule WHERE channel_id = ?`, channelID,
 	).Scan(&items, &seconds)
 	return items, seconds, err
+}
+
+// LineupShowItems returns what a show contributes to a channel under the
+// given options (seasons, commentaries, bonus clips): the same items a show
+// source would schedule.
+func (db *DB) LineupShowItems(showID int64, options *ChannelSourceOptions) []LineupItem {
+	inputs := db.getMediaFromSource(ChannelSource{SourceType: ChannelSourceShow, SourceID: &showID, Options: options})
+	items := make([]LineupItem, 0, len(inputs))
+	for _, input := range inputs {
+		items = append(items, LineupItem{ID: input.MediaID, Type: input.MediaType, Title: input.Title, Duration: input.Duration})
+	}
+	return items
+}
+
+// ReplaceChannelSchedule gives a channel exactly this cycle, in order, and
+// anchors it: the cycle's first second airs at anchor, and every later moment
+// follows from there. A cycle that is a whole number of days long and
+// anchored at a midnight therefore keeps the same time of day at the same
+// point in every pass.
+func (db *DB) ReplaceChannelSchedule(channelID int64, items []LineupItem, anchor time.Time) error {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM channel_schedule WHERE channel_id = ?`, channelID); err != nil {
+		return err
+	}
+	start := 0
+	for position, item := range items {
+		if _, err := tx.Exec(
+			`INSERT INTO channel_schedule (channel_id, media_id, media_type, scheduled_position, cycle_number, duration, cumulative_start)
+			 VALUES (?, ?, ?, ?, 1, ?, ?)`,
+			channelID, item.ID, item.Type, position, item.Duration, start,
+		); err != nil {
+			return err
+		}
+		start += item.Duration
+	}
+	// A channel's place in its cycle is counted from when it was created.
+	if _, err := tx.Exec(`UPDATE channels SET created_at = ? WHERE id = ?`, anchor.UTC(), channelID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

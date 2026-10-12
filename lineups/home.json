@@ -1,21 +1,207 @@
 {
+  "timezone": "America/New_York",
   "channels": [
+    {
+      "name": "Channel One",
+      "icon": "1️⃣",
+      "description": "A day of television: cartoons in the morning, sitcoms after lunch, dramas and a film at night, the strange stuff after eleven",
+      "days": 14,
+      "dayparts": [
+        {
+          "name": "Morning",
+          "from": "06:00",
+          "to": "12:00",
+          "sources": [
+            {
+              "show": "Futurama"
+            },
+            {
+              "show": "BeetleJuice Cartoon"
+            },
+            {
+              "films": {
+                "genres": [
+                  "Family"
+                ],
+                "not_genres": [
+                  "Horror",
+                  "TV Movie"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Afternoon",
+          "from": "12:00",
+          "to": "18:00",
+          "sources": [
+            {
+              "show": "The Office"
+            },
+            {
+              "show": "Parks and Recreation"
+            },
+            {
+              "show": "The IT Crowd"
+            },
+            {
+              "show": "Taskmaster"
+            }
+          ]
+        },
+        {
+          "name": "Prime Time",
+          "from": "18:00",
+          "to": "23:00",
+          "sources": [
+            {
+              "show": "Psych"
+            },
+            {
+              "show": "Doctor Who"
+            },
+            {
+              "films": {
+                "not_genres": [
+                  "Horror",
+                  "Family",
+                  "TV Movie"
+                ],
+                "min_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "name": "Late Night",
+          "from": "23:00",
+          "to": "06:00",
+          "sources": [
+            {
+              "films": {
+                "genres": [
+                  "Horror"
+                ],
+                "min_minutes": 60
+              }
+            },
+            {
+              "show": "Penny Dreadful"
+            },
+            {
+              "show": "The Venture Brothers"
+            },
+            {
+              "bonus": {
+                "categories": [
+                  "commentary"
+                ],
+                "parent": "film",
+                "min_minutes": 60
+              }
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "Toonami",
       "icon": "⚡",
-      "description": "Action animation: Dragon Ball Z Kai, DBZ Abridged, The Venture Brothers",
-      "sources": [
-        { "show": "Dragon Ball Z Kai" },
-        { "show": "Dragon Ball Z Abridged" },
-        { "show": "The Venture Brothers" }
+      "description": "Dragon Ball by day, Adult Swim after ten",
+      "days": 14,
+      "dayparts": [
+        {
+          "name": "Toonami",
+          "from": "06:00",
+          "to": "22:00",
+          "sources": [
+            {
+              "show": "Dragon Ball Z Kai"
+            },
+            {
+              "show": "Dragon Ball Z Abridged"
+            }
+          ]
+        },
+        {
+          "name": "Adult Swim",
+          "from": "22:00",
+          "to": "06:00",
+          "sources": [
+            {
+              "show": "The Venture Brothers"
+            },
+            {
+              "show": "Futurama"
+            }
+          ]
+        }
       ]
     },
     {
       "name": "Movie Night",
       "icon": "🍿",
-      "description": "Every film in the library, and nothing else",
-      "sources": [
-        { "films": { "min_minutes": 60 } }
+      "description": "Every film in the library: family in the daytime, everything in the evening, horror late",
+      "days": 14,
+      "dayparts": [
+        {
+          "name": "Matinee",
+          "from": "06:00",
+          "to": "17:00",
+          "sources": [
+            {
+              "films": {
+                "genres": [
+                  "Family",
+                  "Comedy",
+                  "Adventure",
+                  "Music"
+                ],
+                "not_genres": [
+                  "Horror",
+                  "Crime",
+                  "Thriller"
+                ],
+                "min_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feature",
+          "from": "17:00",
+          "to": "23:00",
+          "sources": [
+            {
+              "films": {
+                "not_genres": [
+                  "Horror",
+                  "TV Movie"
+                ],
+                "min_minutes": 60
+              }
+            }
+          ]
+        },
+        {
+          "name": "Late Show",
+          "from": "23:00",
+          "to": "06:00",
+          "sources": [
+            {
+              "films": {
+                "genres": [
+                  "Horror",
+                  "Thriller",
+                  "Crime",
+                  "Mystery"
+                ],
+                "min_minutes": 60
+              }
+            }
+          ]
+        }
       ]
     },
     {
@@ -23,11 +209,21 @@
       "icon": "🇬🇧",
       "description": "Taskmaster, The IT Crowd, Toast of London, Doctor Who, Black Pool",
       "sources": [
-        { "show": "Taskmaster" },
-        { "show": "The IT Crowd" },
-        { "show": "Toast of London" },
-        { "show": "Doctor Who" },
-        { "show": "Black Pool" }
+        {
+          "show": "Taskmaster"
+        },
+        {
+          "show": "The IT Crowd"
+        },
+        {
+          "show": "Toast of London"
+        },
+        {
+          "show": "Doctor Who"
+        },
+        {
+          "show": "Black Pool"
+        }
       ]
     },
     {
@@ -35,18 +231,71 @@
       "icon": "🔍",
       "description": "Psych, Breaking Bad, and the films with a body in them",
       "sources": [
-        { "show": "Psych" },
-        { "show": "Breaking Bad" },
-        { "films": { "genres": ["Mystery", "Crime"], "not_genres": ["Horror"], "min_minutes": 60 } }
+        {
+          "show": "Psych"
+        },
+        {
+          "show": "Breaking Bad"
+        },
+        {
+          "films": {
+            "genres": [
+              "Mystery",
+              "Crime"
+            ],
+            "not_genres": [
+              "Horror"
+            ],
+            "min_minutes": 60
+          }
+        }
       ]
     },
     {
       "name": "Fright Night",
       "icon": "🩸",
-      "description": "Horror and horror-comedy, all year",
-      "sources": [
-        { "films": { "genres": ["Horror"], "min_minutes": 60 } },
-        { "show": "Penny Dreadful" }
+      "description": "Horror all year: the funny ones by day, the rest after dark",
+      "days": 14,
+      "dayparts": [
+        {
+          "name": "Daylight",
+          "from": "06:00",
+          "to": "20:00",
+          "sources": [
+            {
+              "films": {
+                "titles": [
+                  "Gremlins",
+                  "Shaun of the Dead",
+                  "Tucker and Dale",
+                  "Beetlejuice",
+                  "Addams Family",
+                  "Ghostbusters",
+                  "Nightmare Before Christmas",
+                  "Bride of Frankenstein"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "After Dark",
+          "from": "20:00",
+          "to": "06:00",
+          "sources": [
+            {
+              "films": {
+                "genres": [
+                  "Horror"
+                ],
+                "min_minutes": 60
+              }
+            },
+            {
+              "show": "Penny Dreadful"
+            }
+          ]
+        }
       ]
     },
     {
@@ -54,8 +303,22 @@
       "icon": "🦇",
       "description": "Tim Burton and his neighbours",
       "sources": [
-        { "films": { "titles": ["Beetlejuice", "Edward Scissorhands", "Nightmare Before Christmas", "Sweeney Todd", "Addams Family", "Bride of Frankenstein", "Dracula"] } },
-        { "show": "Penny Dreadful" }
+        {
+          "films": {
+            "titles": [
+              "Beetlejuice",
+              "Edward Scissorhands",
+              "Nightmare Before Christmas",
+              "Sweeney Todd",
+              "Addams Family",
+              "Bride of Frankenstein",
+              "Dracula"
+            ]
+          }
+        },
+        {
+          "show": "Penny Dreadful"
+        }
       ]
     },
     {
@@ -63,7 +326,20 @@
       "icon": "⚔️",
       "description": "Long sittings: Middle-earth, Hogwarts, a galaxy far away",
       "sources": [
-        { "films": { "titles": ["Lord of the Rings", "Harry Potter", "Star Wars", "Empire Strikes Back", "Inception", "Princess Bride", "NeverEnding Story", "Mask of Zorro"] } }
+        {
+          "films": {
+            "titles": [
+              "Lord of the Rings",
+              "Harry Potter",
+              "Star Wars",
+              "Empire Strikes Back",
+              "Inception",
+              "Princess Bride",
+              "NeverEnding Story",
+              "Mask of Zorro"
+            ]
+          }
+        }
       ]
     },
     {
@@ -71,7 +347,17 @@
       "icon": "🎈",
       "description": "Animated features and family adventures",
       "sources": [
-        { "films": { "genres": ["Family"], "not_genres": ["Horror", "TV Movie"] } }
+        {
+          "films": {
+            "genres": [
+              "Family"
+            ],
+            "not_genres": [
+              "Horror",
+              "TV Movie"
+            ]
+          }
+        }
       ]
     },
     {
@@ -79,7 +365,12 @@
       "icon": "🎞️",
       "description": "Films from before 1970",
       "sources": [
-        { "films": { "year_to": 1969, "min_minutes": 60 } }
+        {
+          "films": {
+            "year_to": 1969,
+            "min_minutes": 60
+          }
+        }
       ]
     },
     {
@@ -87,7 +378,19 @@
       "icon": "🎭",
       "description": "Musicals, old and new",
       "sources": [
-        { "films": { "genres": ["Music"], "titles": ["Sweeney Todd", "Seven Brides", "Showboat"], "min_minutes": 60 } }
+        {
+          "films": {
+            "genres": [
+              "Music"
+            ],
+            "titles": [
+              "Sweeney Todd",
+              "Seven Brides",
+              "Showboat"
+            ],
+            "min_minutes": 60
+          }
+        }
       ]
     },
     {
@@ -95,9 +398,21 @@
       "icon": "🎤",
       "description": "The Office, Parks and Recreation, and the Christopher Guest shelf",
       "sources": [
-        { "show": "The Office" },
-        { "show": "Parks and Recreation" },
-        { "films": { "titles": ["Best in Show", "Waiting for Guffman", "Popstar"] } }
+        {
+          "show": "The Office"
+        },
+        {
+          "show": "Parks and Recreation"
+        },
+        {
+          "films": {
+            "titles": [
+              "Best in Show",
+              "Waiting for Guffman",
+              "Popstar"
+            ]
+          }
+        }
       ]
     },
     {
@@ -105,7 +420,13 @@
       "icon": "✂️",
       "description": "Deleted scenes from everything",
       "sources": [
-        { "bonus": { "categories": ["deleted_scene"] } }
+        {
+          "bonus": {
+            "categories": [
+              "deleted_scene"
+            ]
+          }
+        }
       ]
     },
     {
@@ -113,7 +434,15 @@
       "icon": "🎬",
       "description": "Film commentaries: the whole film with the people who made it talking",
       "sources": [
-        { "bonus": { "categories": ["commentary"], "parent": "film", "min_minutes": 60 } }
+        {
+          "bonus": {
+            "categories": [
+              "commentary"
+            ],
+            "parent": "film",
+            "min_minutes": 60
+          }
+        }
       ]
     },
     {
@@ -121,9 +450,24 @@
       "icon": "⏱️",
       "description": "Nothing over a quarter of an hour",
       "sources": [
-        { "show": "Con Man" },
-        { "show": "BeetleJuice Cartoon" },
-        { "bonus": { "categories": ["featurette", "music_video", "gag_reel", "interview", "behind_the_scenes"], "max_minutes": 15 } }
+        {
+          "show": "Con Man"
+        },
+        {
+          "show": "BeetleJuice Cartoon"
+        },
+        {
+          "bonus": {
+            "categories": [
+              "featurette",
+              "music_video",
+              "gag_reel",
+              "interview",
+              "behind_the_scenes"
+            ],
+            "max_minutes": 15
+          }
+        }
       ]
     },
     {
@@ -131,7 +475,13 @@
       "icon": "🍍",
       "description": "Every episode, deleted scene and blooper",
       "sources": [
-        { "show": "Psych", "extras": ["deleted_scene", "gag_reel"] }
+        {
+          "show": "Psych",
+          "extras": [
+            "deleted_scene",
+            "gag_reel"
+          ]
+        }
       ]
     },
     {
@@ -139,7 +489,14 @@
       "icon": "📎",
       "description": "Episodes, commentaries, deleted scenes and bloopers",
       "sources": [
-        { "show": "The Office", "version": "both", "extras": ["deleted_scene", "gag_reel"] }
+        {
+          "show": "The Office",
+          "version": "both",
+          "extras": [
+            "deleted_scene",
+            "gag_reel"
+          ]
+        }
       ]
     },
     {
@@ -147,7 +504,14 @@
       "icon": "🌳",
       "description": "Episodes, commentaries, deleted scenes and bloopers",
       "sources": [
-        { "show": "Parks and Recreation", "version": "both", "extras": ["deleted_scene", "gag_reel"] }
+        {
+          "show": "Parks and Recreation",
+          "version": "both",
+          "extras": [
+            "deleted_scene",
+            "gag_reel"
+          ]
+        }
       ]
     },
     {
@@ -155,7 +519,13 @@
       "icon": "🚀",
       "description": "Episodes, commentaries and deleted scenes",
       "sources": [
-        { "show": "Futurama", "version": "both", "extras": ["deleted_scene"] }
+        {
+          "show": "Futurama",
+          "version": "both",
+          "extras": [
+            "deleted_scene"
+          ]
+        }
       ]
     }
   ]
