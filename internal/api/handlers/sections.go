@@ -35,6 +35,11 @@ func (h *SectionHandler) ListSections(c *gin.Context) {
 		return
 	}
 
+	// Ensure non-nil slice for JSON encoding
+	if sections == nil {
+		sections = []db.Section{}
+	}
+
 	// Optionally include media counts
 	if c.Query("with_counts") == "true" {
 		for i := range sections {
@@ -195,6 +200,11 @@ func (h *SectionHandler) GetSectionMedia(c *gin.Context) {
 		return
 	}
 
+	// Ensure non-nil slice for JSON encoding
+	if media == nil {
+		media = []interface{}{}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"items":  media,
 		"total":  total,
@@ -233,6 +243,11 @@ func (h *SectionHandler) GetSectionMediaBySlug(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch media"})
 		return
+	}
+
+	// Ensure non-nil slice for JSON encoding
+	if media == nil {
+		media = []interface{}{}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
