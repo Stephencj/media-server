@@ -284,7 +284,7 @@ type Section struct {
 	ID           int64     `json:"id"`
 	Name         string    `json:"name"`
 	Slug         string    `json:"slug"`
-	Icon         string    `json:"icon,omitempty"`
+	Icon         string    `json:"icon"`
 	Description  string    `json:"description,omitempty"`
 	SectionType  string    `json:"section_type"` // 'standard', 'smart', 'folder'
 	DisplayOrder int       `json:"display_order"`

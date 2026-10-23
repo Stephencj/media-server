@@ -53,6 +53,12 @@ struct ContinueWatchingItem: Codable, Identifiable {
 
 struct ContinueWatchingResponse: Codable {
     let items: [ContinueWatchingItem]
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Decode items leniently: missing or null -> []
+        items = try container.decodeIfPresent([ContinueWatchingItem].self, forKey: .items) ?? []
+    }
 }
 
 struct UpdateProgressRequest: Codable {

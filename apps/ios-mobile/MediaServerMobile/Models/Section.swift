@@ -20,6 +20,21 @@ struct LibrarySection: Identifiable, Codable {
         case isVisible = "is_visible"
         case mediaCount = "media_count"
     }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int64.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        slug = try container.decode(String.self, forKey: .slug)
+        // Decode icon leniently: missing or null -> ""
+        icon = try container.decodeIfPresent(String.self, forKey: .icon) ?? ""
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        sectionType = try container.decode(SectionType.self, forKey: .sectionType)
+        displayOrder = try container.decode(Int.self, forKey: .displayOrder)
+        isVisible = try container.decode(Bool.self, forKey: .isVisible)
+        mediaCount = try container.decodeIfPresent(Int.self, forKey: .mediaCount)
+        rules = try container.decodeIfPresent([SectionRule].self, forKey: .rules)
+    }
 }
 
 // Section types
