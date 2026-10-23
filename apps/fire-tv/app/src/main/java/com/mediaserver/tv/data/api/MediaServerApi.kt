@@ -92,6 +92,13 @@ interface MediaServerApi {
         @Path("playlistId") playlistId: Long,
         @Body request: ReorderPlaylistRequest
     ): MessageResponse
+
+    // Extras
+    @GET("api/media/{id}/extras")
+    suspend fun getMovieExtras(@Path("id") mediaId: Long): ItemsResponse<Extra>
+
+    @GET("api/shows/{showId}/extras")
+    suspend fun getShowExtras(@Path("showId") showId: Long): ItemsResponse<Extra>
 }
 
 @kotlinx.serialization.Serializable

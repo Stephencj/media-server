@@ -203,6 +203,9 @@ struct TVShowDetailView: View {
                             .foregroundColor(.red)
                             .font(.caption)
                     }
+
+                    // Extras section
+                    ShowBonusSection(showId: show.id)
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)

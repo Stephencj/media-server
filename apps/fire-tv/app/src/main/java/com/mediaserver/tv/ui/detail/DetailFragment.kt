@@ -12,6 +12,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.mediaserver.tv.R
+import com.mediaserver.tv.data.models.Extra
 import com.mediaserver.tv.data.models.Media
 import com.mediaserver.tv.data.models.MediaType
 import com.mediaserver.tv.ui.player.PlayerActivity
@@ -50,7 +51,10 @@ class DetailFragment : DetailsSupportFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        media?.let { viewModel.loadProgress(it.id, it.type.name.lowercase()) }
+        media?.let {
+            viewModel.loadProgress(it.id, it.type.name.lowercase())
+            viewModel.loadExtras(it.id, it.type)
+        }
 
         observeViewModel()
     }
@@ -101,6 +105,7 @@ class DetailFragment : DetailsSupportFragment() {
                     }
                     startActivity(intent)
                 }
+                is Extra -> playExtra(item)
             }
         }
     }
@@ -127,15 +132,73 @@ class DetailFragment : DetailsSupportFragment() {
         startActivity(intent)
     }
 
+    private fun playExtra(extra: Extra) {
+        // Convert Extra to Media for playback
+        val extraMedia = Media(
+            id = extra.id,
+            title = extra.title,
+            type = MediaType.MOVIE, // Extras play like movies
+            duration = extra.duration,
+            resolution = extra.resolution,
+            fileSize = extra.fileSize
+        )
+        val intent = Intent(requireContext(), PlayerActivity::class.java).apply {
+            putExtra(PlayerActivity.EXTRA_MEDIA, extraMedia)
+            putExtra(PlayerActivity.EXTRA_START_POSITION, 0)
+        }
+        startActivity(intent)
+    }
+
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.progress.collect { progress ->
-                    if (progress != null && progress.position > 0) {
-                        updateResumeAction(progress.position)
+                launch {
+                    viewModel.progress.collect { progress ->
+                        if (progress != null && progress.position > 0) {
+                            updateResumeAction(progress.position)
+                        }
+                    }
+                }
+                launch {
+                    viewModel.commentaries.collect { commentaries ->
+                        updateExtrasRows()
+                    }
+                }
+                launch {
+                    viewModel.extraGroups.collect { groups ->
+                        updateExtrasRows()
                     }
                 }
             }
+        }
+    }
+
+    private fun updateExtrasRows() {
+        // Remove existing extras rows (keep details row at 0 and "More Like This" at 1)
+        while (rowsAdapter.size() > 2) {
+            rowsAdapter.removeItems(2, 1)
+        }
+
+        var rowIndex = 2
+
+        // Add commentaries row
+        val commentaries = viewModel.commentaries.value
+        if (commentaries.isNotEmpty()) {
+            val header = HeaderItem(rowIndex.toLong(), "Commentaries")
+            val adapter = ArrayObjectAdapter(ExtraPresenter())
+            commentaries.forEach { adapter.add(it) }
+            rowsAdapter.add(ListRow(header, adapter))
+            rowIndex++
+        }
+
+        // Add other extras groups
+        val groups = viewModel.extraGroups.value
+        for (group in groups) {
+            val header = HeaderItem(rowIndex.toLong(), group.title)
+            val adapter = ArrayObjectAdapter(ExtraPresenter())
+            group.extras.forEach { adapter.add(it) }
+            rowsAdapter.add(ListRow(header, adapter))
+            rowIndex++
         }
     }
 
@@ -167,7 +230,9 @@ class DetailFragment : DetailsSupportFragment() {
 
     override fun onResume() {
         super.onResume()
-        media?.let { viewModel.loadProgress(it.id, it.type.name.lowercase()) }
+        media?.let {
+            viewModel.loadProgress(it.id, it.type.name.lowercase())
+        }
     }
 
     companion object {
@@ -234,6 +299,29 @@ private class CardPresenter : Presenter() {
         val cardView = viewHolder.view as androidx.leanback.widget.ImageCardView
         cardView.titleText = media.title
         cardView.contentText = media.year?.toString() ?: ""
+    }
+
+    override fun onUnbindViewHolder(viewHolder: ViewHolder) {}
+}
+
+/** Presenter for Extra items in the extras rows. */
+private class ExtraPresenter : Presenter() {
+    override fun onCreateViewHolder(parent: android.view.ViewGroup): ViewHolder {
+        val cardView = androidx.leanback.widget.ImageCardView(parent.context).apply {
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setMainImageDimensions(200, 113) // 16:9 aspect ratio
+        }
+        return ViewHolder(cardView)
+    }
+
+    override fun onBindViewHolder(viewHolder: ViewHolder, item: Any) {
+        val extra = item as Extra
+        val cardView = viewHolder.view as androidx.leanback.widget.ImageCardView
+        cardView.titleText = extra.title
+        // Show episode label for commentaries, duration for others
+        cardView.contentText = listOfNotNull(extra.episodeLabel, extra.formattedDuration.takeIf { it.isNotEmpty() })
+            .joinToString(" · ")
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {}

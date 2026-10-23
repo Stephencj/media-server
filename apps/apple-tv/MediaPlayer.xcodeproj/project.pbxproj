@@ -45,6 +45,8 @@
 		A100000000000000000000E2 /* MatchReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000E2 /* MatchReviewView.swift */; };
 		A10000000000000000000036 /* ChannelGuideViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* ChannelGuideViewModel.swift */; };
 		A100000000000000000000E3 /* MovieBonusViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000E3 /* MovieBonusViewModel.swift */; };
+		A100000000000000000000E5 /* ShowBonusViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000E5 /* ShowBonusViewModel.swift */; };
+		A100000000000000000000E6 /* ShowBonusSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000E6 /* ShowBonusSection.swift */; };
 		A100000000000000000000E1 /* MatchReviewViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000E1 /* MatchReviewViewModel.swift */; };
 		A10000000000000000000038 /* ChannelSwitchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* ChannelSwitchOverlay.swift */; };
 		A10000000000000000000099 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000099 /* Secrets.swift */; };
@@ -89,6 +91,8 @@
 		A200000000000000000000E2 /* MatchReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchReviewView.swift; sourceTree = "<group>"; };
 		A20000000000000000000036 /* ChannelGuideViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideViewModel.swift; sourceTree = "<group>"; };
 		A200000000000000000000E3 /* MovieBonusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieBonusViewModel.swift; sourceTree = "<group>"; };
+		A200000000000000000000E5 /* ShowBonusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowBonusViewModel.swift; sourceTree = "<group>"; };
+		A200000000000000000000E6 /* ShowBonusSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowBonusSection.swift; sourceTree = "<group>"; };
 		A200000000000000000000E1 /* MatchReviewViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchReviewViewModel.swift; sourceTree = "<group>"; };
 		A20000000000000000000038 /* ChannelSwitchOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelSwitchOverlay.swift; sourceTree = "<group>"; };
 		A20000000000000000000099 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
@@ -154,6 +158,7 @@
 				A20000000000000000000033 /* ChannelPlayerView.swift */,
 				A20000000000000000000035 /* ChannelGuideView.swift */,
 				A200000000000000000000E4 /* MovieBonusSection.swift */,
+				A200000000000000000000E6 /* ShowBonusSection.swift */,
 				A200000000000000000000E2 /* MatchReviewView.swift */,
 			);
 			path = Views;
@@ -172,6 +177,7 @@
 				A20000000000000000000031 /* ChannelPlayerViewModel.swift */,
 				A20000000000000000000036 /* ChannelGuideViewModel.swift */,
 				A200000000000000000000E3 /* MovieBonusViewModel.swift */,
+				A200000000000000000000E5 /* ShowBonusViewModel.swift */,
 				A200000000000000000000E1 /* MatchReviewViewModel.swift */,
 			);
 			path = ViewModels;
@@ -322,9 +328,11 @@
 				A10000000000000000000034 /* ChannelCardView.swift in Sources */,
 				A10000000000000000000035 /* ChannelGuideView.swift in Sources */,
 				A100000000000000000000E4 /* MovieBonusSection.swift in Sources */,
+				A100000000000000000000E6 /* ShowBonusSection.swift in Sources */,
 				A100000000000000000000E2 /* MatchReviewView.swift in Sources */,
 				A10000000000000000000036 /* ChannelGuideViewModel.swift in Sources */,
 				A100000000000000000000E3 /* MovieBonusViewModel.swift in Sources */,
+				A100000000000000000000E5 /* ShowBonusViewModel.swift in Sources */,
 				A100000000000000000000E1 /* MatchReviewViewModel.swift in Sources */,
 				A10000000000000000000038 /* ChannelSwitchOverlay.swift in Sources */,
 			);

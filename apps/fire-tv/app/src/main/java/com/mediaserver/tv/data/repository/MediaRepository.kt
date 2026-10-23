@@ -2,6 +2,7 @@ package com.mediaserver.tv.data.repository
 
 import com.mediaserver.tv.data.api.MediaServerApi
 import com.mediaserver.tv.data.models.ContinueWatchingItem
+import com.mediaserver.tv.data.models.Extra
 import com.mediaserver.tv.data.models.Media
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,5 +33,13 @@ class MediaRepository @Inject constructor(
 
     suspend fun triggerScan(): Result<Unit> = runCatching {
         api.triggerScan()
+    }
+
+    suspend fun getMovieExtras(mediaId: Long): Result<List<Extra>> = runCatching {
+        api.getMovieExtras(mediaId).items
+    }
+
+    suspend fun getShowExtras(showId: Long): Result<List<Extra>> = runCatching {
+        api.getShowExtras(showId).items
     }
 }

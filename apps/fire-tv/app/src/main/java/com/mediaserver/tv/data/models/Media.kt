@@ -37,7 +37,7 @@ data class Media(
     @SerialName("subtitle_tracks") val subtitleTracks: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null
-) {
+) : java.io.Serializable {
     val formattedDuration: String
         get() {
             val d = duration ?: return ""
@@ -93,3 +93,38 @@ data class ScanResponse(
     val message: String,
     val status: String
 )
+
+@Serializable
+data class Extra(
+    val id: Long,
+    val title: String,
+    val category: String,
+    val duration: Int? = null,
+    val resolution: String? = null,
+    @SerialName("file_size") val fileSize: Long? = null,
+    @SerialName("season_number") val seasonNumber: Int? = null,
+    @SerialName("episode_number") val episodeNumber: Int? = null
+) : java.io.Serializable {
+    val isCommentary: Boolean
+        get() = category == "commentary"
+
+    val formattedDuration: String
+        get() {
+            val d = duration ?: return ""
+            val hours = d / 3600
+            val minutes = (d % 3600) / 60
+            val seconds = d % 60
+            return when {
+                hours > 0 -> "${hours}h ${minutes}m"
+                minutes >= 10 -> "${minutes}m"
+                else -> "${minutes}m ${seconds}s"
+            }
+        }
+
+    val episodeLabel: String?
+        get() {
+            val s = seasonNumber ?: return null
+            val e = episodeNumber ?: return null
+            return "S%02dE%02d".format(s, e)
+        }
+}
