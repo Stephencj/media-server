@@ -385,28 +385,31 @@ class APIClient: ObservableObject {
 
     /// Get media items in a section
     func getSectionMedia(slug: String, limit: Int = 50, offset: Int = 0) async throws -> [Media] {
-        struct Response: Codable {
-            let items: [Media]
-            let total: Int
-            let limit: Int
-            let offset: Int
-        }
-
-        let response: Response = try await get("/api/sections/slug/\(slug)/media?limit=\(limit)&offset=\(offset)")
+        let response: SectionMediaResponse = try await get("/api/sections/slug/\(slug)/media?limit=\(limit)&offset=\(offset)")
         return response.items
     }
 
     /// Get media items in a section by ID
     func getSectionMediaById(id: Int64, limit: Int = 50, offset: Int = 0) async throws -> [Media] {
-        struct Response: Codable {
-            let items: [Media]
-            let total: Int
-            let limit: Int
-            let offset: Int
-        }
-
-        let response: Response = try await get("/api/sections/\(id)/media?limit=\(limit)&offset=\(offset)")
+        let response: SectionMediaResponse = try await get("/api/sections/\(id)/media?limit=\(limit)&offset=\(offset)")
         return response.items
+    }
+}
+
+// Response for section media with lenient decoding (items may be null from older servers)
+struct SectionMediaResponse: Codable {
+    let items: [Media]
+    let total: Int
+    let limit: Int
+    let offset: Int
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Decode items leniently: missing or null -> []
+        items = try container.decodeIfPresent([Media].self, forKey: .items) ?? []
+        total = try container.decode(Int.self, forKey: .total)
+        limit = try container.decode(Int.self, forKey: .limit)
+        offset = try container.decode(Int.self, forKey: .offset)
     }
 }
 
