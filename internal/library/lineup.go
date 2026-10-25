@@ -519,7 +519,10 @@ func lineupFilms(database *db.DB) ([]*db.Media, error) {
 			features = append(features, movie)
 		}
 	}
-	entries, _ := GroupMovieCopies(features)
+	entries, copies := GroupMovieCopies(features)
+	for i, entry := range entries {
+		entries[i] = StreamingCopy(entry, copies[entry.ID])
+	}
 	return entries, nil
 }
 
