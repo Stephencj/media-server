@@ -1,76 +1,89 @@
 import SwiftUI
 
-/// The part of a show's page for extras: commentary tracks (with episode
-/// labels) and bonus clips by kind. Shows nothing for a show that has none.
+/// Extras on a show's page, by kind, each kind folded away until opened:
+/// a show can have a few hundred. Shows nothing when there are none.
 struct ShowBonusSection: View {
-    @StateObject private var viewModel: ShowBonusViewModel
-    @State private var playing: Media?
-
-    init(showId: Int64) {
-        _viewModel = StateObject(wrappedValue: ShowBonusViewModel(showId: showId))
-    }
+    let title: String
+    let groups: [ShowExtraGroup]
+    let play: (ShowExtra) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            if !viewModel.commentaries.isEmpty {
-                section("Commentaries", note: "The episode with a different audio track") {
-                    ForEach(viewModel.commentaries) { extra in
-                        row(
-                            title: extra.title,
-                            detail: [extra.episodeLabel, extra.formattedDuration].compactMap { $0 }.joined(separator: " \u{00B7} ")
-                        ) {
-                            playing = extra.toMedia()
+        if !groups.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(title)
+                    .font(.headline)
+                VStack(spacing: 0) {
+                    ForEach(groups) { group in
+                        ShowBonusGroup(group: group, play: play)
+                        if group != groups.last {
+                            Divider().padding(.leading, 12)
                         }
                     }
                 }
+                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
 
-            ForEach(viewModel.groups) { group in
-                section(group.title, note: nil) {
-                    ForEach(group.extras) { extra in
-                        row(title: extra.title, detail: extra.formattedDuration) { playing = extra.toMedia() }
-                    }
+private struct ShowBonusGroup: View {
+    let group: ShowExtraGroup
+    let play: (ShowExtra) -> Void
+    @State private var open = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { open.toggle() }
+            } label: {
+                HStack {
+                    Text(group.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.primary)
+                    Text("\(group.extras.count)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                        .rotationEffect(.degrees(open ? 90 : 0))
+                }
+                .padding(.horizontal, 12)
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("extrasGroup-\(group.title)")
+
+            if open {
+                ForEach(group.extras) { extra in
+                    ShowBonusRow(extra: extra) { play(extra) }
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fullScreenCover(item: $playing) { media in
-            PlayerView(media: media)
-        }
-        .task { await viewModel.load() }
     }
+}
 
-    private func section<Rows: View>(_ title: String, note: String?, @ViewBuilder rows: () -> Rows) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.headline)
-            if let note {
-                Text(note)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            VStack(spacing: 0) {
-                rows()
-            }
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
-            .padding(.top, 4)
-        }
-    }
+struct ShowBonusRow: View {
+    let extra: ShowExtra
+    let action: () -> Void
 
-    private func row(title: String, detail: String, action: @escaping () -> Void) -> some View {
+    var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: "play.circle.fill")
                     .font(.title2)
                     .foregroundColor(.blue)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    Text(extra.displayTitle)
                         .font(.subheadline.weight(.medium))
                         .foregroundColor(.primary)
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    if !detail.isEmpty {
-                        Text(detail)
+                    if !extra.detail.isEmpty {
+                        Text(extra.detail)
                             .font(.caption.monospacedDigit())
                             .foregroundColor(.secondary)
                     }

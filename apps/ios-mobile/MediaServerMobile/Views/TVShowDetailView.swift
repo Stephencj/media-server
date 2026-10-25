@@ -5,11 +5,14 @@ struct TVShowDetailView: View {
     let show: Media
 
     @StateObject private var viewModel: TVShowDetailViewModel
+    @StateObject private var bonus: ShowBonusViewModel
     @State private var selectedEpisode: Episode?
+    @State private var playingExtra: Media?
 
     init(show: Media) {
         self.show = show
         _viewModel = StateObject(wrappedValue: TVShowDetailViewModel(showId: show.id))
+        _bonus = StateObject(wrappedValue: ShowBonusViewModel(showId: show.id))
     }
 
     var body: some View {
@@ -187,12 +190,37 @@ struct TVShowDetailView: View {
                         } else {
                             LazyVStack(spacing: 12) {
                                 ForEach(viewModel.currentEpisodes) { episode in
-                                    Button {
-                                        selectedEpisode = episode
-                                    } label: {
-                                        EpisodeRowContent(episode: episode)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Button {
+                                            selectedEpisode = episode
+                                        } label: {
+                                            EpisodeRowContent(episode: episode)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        // The episode again, talked over.
+                                        let tracks = bonus.commentaries(season: episode.seasonNumber, episode: episode.episodeNumber)
+                                        if !tracks.isEmpty {
+                                            HStack(spacing: 8) {
+                                                ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                                                    Button {
+                                                        playingExtra = track.toMedia()
+                                                    } label: {
+                                                        Label(tracks.count > 1 ? "Commentary \(index + 1)" : "Commentary",
+                                                              systemImage: "text.bubble")
+                                                            .font(.caption.weight(.semibold))
+                                                            .padding(.horizontal, 10)
+                                                            .padding(.vertical, 6)
+                                                            .background(Color.blue.opacity(0.15), in: Capsule())
+                                                    }
+                                                    .buttonStyle(.plain)
+                                                    .foregroundColor(.blue)
+                                                    .accessibilityIdentifier("commentary-\(episode.episodeCode)-\(index + 1)")
+                                                }
+                                            }
+                                            .padding(.leading, 152)
+                                        }
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                         }
@@ -204,8 +232,10 @@ struct TVShowDetailView: View {
                             .font(.caption)
                     }
 
-                    // Extras section
-                    ShowBonusSection(showId: show.id)
+                    // Extras: the chosen season's, then the whole show's.
+                    ShowBonusSection(title: "Season \(viewModel.selectedSeason) Extras",
+                                     groups: bonus.season(viewModel.selectedSeason)) { playingExtra = $0.toMedia() }
+                    ShowBonusSection(title: "Extras", groups: bonus.wholeShow) { playingExtra = $0.toMedia() }
                 }
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -218,8 +248,14 @@ struct TVShowDetailView: View {
                 startPosition: 0
             )
         }
+        .fullScreenCover(item: $playingExtra) { media in
+            PlayerView(media: media)
+        }
         .task {
             await viewModel.loadSeasons()
+        }
+        .task {
+            await bonus.load()
         }
     }
 
