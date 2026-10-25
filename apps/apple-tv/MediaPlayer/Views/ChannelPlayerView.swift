@@ -93,9 +93,10 @@ struct ChannelPlayerView: View {
                                         Text("Now: \(nowPlaying.title)")
                                             .font(.subheadline)
                                             .foregroundColor(.white.opacity(0.8))
+                                            .accessibilityIdentifier("nowPlaying")
                                     }
 
-                                    Label("Sleep Timer", systemImage: "arrow.right")
+                                    Text("Hold the center button for Live and the sleep timer")
                                         .font(.caption)
                                         .foregroundColor(.white.opacity(0.5))
                                         .padding(.top, 2)
@@ -130,27 +131,32 @@ struct ChannelPlayerView: View {
                             .background(Color.black.opacity(0.7))
                             .cornerRadius(12)
                         }
-                        .padding()
+                        .padding(.horizontal)
                     }
+
+                    ChannelTransportBar(viewModel: viewModel)
+                        .padding(.horizontal, 60)
+                        .padding(.bottom, 50)
                 }
             }
 
             // Armed sleep timer stays visible regardless of the info overlay.
-            if let countdown = viewModel.sleepCountdownText {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Label(countdown, systemImage: "moon.fill")
-                            .font(.callout.monospacedDigit().weight(.semibold))
-                            .foregroundColor(.orange)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 10)
-                            .background(Color.black.opacity(0.7), in: Capsule())
-                    }
-                    Spacer()
+            // So is how far behind live, once the bar has gone.
+            VStack(alignment: .trailing, spacing: 12) {
+                if let countdown = viewModel.sleepCountdownText {
+                    Label(countdown, systemImage: "moon.fill")
+                        .font(.callout.monospacedDigit().weight(.semibold))
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.7), in: Capsule())
                 }
-                .padding(40)
+                if !showOverlay {
+                    BehindLiveTag(viewModel: viewModel)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(40)
 
             // Channel banner: up the instant the channel changes.
             if showSwitchOverlay, let channel = currentChannel {
@@ -196,10 +202,20 @@ struct ChannelPlayerView: View {
             dismiss()
         }
         .onPlayPauseCommand {
-            // Toggle overlay visibility on play/pause button
-            showOverlay.toggle()
-            if showOverlay {
-                startOverlayTimer()
+            viewModel.togglePause()
+            revealControls()
+        }
+        // Holding the center button: Live and the sleep timer. A button in
+        // the auto-hiding bar would fight the focus engine for the remote.
+        .onLongPressGesture(minimumDuration: 0.6) {
+            showSleepOptions = true
+        }
+        .onTapGesture {
+            if showOverlay && !viewModel.timeshift.isPaused {
+                cancelOverlayTimer()
+                withAnimation { showOverlay = false }
+            } else {
+                revealControls()
             }
         }
         .onMoveCommand { direction in
@@ -208,13 +224,19 @@ struct ChannelPlayerView: View {
                 switchToNextChannel()
             case .down:
                 switchToPreviousChannel()
+            case .left:
+                viewModel.skip(forward: false)
+                revealControls()
             case .right:
-                // Left/right are otherwise unused here, and a focusable button
-                // in the auto-hiding overlay would fight the focus engine.
-                showSleepOptions = true
+                viewModel.skip(forward: true)
+                revealControls()
             default:
                 break
             }
+        }
+        .onChange(of: viewModel.timeshift.isPaused) { paused in
+            // The bar stays up for as long as the channel is paused.
+            if !paused { startOverlayTimer() }
         }
         .onChange(of: viewModel.sleepFireCount) { _ in
             // Playback is already paused; leave the player.
@@ -261,11 +283,24 @@ struct ChannelPlayerView: View {
         }
     }
 
+    /// The info and the bar, up for five seconds, or for as long as the
+    /// channel is paused.
+    private func revealControls() {
+        showSwitchOverlay = false
+        showOverlay = true
+        if viewModel.timeshift.isPaused {
+            cancelOverlayTimer()
+        } else {
+            startOverlayTimer()
+        }
+    }
+
     private func startOverlayTimer() {
         cancelOverlayTimer()
         overlayTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { _ in
-            withAnimation {
-                showOverlay = false
+            Task { @MainActor in
+                guard !viewModel.timeshift.isPaused else { return }
+                withAnimation { showOverlay = false }
             }
         }
     }
@@ -403,6 +438,18 @@ struct SleepTimerSheet: View {
 
     var body: some View {
         VStack(spacing: 28) {
+            if !viewModel.timeshift.isLive(at: Date()) {
+                Button {
+                    viewModel.jumpToLive()
+                    dismiss()
+                } label: {
+                    optionLabel("Jump to Live",
+                                detail: "\(ChannelTimeshift.clock(viewModel.timeshift.behind(at: Date()))) behind")
+                }
+                .frame(maxWidth: 620)
+                .accessibilityIdentifier("jumpToLive")
+            }
+
             VStack(spacing: 6) {
                 Text("Sleep Timer")
                     .font(.title2.weight(.semibold))
@@ -464,5 +511,111 @@ struct SleepTimerSheet: View {
         let f = DateFormatter()
         f.dateFormat = "h:mm a"
         return f.string(from: date)
+    }
+}
+
+/// The scrub line along the bottom, drawn like the movie player's: how far
+/// into the programme, how far the channel itself has got, and whether this
+/// is live or how far behind it.
+struct ChannelTransportBar: View {
+    @ObservedObject var viewModel: ChannelPlayerViewModel
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if let item = viewModel.nowPlaying, item.duration > 0 {
+                content(item: item, now: context.date)
+            }
+        }
+    }
+
+    private func content(item: ChannelScheduleItem, now: Date) -> some View {
+        let duration = Double(item.duration)
+        let position = viewModel.pendingSkipTarget ?? viewModel.position
+        let behind = viewModel.timeshift.behind(at: now)
+        // The channel's own place in this programme, as far as skipping
+        // forward can go.
+        let live = min(duration, viewModel.position + behind)
+        let isLive = viewModel.timeshift.isLive(at: now)
+
+        return VStack(spacing: 14) {
+            HStack {
+                Image(systemName: viewModel.timeshift.isPaused ? "pause.fill" : "play.fill")
+                    .font(.title3)
+                Spacer()
+                if isLive {
+                    Text("LIVE")
+                        .font(.callout.weight(.heavy))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(Color.red, in: Capsule())
+                        .accessibilityIdentifier("liveBadge")
+                } else {
+                    Text("\(ChannelTimeshift.clock(behind)) behind live")
+                        .font(.callout.weight(.semibold).monospacedDigit())
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.22), in: Capsule())
+                        .accessibilityIdentifier("behindBadge")
+                }
+            }
+
+            GeometryReader { geo in
+                let width = geo.size.width
+                let x = width * CGFloat(min(1, max(0, position / duration)))
+                let liveX = width * CGFloat(min(1, max(0, live / duration)))
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.25))
+                    Capsule().fill(Color.white.opacity(0.45)).frame(width: liveX)
+                    Capsule().fill(Color.white).frame(width: x)
+                    if !isLive {
+                        Rectangle().fill(Color.red).frame(width: 4, height: 18).offset(x: liveX - 2)
+                    }
+                    Circle().fill(Color.white).frame(width: 22, height: 22).offset(x: x - 11)
+                }
+                .frame(height: 10)
+                .frame(maxHeight: .infinity)
+            }
+            .frame(height: 22)
+
+            HStack {
+                Text(ChannelTimeshift.clock(position))
+                    .accessibilityIdentifier("elapsedTime")
+                Spacer()
+                Text("◀ 10s   ▶ 30s")
+                    .foregroundColor(.white.opacity(0.5))
+                Spacer()
+                Text("-\(ChannelTimeshift.clock(duration - position))")
+            }
+            .font(.callout.monospacedDigit())
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 36)
+        .padding(.vertical, 24)
+        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 20))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("transportBar")
+    }
+}
+
+/// How far behind live, in the corner, while the bar is down.
+struct BehindLiveTag: View {
+    @ObservedObject var viewModel: ChannelPlayerViewModel
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if viewModel.nowPlaying != nil, !viewModel.timeshift.isLive(at: context.date) {
+                let text = "\(ChannelTimeshift.clock(viewModel.timeshift.behind(at: context.date))) behind live"
+                Label(text,
+                      systemImage: viewModel.timeshift.isPaused ? "pause.fill" : "clock.arrow.circlepath")
+                    .font(.callout.monospacedDigit().weight(.semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(Color.black.opacity(0.7), in: Capsule())
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(text)
+                    .accessibilityIdentifier("behindTag")
+            }
+        }
     }
 }

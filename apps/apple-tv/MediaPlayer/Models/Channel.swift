@@ -210,6 +210,16 @@ struct GuideProgram: Codable, Identifiable, Hashable {
     }
 }
 
+extension GuideProgram {
+    /// The same programme as the channel player plays it.
+    var scheduleItem: ChannelScheduleItem {
+        ChannelScheduleItem(
+            id: id, mediaId: mediaId, mediaType: mediaType, title: title, duration: duration,
+            cumulativeStart: nil, posterPath: posterPath, backdropPath: backdropPath, showTitle: showTitle
+        )
+    }
+}
+
 struct ChannelGuideEntry: Codable, Identifiable, Hashable {
     let channel: Channel
     let programs: [GuideProgram]

@@ -14,8 +14,28 @@ class ChannelPlayerViewModel: ObservableObject {
     @Published var player: AVPlayer?
     @Published var isBuffering = false
 
+    // MARK: Pause and skip
+
+    /// How far behind live the viewer is. Tuning a channel always lands live.
+    @Published private(set) var timeshift = ChannelTimeshift()
+    /// Seconds into the programme on screen, kept up to date while it plays.
+    @Published private(set) var position: TimeInterval = 0
+    /// Where a run of skip presses will land, while they are still coming.
+    @Published private(set) var pendingSkipTarget: TimeInterval?
+
+    static let skipBack: TimeInterval = 10
+    static let skipForward: TimeInterval = 30
+    /// How long after the last skip press the skip is carried out, so that
+    /// several presses make one seek.
+    private let skipSettle: UInt64 = 600_000_000
+    private var pendingSkip: TimeInterval = 0
+    private var skipTask: Task<Void, Never>?
+
     private let api = APIClient.shared
     private var timeObserver: Any?
+    /// The player `timeObserver` is attached to: the player changes on a
+    /// flip to a standby channel.
+    private weak var observedPlayer: AVPlayer?
     private var cancellables = Set<AnyCancellable>()
     private var refreshTask: Task<Void, Never>?
     private var currentMediaId: Int64?
@@ -137,6 +157,9 @@ class ChannelPlayerViewModel: ObservableObject {
         tuneGeneration += 1
         let generation = tuneGeneration
         let neighbourIds = Set(neighbours.map(\.id))
+        cancelPendingSkip()
+        timeshift.goLive()
+        position = 0
 
         // Whatever is no longer one press away goes now, before anything
         // new is opened.
@@ -371,6 +394,17 @@ class ChannelPlayerViewModel: ObservableObject {
     private func setupObservers() {
         guard let player = player else { return }
 
+        if let observer = timeObserver, let observed = observedPlayer {
+            observed.removeTimeObserver(observer)
+        }
+        timeObserver = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main
+        ) { [weak self] time in
+            guard time.seconds.isFinite else { return }
+            MainActor.assumeIsolated { self?.position = time.seconds }
+        }
+        observedPlayer = player
+
         // Buffering state
         player.publisher(for: \.timeControlStatus)
             .receive(on: DispatchQueue.main)
@@ -453,6 +487,16 @@ class ChannelPlayerViewModel: ObservableObject {
     private func refreshUpNext() async {
         guard let channelId = channel?.id else { return }
 
+        // Behind live, what is up next is what follows the programme being
+        // watched, not what follows the one on air.
+        if !timeshift.isLive(at: Date()) {
+            if let entry = await guide(for: channelId, around: timeshift.watching(at: Date())),
+               let index = entry.programs.firstIndex(where: { $0.id == currentScheduleItemId && $0.isAiring(at: timeshift.watching(at: Date())) }) {
+                upNext = entry.programs[(index + 1)...].prefix(3).map(\.scheduleItem)
+            }
+            return
+        }
+
         if let response = try? await api.getChannelNowPlaying(channelId: channelId) {
             upNext = response.upNext
         }
@@ -476,6 +520,10 @@ class ChannelPlayerViewModel: ObservableObject {
     }
 
     func advanceToNextItem() {
+        if !timeshift.isLive(at: Date()) {
+            Task { await advanceBehindLive() }
+            return
+        }
         guard !upNext.isEmpty else {
             // Queue drained (end of cycle, or three programs since the last
             // top-up). Ask the server what should be on instead of stopping.
@@ -584,6 +632,125 @@ class ChannelPlayerViewModel: ObservableObject {
         player?.pause()
     }
 
+    // MARK: - Pause, skip and live
+
+    /// Play/Pause. Paused, the channel carries on without the viewer, who
+    /// picks up where they stopped and stays that far behind.
+    func togglePause() {
+        guard let player, nowPlaying != nil else { return }
+        let now = Date()
+        if timeshift.isPaused {
+            timeshift.resume(at: now)
+            player.play()
+        } else {
+            timeshift.pause(at: now)
+            player.pause()
+        }
+    }
+
+    /// Back ten seconds or on thirty. Presses in quick succession add up and
+    /// are carried out as one seek once they stop.
+    func skip(forward: Bool) {
+        guard let player, let item = nowPlaying else { return }
+        let now = Date()
+        let from = player.currentTime().seconds.isFinite ? player.currentTime().seconds : position
+        pendingSkip += forward ? Self.skipForward : -Self.skipBack
+        let target = ChannelTimeshift.clamp(from + pendingSkip, from: from,
+                                            duration: Double(item.duration), behind: timeshift.behind(at: now))
+        pendingSkip = target - from
+        pendingSkipTarget = target
+
+        skipTask?.cancel()
+        skipTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: self?.skipSettle ?? 0)
+            guard let self, !Task.isCancelled else { return }
+            self.commitSkip()
+        }
+    }
+
+    private func commitSkip() {
+        guard let player, let item = nowPlaying else { cancelPendingSkip(); return }
+        let from = player.currentTime().seconds.isFinite ? player.currentTime().seconds : position
+        let target = timeshift.skip(from: from, by: pendingSkip, duration: Double(item.duration), at: Date())
+        pendingSkip = 0
+        position = target
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600),
+                    toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
+            Task { @MainActor in self?.pendingSkipTarget = nil }
+        }
+    }
+
+    private func cancelPendingSkip() {
+        skipTask?.cancel()
+        skipTask = nil
+        pendingSkip = 0
+        pendingSkipTarget = nil
+    }
+
+    /// Catches up to what the channel is airing now.
+    func jumpToLive() {
+        guard let channelId = channel?.id else { return }
+        cancelPendingSkip()
+        Task {
+            guard let response = try? await api.getChannelNowPlaying(channelId: channelId),
+                  channel?.id == channelId else { return }
+            tunedIn[channelId] = TunedIn(response: response, fetchedAt: Date())
+            timeshift.goLive()
+            nowPlaying = response.nowPlaying
+            upNext = response.upNext
+            elapsed = response.elapsed
+            if let item = response.nowPlaying, item.id == currentScheduleItemId, let player {
+                // Same programme: just move up to where it has got to.
+                position = Double(response.elapsed)
+                player.seek(to: time(response.elapsed)) { _ in }
+                player.play()
+            } else if let item = response.nowPlaying {
+                setupPlayer(for: item, seekTo: response.elapsed, serverStreamUrl: response.streamUrl)
+            }
+        }
+    }
+
+    /// The guide for one channel over the hours around `date`.
+    private func guide(for channelId: Int64, around date: Date) async -> ChannelGuideEntry? {
+        let response = try? await api.getChannelGuide(start: date.addingTimeInterval(-3600), hours: 6)
+        return response?.channels.first { $0.channel.id == channelId }
+    }
+
+    /// The programme watched behind live has ended: the next one in the
+    /// schedule follows on from its start, still the same distance behind.
+    private func advanceBehindLive() async {
+        guard let channelId = channel?.id else { return }
+        let watching = timeshift.watching(at: Date())
+        guard let entry = await guide(for: channelId, around: watching), channel?.id == channelId else {
+            await refreshNowPlaying(force: true)
+            return
+        }
+        // The programme after the one that ended; by the clock if it can't
+        // be found, as when the file ran a little short of its listing.
+        guard let index = ChannelTimeshift.nextProgramme(
+            ids: entry.programs.map(\.id), starts: entry.programs.map(\.startTime),
+            ending: currentScheduleItemId, watching: watching
+        ) else {
+            await refreshNowPlaying(force: true)
+            return
+        }
+
+        let next = entry.programs[index]
+        // A file that ends early or late against its listing moves the
+        // viewer by the difference, so they start the next programme at its
+        // beginning.
+        let now = Date()
+        let behind = max(0, now.timeIntervalSince(next.startTime))
+        timeshift = ChannelTimeshift(behind: behind)
+        upNext = entry.programs[(index + 1)...].prefix(3).map(\.scheduleItem)
+        let item = next.scheduleItem
+        nowPlaying = item
+        elapsed = 0
+        position = 0
+        currentTunedIn = nil
+        setupPlayer(for: item, seekTo: 0)
+    }
+
     /// Stops what is playing but keeps the player, ready for the next item.
     /// Safe to call between programs.
     private func teardownPlayer() {
@@ -598,10 +765,12 @@ class ChannelPlayerViewModel: ObservableObject {
         standbyTask?.cancel()
         standbyTask = nil
         killStandby(except: [])
-        if let observer = timeObserver, let player = player {
-            player.removeTimeObserver(observer)
-            timeObserver = nil
+        cancelPendingSkip()
+        if let observer = timeObserver, let observed = observedPlayer {
+            observed.removeTimeObserver(observer)
         }
+        timeObserver = nil
+        observedPlayer = nil
         if let player { kill(player) }
         player = nil
         currentTunedIn = nil
