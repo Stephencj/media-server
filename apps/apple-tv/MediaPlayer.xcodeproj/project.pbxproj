@@ -46,6 +46,7 @@
 		A10000000000000000000036 /* ChannelGuideViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000036 /* ChannelGuideViewModel.swift */; };
 		A100000000000000000000E3 /* MovieBonusViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000E3 /* MovieBonusViewModel.swift */; };
 		A100000000000000000000E5 /* ShowBonusViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000E5 /* ShowBonusViewModel.swift */; };
+		A100000000000000000000F0 /* ShowExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000F0 /* ShowExtras.swift */; };
 		A100000000000000000000E6 /* ShowBonusSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000E6 /* ShowBonusSection.swift */; };
 		A100000000000000000000E1 /* MatchReviewViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000E1 /* MatchReviewViewModel.swift */; };
 		A10000000000000000000038 /* ChannelSwitchOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000038 /* ChannelSwitchOverlay.swift */; };
@@ -91,7 +92,8 @@
 		A200000000000000000000E2 /* MatchReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchReviewView.swift; sourceTree = "<group>"; };
 		A20000000000000000000036 /* ChannelGuideViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideViewModel.swift; sourceTree = "<group>"; };
 		A200000000000000000000E3 /* MovieBonusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieBonusViewModel.swift; sourceTree = "<group>"; };
-		A200000000000000000000E5 /* ShowBonusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowBonusViewModel.swift; sourceTree = "<group>"; };
+		A200000000000000000000E5 /* ShowBonusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ShowBonusViewModel.swift; path = ../shared/ShowBonusViewModel.swift; sourceTree = SOURCE_ROOT; };
+		A200000000000000000000F0 /* ShowExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ShowExtras.swift; path = ../shared/ShowExtras.swift; sourceTree = SOURCE_ROOT; };
 		A200000000000000000000E6 /* ShowBonusSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowBonusSection.swift; sourceTree = "<group>"; };
 		A200000000000000000000E1 /* MatchReviewViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchReviewViewModel.swift; sourceTree = "<group>"; };
 		A20000000000000000000038 /* ChannelSwitchOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelSwitchOverlay.swift; sourceTree = "<group>"; };
@@ -178,6 +180,7 @@
 				A20000000000000000000036 /* ChannelGuideViewModel.swift */,
 				A200000000000000000000E3 /* MovieBonusViewModel.swift */,
 				A200000000000000000000E5 /* ShowBonusViewModel.swift */,
+				A200000000000000000000F0 /* ShowExtras.swift */,
 				A200000000000000000000E1 /* MatchReviewViewModel.swift */,
 			);
 			path = ViewModels;
@@ -333,6 +336,7 @@
 				A10000000000000000000036 /* ChannelGuideViewModel.swift in Sources */,
 				A100000000000000000000E3 /* MovieBonusViewModel.swift in Sources */,
 				A100000000000000000000E5 /* ShowBonusViewModel.swift in Sources */,
+				A100000000000000000000F0 /* ShowExtras.swift in Sources */,
 				A100000000000000000000E1 /* MatchReviewViewModel.swift in Sources */,
 				A10000000000000000000038 /* ChannelSwitchOverlay.swift in Sources */,
 			);

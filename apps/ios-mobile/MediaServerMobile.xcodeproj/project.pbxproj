@@ -73,7 +73,7 @@
 		A20000000000000000000030 /* ChannelViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelViewModel.swift; sourceTree = "<group>"; };
 		A20000000000000000000031 /* ChannelGuideViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelGuideViewModel.swift; sourceTree = "<group>"; };
 		A200000000000000000000E3 /* MovieBonusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieBonusViewModel.swift; sourceTree = "<group>"; };
-		A200000000000000000000E5 /* ShowBonusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowBonusViewModel.swift; sourceTree = "<group>"; };
+		A200000000000000000000E5 /* ShowBonusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ShowBonusViewModel.swift; path = ../shared/ShowBonusViewModel.swift; sourceTree = SOURCE_ROOT; };
 		A200000000000000000000F0 /* ShowExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ShowExtras.swift; path = ../shared/ShowExtras.swift; sourceTree = SOURCE_ROOT; };
 		A200000000000000000000E6 /* ShowBonusSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowBonusSection.swift; sourceTree = "<group>"; };
 		A200000000000000000000E1 /* MatchReviewViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchReviewViewModel.swift; sourceTree = "<group>"; };

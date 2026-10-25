@@ -1,7 +1,8 @@
 import Foundation
 
-// ShowExtra, ShowExtraGroup and the rules for laying them out are in
-// apps/shared/ShowExtras.swift, shared with the Apple TV app.
+// Loading a show's extras for its page, built into both the iPhone and
+// Apple TV apps, which have the same APIClient and Media. The rules for
+// laying extras out are in ShowExtras.swift beside this.
 
 extension ShowExtra {
     /// The player takes a `Media`; an extra plays as one of type `.extra`.

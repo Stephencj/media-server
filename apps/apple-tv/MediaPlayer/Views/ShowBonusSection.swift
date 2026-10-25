@@ -1,80 +1,62 @@
 import SwiftUI
 
-/// The part of a show's page for extras: commentary tracks (with episode
-/// labels) and bonus clips by kind. Shows nothing for a show that has none.
+/// Extras on a show's page: a heading, then one shelf of cards per kind,
+/// each scrolling sideways so a show with hundreds of extras doesn't push
+/// the rest of the page out of reach. Shows nothing when there are none.
 struct ShowBonusSection: View {
-    @StateObject private var viewModel: ShowBonusViewModel
-    @State private var playing: Media?
-
-    init(showId: Int64) {
-        _viewModel = StateObject(wrappedValue: ShowBonusViewModel(showId: showId))
-    }
+    let title: String
+    let groups: [ShowExtraGroup]
+    let play: (ShowExtra) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 36) {
-            if !viewModel.commentaries.isEmpty {
-                shelf("Commentaries", note: "The episode with a different audio track") {
-                    ForEach(viewModel.commentaries) { extra in
-                        card(
-                            title: extra.title,
-                            detail: [extra.episodeLabel, extra.formattedDuration].compactMap { $0 }.joined(separator: " \u{00B7} ")
-                        ) {
-                            playing = extra.toMedia()
-                        }
-                    }
+        if !groups.isEmpty {
+            VStack(alignment: .leading, spacing: 24) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                ForEach(groups) { group in
+                    shelf(group)
                 }
             }
-
-            ForEach(viewModel.groups) { group in
-                shelf(group.title, note: nil) {
-                    ForEach(group.extras) { extra in
-                        card(title: extra.title, detail: extra.formattedDuration) { playing = extra.toMedia() }
-                    }
-                }
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 30)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fullScreenCover(item: $playing) { media in
-            PlayerView(media: media)
-        }
-        .task { await viewModel.load() }
     }
 
-    /// One row of cards that scrolls sideways, so a show with many extras
-    /// doesn't push the rest of the page out of reach.
-    private func shelf<Cards: View>(_ title: String, note: String?, @ViewBuilder cards: () -> Cards) -> some View {
+    private func shelf(_ group: ShowExtraGroup) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                Text(title)
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(group.title)
                     .font(.headline)
-                if let note {
-                    Text(note)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                Text("\(group.extras.count)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary)
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 30) {
-                    cards()
+                LazyHStack(spacing: 30) {
+                    ForEach(group.extras) { extra in
+                        card(extra)
+                    }
                 }
                 .padding(.vertical, 20)
                 .padding(.horizontal, 4)
             }
             .focusSection()
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("extrasShelf-\(group.title)")
     }
 
-    private func card(title: String, detail: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func card(_ extra: ShowExtra) -> some View {
+        Button { play(extra) } label: {
             VStack(alignment: .leading, spacing: 8) {
                 Image(systemName: "play.circle.fill")
                     .font(.title2)
-                Text(title)
+                Text(extra.displayTitle)
                     .font(.callout.weight(.medium))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                if !detail.isEmpty {
-                    Text(detail)
+                if !extra.detail.isEmpty {
+                    Text(extra.detail)
                         .font(.caption)
                         .monospacedDigit()
                         .foregroundColor(.secondary)

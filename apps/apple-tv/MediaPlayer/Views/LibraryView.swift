@@ -9,6 +9,7 @@ struct LibraryView: View {
     // grid instead of the Sort menu in the toolbar.
     @FocusState private var focusedMediaID: Int64?
     @State private var showMatchReview = false
+    @State private var path: [Media] = []
 
     init(mediaType: MediaType) {
         self.mediaType = mediaType
@@ -20,7 +21,7 @@ struct LibraryView: View {
     ]
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 if viewModel.items.isEmpty && !viewModel.isLoading {
                     ContentUnavailableView(
@@ -93,6 +94,14 @@ struct LibraryView: View {
         }
         .task {
             await viewModel.loadItems()
+            #if DEBUG
+            // UI tests start on a title's page: -open-title <title>.
+            let args = ProcessInfo.processInfo.arguments
+            if let i = args.firstIndex(of: "-open-title"), i + 1 < args.count, path.isEmpty,
+               let media = viewModel.items.first(where: { $0.title == args[i + 1] }) {
+                path = [media]
+            }
+            #endif
         }
         .refreshable {
             await viewModel.loadItems()

@@ -2,7 +2,18 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var appState: AppState
-    @State private var selectedTab = 4
+    @State private var selectedTab = MainTabView.firstTab
+
+    /// Channels, or for UI tests the tab given by -tab <n>.
+    private static var firstTab: Int {
+        #if DEBUG
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "-tab"), i + 1 < args.count, let tab = Int(args[i + 1]) {
+            return tab
+        }
+        #endif
+        return 4
+    }
 
     var body: some View {
         ZStack {
