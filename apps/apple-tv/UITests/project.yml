@@ -6,18 +6,18 @@ options:
   deploymentTarget:
     tvOS: "17.0"
 targets:
-  ChannelControlsUITests:
+  MediaPlayerUITests:
     type: bundle.ui-testing
     platform: tvOS
-    sources: [ChannelControlsUITests]
+    sources: [MediaPlayerUITests]
     settings:
       DEVELOPMENT_TEAM: PJV7U329Q6
       PRODUCT_BUNDLE_IDENTIFIER: com.mediaserver.tv.uitests
       GENERATE_INFOPLIST_FILE: YES
 schemes:
-  ChannelControlsUITests:
+  MediaPlayerUITests:
     build:
       targets:
-        ChannelControlsUITests: [test]
+        MediaPlayerUITests: [test]
     test:
-      targets: [ChannelControlsUITests]
+      targets: [MediaPlayerUITests]

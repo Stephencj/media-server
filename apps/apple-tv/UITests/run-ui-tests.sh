@@ -10,6 +10,6 @@ xcodebuild -quiet -project "$here/../MediaPlayer.xcodeproj" -scheme MediaPlayer 
 	-destination "platform=tvOS Simulator,id=$SIM" -derivedDataPath "$DD/app" build
 xcrun simctl install "$SIM" "$DD/app/Build/Products/Debug-appletvsimulator/MediaPlayer.app"
 (cd "$here" && xcodegen -q)
-xcodebuild -project "$here/MediaPlayerUITests.xcodeproj" -scheme ChannelControlsUITests \
+xcodebuild -project "$here/MediaPlayerUITests.xcodeproj" -scheme MediaPlayerUITests \
 	-destination "platform=tvOS Simulator,id=$SIM" -derivedDataPath "$DD/tests" test "$@" 2>&1 \
 	| grep -E "Test Case|error|failed|passed|XCTAssert|TEST (SUCCEEDED|FAILED)"
