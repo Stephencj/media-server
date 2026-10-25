@@ -1,0 +1,23 @@
+# UI tests for the Apple TV app, kept in their own project so the app's
+# hand-kept MediaPlayer.xcodeproj stays as it is. They drive the installed app
+# (com.mediaserver.tv) by bundle id. Run with ./run-ui-tests.sh.
+name: MediaPlayerUITests
+options:
+  deploymentTarget:
+    tvOS: "17.0"
+targets:
+  ChannelControlsUITests:
+    type: bundle.ui-testing
+    platform: tvOS
+    sources: [ChannelControlsUITests]
+    settings:
+      DEVELOPMENT_TEAM: PJV7U329Q6
+      PRODUCT_BUNDLE_IDENTIFIER: com.mediaserver.tv.uitests
+      GENERATE_INFOPLIST_FILE: YES
+schemes:
+  ChannelControlsUITests:
+    build:
+      targets:
+        ChannelControlsUITests: [test]
+    test:
+      targets: [ChannelControlsUITests]

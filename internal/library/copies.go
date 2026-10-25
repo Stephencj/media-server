@@ -78,3 +78,42 @@ func MovieCopies(movies []*db.Media, mediaID int64) []*db.Media {
 	}
 	return nil
 }
+
+// StreamingCopy returns which of a film's files a channel should play: the
+// entry, unless another copy is the same cut (within a minute of its length)
+// at no lower a resolution and is smaller. A channel streams the whole film
+// at once over the house's network, so the same picture in fewer bits is the
+// better one there, while browsing still leads with the fullest file.
+func StreamingCopy(entry *db.Media, copies []*db.Media) *db.Media {
+	best := entry
+	for _, other := range copies {
+		if abs(other.Duration-entry.Duration) > 60 || width(other.Resolution) < width(entry.Resolution) {
+			continue
+		}
+		if other.FileSize > 0 && other.FileSize < best.FileSize {
+			best = other
+		}
+	}
+	if best == entry {
+		return entry
+	}
+	chosen := *best
+	chosen.CopyCount = entry.CopyCount
+	return &chosen
+}
+
+func abs(n int) int {
+	if n < 0 {
+		return -n
+	}
+	return n
+}
+
+// width is the first number of a "1920x1080" resolution, or 0.
+func width(resolution string) int {
+	var w, h int
+	if _, err := fmt.Sscanf(resolution, "%dx%d", &w, &h); err != nil {
+		return 0
+	}
+	return w
+}

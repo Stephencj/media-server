@@ -15,6 +15,12 @@ struct ChannelGuideView: View {
     @FocusState private var focusedAiring: String?
     @State private var focused: (channel: Channel, program: GuideProgram)?
 
+    /// The time being browsed: nil while looking at what is on now, or the
+    /// start of the programme moved along to. Moving up or down keeps to it,
+    /// so the next row is entered at the same point in the evening and not
+    /// wherever happens to sit underneath.
+    @State private var browseTime: Date?
+
     // Geometry. 30 minutes reads as 300pt, wide enough that a sitcom slot is
     // still legible at ten feet.
     private let pointsPerMinute: CGFloat = 10
@@ -210,6 +216,22 @@ struct ChannelGuideView: View {
             }
         }
         .frame(height: rowHeight, alignment: .leading)
+        // Each row is entered as a whole, at the programme `landing` picks.
+        // Left to itself the focus engine goes to whichever block is nearest
+        // on screen, and since blocks are as wide as programmes are long that
+        // is as likely to be next up as what is on.
+        .focusSection()
+        .defaultFocus($focusedAiring, landing(in: entry)?.airingId, priority: .userInitiated)
+    }
+
+    /// Where focus lands on entering a channel's row: what it is airing at
+    /// the time being browsed, which is now unless the viewer has moved along
+    /// the schedule.
+    private func landing(in entry: ChannelGuideEntry) -> GuideProgram? {
+        if let browseTime, let program = entry.program(airingAt: browseTime) {
+            return program
+        }
+        return entry.program(airingAt: viewModel.now) ?? entry.programs.first
     }
 
     private var laneWidth: CGFloat {
@@ -255,6 +277,13 @@ struct ChannelGuideView: View {
         .focused($focusedAiring, equals: program.airingId)
         .onChange(of: focusedAiring) { newValue in
             if newValue == program.airingId {
+                // Only a move along a row changes the time being browsed.
+                // A move between rows arrives at that time and must not
+                // reset it to wherever the new programme happens to start,
+                // or each row down would drift a little earlier.
+                if focused == nil || focused?.channel.id == entry.channel.id {
+                    browseTime = program.isAiring(at: viewModel.now) ? nil : program.startTime
+                }
                 focused = (entry.channel, program)
             }
         }

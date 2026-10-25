@@ -13,7 +13,10 @@ struct ChannelPlayerView: View {
     @State private var overlayTimer: Timer?
     @State private var showSwitchOverlay = false
     @State private var showSleepOptions = false
-    @State private var switchDirection: ChannelSwitchDirection = .up
+    /// Counts channel changes, so only the latest one's timer takes the
+    /// banner down.
+    @State private var bannerToken = 0
+    @State private var showSpinner = false
 
     init(channels: [Channel], startIndex: Int) {
         self.channels = channels
@@ -28,16 +31,18 @@ struct ChannelPlayerView: View {
 
     var body: some View {
         ZStack {
-            // Video Player
+            Color.black.ignoresSafeArea()
+
+            // The picture and nothing else. Channels are live television:
+            // there is no scrubbing, so AVKit's transport bar and its
+            // chapters panel have no business appearing on a channel change.
             if let player = viewModel.player {
-                AVPlayerView(player: player)
+                ChannelVideoSurface(player: player)
                     .ignoresSafeArea()
-            } else {
-                Color.black.ignoresSafeArea()
             }
 
-            // Loading indicator
-            if viewModel.isBuffering || viewModel.isLoading {
+            // Only once a channel is taking long enough to wonder about.
+            if showSpinner {
                 ProgressView()
                     .scaleEffect(2)
             }
@@ -88,9 +93,10 @@ struct ChannelPlayerView: View {
                                         Text("Now: \(nowPlaying.title)")
                                             .font(.subheadline)
                                             .foregroundColor(.white.opacity(0.8))
+                                            .accessibilityIdentifier("nowPlaying")
                                     }
 
-                                    Label("Sleep Timer", systemImage: "arrow.right")
+                                    Text("Hold the center button for Live and the sleep timer")
                                         .font(.caption)
                                         .foregroundColor(.white.opacity(0.5))
                                         .padding(.top, 2)
@@ -125,41 +131,54 @@ struct ChannelPlayerView: View {
                             .background(Color.black.opacity(0.7))
                             .cornerRadius(12)
                         }
-                        .padding()
+                        .padding(.horizontal)
                     }
+
+                    ChannelTransportBar(viewModel: viewModel)
+                        .padding(.horizontal, 60)
+                        .padding(.bottom, 50)
                 }
             }
 
             // Armed sleep timer stays visible regardless of the info overlay.
-            if let countdown = viewModel.sleepCountdownText {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Label(countdown, systemImage: "moon.fill")
-                            .font(.callout.monospacedDigit().weight(.semibold))
-                            .foregroundColor(.orange)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 10)
-                            .background(Color.black.opacity(0.7), in: Capsule())
-                    }
-                    Spacer()
+            // So is how far behind live, once the bar has gone.
+            VStack(alignment: .trailing, spacing: 12) {
+                if let countdown = viewModel.sleepCountdownText {
+                    Label(countdown, systemImage: "moon.fill")
+                        .font(.callout.monospacedDigit().weight(.semibold))
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.7), in: Capsule())
                 }
-                .padding(40)
+                if !showOverlay {
+                    BehindLiveTag(viewModel: viewModel)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(40)
 
-            // Channel Switch Overlay
+            // Channel banner: up the instant the channel changes.
             if showSwitchOverlay, let channel = currentChannel {
                 VStack {
                     Spacer()
-                    ChannelSwitchOverlay(
-                        channel: channel,
-                        nowPlaying: viewModel.nowPlaying,
-                        direction: switchDirection
-                    )
-                    Spacer()
+                    HStack {
+                        ChannelBanner(channel: channel, nowPlaying: viewModel.nowPlaying)
+                        Spacer()
+                    }
                 }
+                .padding(60)
                 .transition(.opacity)
             }
+        }
+        // With no AVKit controller inside, something has to hold focus for
+        // the remote's presses to arrive.
+        .focusable()
+        .task(id: viewModel.isLoading || viewModel.isBuffering) {
+            showSpinner = false
+            guard viewModel.isLoading || viewModel.isBuffering else { return }
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            if !Task.isCancelled { showSpinner = true }
         }
         .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
             // Check if this notification is for our current player
@@ -170,7 +189,7 @@ struct ChannelPlayerView: View {
         }
         .task {
             if let channel = currentChannel {
-                await viewModel.loadChannel(channelId: channel.id)
+                viewModel.tune(to: channel, neighbours: neighbours(of: currentIndex), immediately: true)
             }
             startOverlayTimer()
         }
@@ -183,10 +202,20 @@ struct ChannelPlayerView: View {
             dismiss()
         }
         .onPlayPauseCommand {
-            // Toggle overlay visibility on play/pause button
-            showOverlay.toggle()
-            if showOverlay {
-                startOverlayTimer()
+            viewModel.togglePause()
+            revealControls()
+        }
+        // Holding the center button: Live and the sleep timer. A button in
+        // the auto-hiding bar would fight the focus engine for the remote.
+        .onLongPressGesture(minimumDuration: 0.6) {
+            showSleepOptions = true
+        }
+        .onTapGesture {
+            if showOverlay && !viewModel.timeshift.isPaused {
+                cancelOverlayTimer()
+                withAnimation { showOverlay = false }
+            } else {
+                revealControls()
             }
         }
         .onMoveCommand { direction in
@@ -195,13 +224,19 @@ struct ChannelPlayerView: View {
                 switchToNextChannel()
             case .down:
                 switchToPreviousChannel()
+            case .left:
+                viewModel.skip(forward: false)
+                revealControls()
             case .right:
-                // Left/right are otherwise unused here, and a focusable button
-                // in the auto-hiding overlay would fight the focus engine.
-                showSleepOptions = true
+                viewModel.skip(forward: true)
+                revealControls()
             default:
                 break
             }
+        }
+        .onChange(of: viewModel.timeshift.isPaused) { paused in
+            // The bar stays up for as long as the channel is paused.
+            if !paused { startOverlayTimer() }
         }
         .onChange(of: viewModel.sleepFireCount) { _ in
             // Playback is already paused; leave the player.
@@ -214,43 +249,58 @@ struct ChannelPlayerView: View {
 
     private func switchToNextChannel() {
         guard channels.count > 1 else { return }
-
-        let newIndex = (currentIndex + 1) % channels.count
-        switchToChannel(at: newIndex, direction: .up)
+        switchToChannel(at: (currentIndex + 1) % channels.count)
     }
 
     private func switchToPreviousChannel() {
         guard channels.count > 1 else { return }
-
-        let newIndex = currentIndex == 0 ? channels.count - 1 : currentIndex - 1
-        switchToChannel(at: newIndex, direction: .down)
+        switchToChannel(at: currentIndex == 0 ? channels.count - 1 : currentIndex - 1)
     }
 
-    private func switchToChannel(at index: Int, direction: ChannelSwitchDirection) {
+    /// The channels one press away in either direction.
+    private func neighbours(of index: Int) -> [Channel] {
+        guard channels.count > 1 else { return [] }
+        let next = (index + 1) % channels.count
+        let previous = (index - 1 + channels.count) % channels.count
+        return next == previous ? [channels[next]] : [channels[next], channels[previous]]
+    }
+
+    private func switchToChannel(at index: Int) {
         currentIndex = index
-        switchDirection = direction
 
-        withAnimation {
-            showSwitchOverlay = true
-        }
+        // Banner and cut first, with no animation to wait through; the
+        // picture follows as soon as it can.
+        showOverlay = false
+        showSwitchOverlay = true
+        viewModel.tune(to: channels[index], neighbours: neighbours(of: index))
 
+        bannerToken += 1
+        let token = bannerToken
         Task {
-            await viewModel.switchToChannel(channelId: channels[index].id)
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            guard token == bannerToken else { return }
+            withAnimation { showSwitchOverlay = false }
         }
+    }
 
-        // Auto-dismiss switch overlay after 2 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation {
-                showSwitchOverlay = false
-            }
+    /// The info and the bar, up for five seconds, or for as long as the
+    /// channel is paused.
+    private func revealControls() {
+        showSwitchOverlay = false
+        showOverlay = true
+        if viewModel.timeshift.isPaused {
+            cancelOverlayTimer()
+        } else {
+            startOverlayTimer()
         }
     }
 
     private func startOverlayTimer() {
         cancelOverlayTimer()
         overlayTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { _ in
-            withAnimation {
-                showOverlay = false
+            Task { @MainActor in
+                guard !viewModel.timeshift.isPaused else { return }
+                withAnimation { showOverlay = false }
             }
         }
     }
@@ -259,6 +309,71 @@ struct ChannelPlayerView: View {
         overlayTimer?.invalidate()
         overlayTimer = nil
     }
+}
+
+/// The strip a television shows on a channel change: number, name, and what
+/// is on, at the bottom of the screen where it doesn't cover the picture.
+private struct ChannelBanner: View {
+    let channel: Channel
+    let nowPlaying: ChannelScheduleItem?
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 28) {
+            Text("\(channel.displayNumber)")
+                .font(.system(size: 64, weight: .bold, design: .rounded))
+                .monospacedDigit()
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
+                    Text(channel.icon)
+                    Text(channel.name)
+                        .fontWeight(.semibold)
+                }
+                .font(.title3)
+
+                Text(programme)
+                    .font(.headline)
+                    .foregroundColor(.white.opacity(0.75))
+                    .lineLimit(1)
+            }
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 36)
+        .padding(.vertical, 24)
+        .background(Color.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var programme: String {
+        guard let nowPlaying else { return " " }
+        if let showTitle = nowPlaying.showTitle, !showTitle.isEmpty {
+            return "\(showTitle) · \(nowPlaying.title)"
+        }
+        return nowPlaying.title
+    }
+}
+
+/// A bare video layer: the player's picture with none of AVKit's interface.
+struct ChannelVideoSurface: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> PlayerLayerView {
+        let view = PlayerLayerView()
+        view.backgroundColor = .black
+        view.playerLayer.videoGravity = .resizeAspect
+        view.playerLayer.player = player
+        return view
+    }
+
+    func updateUIView(_ view: PlayerLayerView, context: Context) {
+        if view.playerLayer.player !== player {
+            view.playerLayer.player = player
+        }
+    }
+}
+
+final class PlayerLayerView: UIView {
+    override class var layerClass: AnyClass { AVPlayerLayer.self }
+    var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 }
 
 struct UpNextItemRow: View {
@@ -323,6 +438,18 @@ struct SleepTimerSheet: View {
 
     var body: some View {
         VStack(spacing: 28) {
+            if !viewModel.timeshift.isLive(at: Date()) {
+                Button {
+                    viewModel.jumpToLive()
+                    dismiss()
+                } label: {
+                    optionLabel("Jump to Live",
+                                detail: "\(ChannelTimeshift.clock(viewModel.timeshift.behind(at: Date()))) behind")
+                }
+                .frame(maxWidth: 620)
+                .accessibilityIdentifier("jumpToLive")
+            }
+
             VStack(spacing: 6) {
                 Text("Sleep Timer")
                     .font(.title2.weight(.semibold))
@@ -384,5 +511,111 @@ struct SleepTimerSheet: View {
         let f = DateFormatter()
         f.dateFormat = "h:mm a"
         return f.string(from: date)
+    }
+}
+
+/// The scrub line along the bottom, drawn like the movie player's: how far
+/// into the programme, how far the channel itself has got, and whether this
+/// is live or how far behind it.
+struct ChannelTransportBar: View {
+    @ObservedObject var viewModel: ChannelPlayerViewModel
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if let item = viewModel.nowPlaying, item.duration > 0 {
+                content(item: item, now: context.date)
+            }
+        }
+    }
+
+    private func content(item: ChannelScheduleItem, now: Date) -> some View {
+        let duration = Double(item.duration)
+        let position = viewModel.pendingSkipTarget ?? viewModel.position
+        let behind = viewModel.timeshift.behind(at: now)
+        // The channel's own place in this programme, as far as skipping
+        // forward can go.
+        let live = min(duration, viewModel.position + behind)
+        let isLive = viewModel.timeshift.isLive(at: now)
+
+        return VStack(spacing: 14) {
+            HStack {
+                Image(systemName: viewModel.timeshift.isPaused ? "pause.fill" : "play.fill")
+                    .font(.title3)
+                Spacer()
+                if isLive {
+                    Text("LIVE")
+                        .font(.callout.weight(.heavy))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(Color.red, in: Capsule())
+                        .accessibilityIdentifier("liveBadge")
+                } else {
+                    Text("\(ChannelTimeshift.clock(behind)) behind live")
+                        .font(.callout.weight(.semibold).monospacedDigit())
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.22), in: Capsule())
+                        .accessibilityIdentifier("behindBadge")
+                }
+            }
+
+            GeometryReader { geo in
+                let width = geo.size.width
+                let x = width * CGFloat(min(1, max(0, position / duration)))
+                let liveX = width * CGFloat(min(1, max(0, live / duration)))
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.25))
+                    Capsule().fill(Color.white.opacity(0.45)).frame(width: liveX)
+                    Capsule().fill(Color.white).frame(width: x)
+                    if !isLive {
+                        Rectangle().fill(Color.red).frame(width: 4, height: 18).offset(x: liveX - 2)
+                    }
+                    Circle().fill(Color.white).frame(width: 22, height: 22).offset(x: x - 11)
+                }
+                .frame(height: 10)
+                .frame(maxHeight: .infinity)
+            }
+            .frame(height: 22)
+
+            HStack {
+                Text(ChannelTimeshift.clock(position))
+                    .accessibilityIdentifier("elapsedTime")
+                Spacer()
+                Text("◀ 10s   ▶ 30s")
+                    .foregroundColor(.white.opacity(0.5))
+                Spacer()
+                Text("-\(ChannelTimeshift.clock(duration - position))")
+            }
+            .font(.callout.monospacedDigit())
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 36)
+        .padding(.vertical, 24)
+        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 20))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("transportBar")
+    }
+}
+
+/// How far behind live, in the corner, while the bar is down.
+struct BehindLiveTag: View {
+    @ObservedObject var viewModel: ChannelPlayerViewModel
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            if viewModel.nowPlaying != nil, !viewModel.timeshift.isLive(at: context.date) {
+                let text = "\(ChannelTimeshift.clock(viewModel.timeshift.behind(at: context.date))) behind live"
+                Label(text,
+                      systemImage: viewModel.timeshift.isPaused ? "pause.fill" : "clock.arrow.circlepath")
+                    .font(.callout.monospacedDigit().weight(.semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
+                    .background(Color.black.opacity(0.7), in: Capsule())
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(text)
+                    .accessibilityIdentifier("behindTag")
+            }
+        }
     }
 }

@@ -72,6 +72,15 @@ struct ChannelListView: View {
             }
             .task {
                 await viewModel.loadChannels()
+                #if DEBUG
+                // UI tests start on a channel: -open-channel <position in the list>.
+                let args = ProcessInfo.processInfo.arguments
+                if let i = args.firstIndex(of: "-open-channel"), i + 1 < args.count,
+                   let index = Int(args[i + 1]), viewModel.channels.indices.contains(index),
+                   selectedChannelIndex == nil {
+                    selectedChannelIndex = index
+                }
+                #endif
             }
             .refreshable {
                 await viewModel.loadChannels()

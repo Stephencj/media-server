@@ -51,6 +51,8 @@
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Automatic</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Connects straight to your media server when you are at home, which is much faster than going through the internet.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
