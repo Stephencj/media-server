@@ -1099,8 +1099,8 @@ func (db *DB) SearchTVShowsFuzzy(query string, limit int) ([]*TVShow, error) {
 			(SELECT COUNT(DISTINCT season_number) FROM episodes WHERE tv_show_id = t.id) as season_count,
 			(SELECT COUNT(*) FROM episodes WHERE tv_show_id = t.id) as episode_count
 		 FROM tv_shows t
-		 WHERE ? LIKE '%' || t.title || '%' COLLATE NOCASE
-		    OR ? LIKE '%' || t.original_title || '%' COLLATE NOCASE
+		 WHERE (coalesce(t.title, '') <> '' AND ? LIKE '%' || t.title || '%' COLLATE NOCASE)
+		    OR (coalesce(t.original_title, '') <> '' AND ? LIKE '%' || t.original_title || '%' COLLATE NOCASE)
 		 ORDER BY LENGTH(t.title) DESC
 		 LIMIT ?`,
 		query, query, limit,
@@ -1139,8 +1139,8 @@ func (db *DB) SearchMediaFuzzy(query string, mediaType MediaType, limit int) ([]
 			file_path, file_size, duration, video_codec, audio_codec, resolution, audio_tracks,
 			subtitle_tracks, created_at, updated_at
 		 FROM media
-		 WHERE type = ? AND (? LIKE '%' || title || '%' COLLATE NOCASE
-		    OR ? LIKE '%' || original_title || '%' COLLATE NOCASE)
+		 WHERE type = ? AND ((coalesce(title, '') <> '' AND ? LIKE '%' || title || '%' COLLATE NOCASE)
+		    OR (coalesce(original_title, '') <> '' AND ? LIKE '%' || original_title || '%' COLLATE NOCASE))
 		 ORDER BY LENGTH(title) DESC LIMIT ?`,
 		mediaType, query, query, limit,
 	)
@@ -1420,6 +1420,17 @@ func (db *DB) CreateExtra(extra *Extra) (*Extra, error) {
 
 	id, _ := result.LastInsertId()
 	return db.GetExtraByID(id)
+}
+
+// SetExtraParent records what an extra belongs to: a film, or a show and
+// perhaps one of its episodes.
+func (db *DB) SetExtraParent(extra *Extra) error {
+	_, err := db.conn.Exec(
+		`UPDATE extras SET movie_id = ?, tv_show_id = ?, episode_id = ?, season_number = ?, episode_number = ?,
+			updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+		extra.MovieID, extra.TVShowID, extra.EpisodeID, extra.SeasonNumber, extra.EpisodeNumber, extra.ID,
+	)
+	return err
 }
 
 // GetExtraByID retrieves an extra by ID

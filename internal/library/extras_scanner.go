@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/stephencjuliano/media-server/internal/db"
 )
@@ -71,9 +72,17 @@ func (s *Scanner) ScanExtrasSource(source *db.MediaSource) error {
 
 // processExtraFile processes a single extras file
 func (s *Scanner) processExtraFile(filePath string, source *db.MediaSource) error {
-	// Check if already in database
-	if _, err := s.db.GetExtraByFilePath(filePath); err == nil {
-		return nil // Already exists
+	// Already known. One that belongs to nothing gets another try: its film
+	// or show may have arrived since, or been named a little differently.
+	if existing, err := s.db.GetExtraByFilePath(filePath); err == nil {
+		if existing.MovieID == nil && existing.TVShowID == nil && existing.EpisodeID == nil {
+			parseResult := ParseExtrasFilename(filePath, source.Path)
+			s.linkExtraToParent(existing, parseResult, source.Path, filePath)
+			if existing.MovieID != nil || existing.TVShowID != nil {
+				return s.db.SetExtraParent(existing)
+			}
+		}
+		return nil
 	}
 
 	// Extract metadata using MetadataExtractor
@@ -397,6 +406,14 @@ func (s *Scanner) linkExtraToParent(extra *db.Extra, parseResult ExtrasParseResu
 
 	// Try to link to movie
 	if isMovie || !isTV {
+		// The film whose own folder or title is this folder's name, give or
+		// take spaces, case and punctuation: "Ghost Busters" is Ghostbusters.
+		if film := s.filmNamed(cleanParentName); film != nil {
+			extra.MovieID = &film.ID
+			log.Printf("Linked extra to movie by name: %s (from '%s')", film.Title, parentName)
+			return
+		}
+
 		// Try with cleaned name first using fuzzy search
 		movies, err := s.db.SearchMediaFuzzy(cleanParentName, db.MediaTypeMovie, 5)
 		if err == nil && len(movies) > 0 {
@@ -418,4 +435,44 @@ func (s *Scanner) linkExtraToParent(extra *db.Extra, parseResult ExtrasParseResu
 	}
 
 	log.Printf("Could not link extra to parent: %s (cleaned: %s)", parentName, cleanParentName)
+}
+
+// filmNamed finds the one film whose title, or the folder its file is in,
+// is name once both are reduced to letters and digits. Nil when none is, or
+// when more than one film answers to it.
+func (s *Scanner) filmNamed(name string) *db.Media {
+	want := lettersAndDigits(name)
+	if want == "" {
+		return nil
+	}
+	films, err := s.db.GetMediaByType(db.MediaTypeMovie, 1_000_000, 0)
+	if err != nil {
+		return nil
+	}
+	var found *db.Media
+	for _, film := range films {
+		if lettersAndDigits(film.Title) != want && lettersAndDigits(filepath.Base(filepath.Dir(film.FilePath))) != want {
+			continue
+		}
+		// Copies of one film share a match; different films with one name
+		// are left for a person to sort out.
+		if found != nil && (found.TMDbID == 0 || found.TMDbID != film.TMDbID) {
+			return nil
+		}
+		if found == nil || film.Duration > found.Duration {
+			found = film
+		}
+	}
+	return found
+}
+
+// lettersAndDigits lower-cases s and keeps only its letters and digits.
+func lettersAndDigits(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
