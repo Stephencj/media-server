@@ -3,13 +3,16 @@ package com.mediaserver.tv.data.repository
 import com.mediaserver.tv.data.api.MediaServerApi
 import com.mediaserver.tv.data.models.ContinueWatchingItem
 import com.mediaserver.tv.data.models.Extra
+import com.mediaserver.tv.data.api.UpdateProgressRequest
 import com.mediaserver.tv.data.models.Media
+import com.mediaserver.tv.data.models.WatchProgress
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class MediaRepository @Inject constructor(
-    private val api: MediaServerApi
+    private val api: MediaServerApi,
+    private val authRepository: AuthRepository
 ) {
     suspend fun getMovies(limit: Int = 50, offset: Int = 0): Result<List<Media>> = runCatching {
         api.getMovies(limit, offset).items
@@ -30,6 +33,24 @@ class MediaRepository @Inject constructor(
     suspend fun getContinueWatching(limit: Int = 10): Result<List<ContinueWatchingItem>> = runCatching {
         api.getContinueWatching(limit).items
     }
+
+    suspend fun getProgress(mediaId: Long, mediaType: String): Result<WatchProgress> = runCatching {
+        api.getProgress(mediaId, mediaType)
+    }
+
+    suspend fun updateProgress(
+        mediaId: Long,
+        position: Int,
+        duration: Int,
+        mediaType: String,
+        completed: Boolean = false
+    ): Result<WatchProgress> = runCatching {
+        api.updateProgress(mediaId, UpdateProgressRequest(position, duration, mediaType, completed))
+    }
+
+    /** The file as-is; the player sends the auth header itself. */
+    fun getDirectPlayUrl(mediaId: Long, mediaType: String): String =
+        "${authRepository.serverUrl}/api/stream/$mediaId/direct?type=$mediaType"
 
     suspend fun triggerScan(): Result<Unit> = runCatching {
         api.triggerScan()

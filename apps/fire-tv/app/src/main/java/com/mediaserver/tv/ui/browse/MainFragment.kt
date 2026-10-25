@@ -14,7 +14,6 @@ import com.mediaserver.tv.R
 import com.mediaserver.tv.data.models.ContinueWatchingItem
 import com.mediaserver.tv.data.models.Media
 import com.mediaserver.tv.ui.detail.DetailActivity
-import com.mediaserver.tv.ui.settings.SettingsActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 

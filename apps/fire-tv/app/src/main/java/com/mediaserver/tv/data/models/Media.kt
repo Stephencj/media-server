@@ -53,16 +53,32 @@ data class Media(
         get() = backdropPath?.let { "https://image.tmdb.org/t/p/w780$it" }
 }
 
+/** Where a user is in a video. The server answers with only media_id,
+ *  position, duration and completed when nothing is saved yet. */
 @Serializable
-data class ContinueWatchingItem(
-    val id: Long,
-    @SerialName("user_id") val userId: Long,
+data class WatchProgress(
+    val id: Long = 0,
+    @SerialName("user_id") val userId: Long = 0,
     @SerialName("media_id") val mediaId: Long,
-    @SerialName("media_type") val mediaType: String,
+    @SerialName("media_type") val mediaType: String = "movie",
     val position: Int,
     val duration: Int,
-    val completed: Boolean,
-    @SerialName("updated_at") val updatedAt: String
+    val completed: Boolean = false,
+    @SerialName("updated_at") val updatedAt: String? = null
+) : java.io.Serializable {
+    val formattedRemaining: String
+        get() {
+            val left = (duration - position).coerceAtLeast(0)
+            val hours = left / 3600
+            val minutes = (left % 3600) / 60
+            return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+        }
+}
+
+@Serializable
+data class ContinueWatchingItem(
+    val media: Media,
+    val progress: WatchProgress
 )
 
 @Serializable

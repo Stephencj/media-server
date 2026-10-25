@@ -6,6 +6,7 @@ import android.widget.ProgressBar
 import androidx.core.content.ContextCompat
 import androidx.leanback.widget.ImageCardView
 import androidx.leanback.widget.Presenter
+import coil.load
 import com.mediaserver.tv.R
 import com.mediaserver.tv.data.models.ContinueWatchingItem
 
@@ -34,6 +35,12 @@ class ContinueWatchingPresenter : Presenter() {
         cardView.titleText = media.title
         cardView.contentText = "${progress.formattedRemaining} remaining"
         cardView.mainImage = defaultCardImage
+        media.posterUrl?.let { url ->
+            cardView.mainImageView?.load(url) {
+                placeholder(defaultCardImage)
+                error(defaultCardImage)
+            }
+        }
 
         // The info area shows progress - we'll use content text for now
         // In a more complete implementation, you'd add a custom progress bar

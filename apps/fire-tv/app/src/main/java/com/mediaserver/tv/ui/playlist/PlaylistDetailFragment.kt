@@ -9,7 +9,7 @@ import androidx.leanback.widget.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.bumptech.glide.Glide
+import coil.load
 import com.mediaserver.tv.R
 import com.mediaserver.tv.data.models.PlaylistItem
 import com.mediaserver.tv.ui.player.PlayerActivity
@@ -54,8 +54,8 @@ class PlaylistDetailFragment : BrowseSupportFragment(), OnItemViewClickedListene
     }
 
     private fun setupUI() {
-        brandColor = ContextCompat.getColor(requireContext(), R.color.fastlane_background)
-        searchAffordanceColor = ContextCompat.getColor(requireContext(), R.color.search_opaque)
+        brandColor = ContextCompat.getColor(requireContext(), R.color.brand_color)
+        searchAffordanceColor = ContextCompat.getColor(requireContext(), R.color.search_color)
     }
 
     private fun updateUI(state: PlaylistDetailUiState) {
@@ -188,9 +188,7 @@ class PlaylistItemPresenter : Presenter() {
         cardView.setMainImageDimensions(CARD_WIDTH, CARD_HEIGHT)
 
         playlistItem.posterUrl?.let { url ->
-            Glide.with(cardView.context)
-                .load(url)
-                .into(cardView.mainImageView!!)
+            cardView.mainImageView?.load(url)
         }
     }
 

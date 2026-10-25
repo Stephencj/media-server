@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.leanback.widget.ImageCardView
 import androidx.leanback.widget.Presenter
+import coil.load
 import com.mediaserver.tv.R
 import com.mediaserver.tv.data.models.Media
 import com.mediaserver.tv.data.models.MediaType
@@ -40,11 +41,12 @@ class CardPresenter : Presenter() {
             cardView.badgeImage = null
         }
 
-        // TODO: Load actual poster image using Coil
-        // if (media.posterPath != null) {
-        //     val imageUrl = "${serverUrl}${media.posterPath}"
-        //     cardView.mainImageView.load(imageUrl)
-        // }
+        media.posterUrl?.let { url ->
+            cardView.mainImageView?.load(url) {
+                placeholder(defaultCardImage)
+                error(defaultCardImage)
+            }
+        }
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {

@@ -134,18 +134,6 @@ data class User(
 )
 
 @kotlinx.serialization.Serializable
-data class WatchProgress(
-    val id: Long,
-    @kotlinx.serialization.SerialName("user_id") val userId: Long,
-    @kotlinx.serialization.SerialName("media_id") val mediaId: Long,
-    @kotlinx.serialization.SerialName("media_type") val mediaType: String,
-    val position: Int,
-    val duration: Int,
-    val completed: Boolean,
-    @kotlinx.serialization.SerialName("updated_at") val updatedAt: String
-)
-
-@kotlinx.serialization.Serializable
 data class UpdateProgressRequest(
     val position: Int,
     val duration: Int,

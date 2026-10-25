@@ -11,6 +11,8 @@ import androidx.leanback.widget.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.mediaserver.tv.R
 import com.mediaserver.tv.data.models.Extra
 import com.mediaserver.tv.data.models.Media
@@ -52,7 +54,7 @@ class DetailFragment : DetailsSupportFragment() {
         super.onViewCreated(view, savedInstanceState)
 
         media?.let {
-            viewModel.loadProgress(it.id, it.type.name.lowercase())
+            viewModel.loadProgress(it.id, it.type.value)
             viewModel.loadExtras(it.id, it.type)
         }
 
@@ -73,8 +75,17 @@ class DetailFragment : DetailsSupportFragment() {
 
         val detailsRow = DetailsOverviewRow(media)
 
-        // Placeholder image
-        detailsRow.imageDrawable = ContextCompat.getDrawable(requireContext(), R.drawable.default_poster)
+        // The poster, once it's loaded. The placeholder shape has no size of its
+        // own and stretched across the whole page, hiding the title and Play.
+        media.posterUrl?.let { url ->
+            val density = resources.displayMetrics.density
+            val request = ImageRequest.Builder(requireContext())
+                .data(url)
+                .size((POSTER_WIDTH_DP * density).toInt(), (POSTER_HEIGHT_DP * density).toInt())
+                .target { drawable -> detailsRow.imageDrawable = drawable }
+                .build()
+            requireContext().imageLoader.enqueue(request)
+        }
 
         // Actions
         val actionAdapter = ArrayObjectAdapter()
@@ -231,7 +242,7 @@ class DetailFragment : DetailsSupportFragment() {
     override fun onResume() {
         super.onResume()
         media?.let {
-            viewModel.loadProgress(it.id, it.type.name.lowercase())
+            viewModel.loadProgress(it.id, it.type.value)
         }
     }
 
@@ -242,6 +253,9 @@ class DetailFragment : DetailsSupportFragment() {
         private const val ACTION_PLAY = 1L
         private const val ACTION_RESUME = 2L
         private const val ACTION_ADD_WATCHLIST = 3L
+
+        private const val POSTER_WIDTH_DP = 180
+        private const val POSTER_HEIGHT_DP = 270
 
         fun newInstance(media: Media, startPosition: Int = 0): DetailFragment {
             return DetailFragment().apply {

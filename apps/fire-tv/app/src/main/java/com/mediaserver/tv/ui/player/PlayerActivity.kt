@@ -1,5 +1,7 @@
 package com.mediaserver.tv.ui.player
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -17,6 +19,7 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.ui.PlayerView
 import com.mediaserver.tv.R
 import com.mediaserver.tv.data.models.Media
+import com.mediaserver.tv.data.models.MediaType
 import com.mediaserver.tv.data.repository.AuthRepository
 import com.mediaserver.tv.data.repository.MediaRepository
 import dagger.hilt.android.AndroidEntryPoint
@@ -99,7 +102,7 @@ class PlayerActivity : FragmentActivity() {
                     )
 
                 // Try direct play first, fall back to HLS
-                val streamUrl = mediaRepository.getDirectPlayUrl(media.id)
+                val streamUrl = mediaRepository.getDirectPlayUrl(media.id, media.type.value)
                 val mediaItem = MediaItem.fromUri(streamUrl)
 
                 val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
@@ -224,5 +227,12 @@ class PlayerActivity : FragmentActivity() {
     companion object {
         const val EXTRA_MEDIA = "extra_media"
         const val EXTRA_START_POSITION = "extra_start_position"
+
+        /** For a playlist entry, which carries only the id, title and type. */
+        fun createIntent(context: Context, mediaId: Long, title: String, mediaType: String): Intent =
+            Intent(context, PlayerActivity::class.java).apply {
+                val type = MediaType.values().firstOrNull { it.value == mediaType } ?: MediaType.MOVIE
+                putExtra(EXTRA_MEDIA, Media(id = mediaId, title = title, type = type))
+            }
     }
 }
