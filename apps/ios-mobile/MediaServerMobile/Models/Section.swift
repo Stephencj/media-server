@@ -61,9 +61,15 @@ struct SectionRule: Identifiable, Codable {
     }
 }
 
-// API response wrapper
+// API response wrapper with lenient decoding
 struct SectionsResponse: Codable {
     let sections: [LibrarySection]
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        // Decode sections leniently: missing or null -> []
+        sections = try container.decodeIfPresent([LibrarySection].self, forKey: .sections) ?? []
+    }
 }
 
 // LibrarySection with media items
