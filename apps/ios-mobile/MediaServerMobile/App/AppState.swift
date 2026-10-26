@@ -19,17 +19,9 @@ class AppState: ObservableObject {
     @Published var preferredAudioLanguage: String {
         didSet { UserDefaults.standard.set(preferredAudioLanguage, forKey: "preferredAudioLanguage") }
     }
-    @Published var preferredSubtitleLanguage: String? {
-        didSet { UserDefaults.standard.set(preferredSubtitleLanguage, forKey: "preferredSubtitleLanguage") }
-    }
-    @Published var subtitlesEnabled: Bool {
-        didSet { UserDefaults.standard.set(subtitlesEnabled, forKey: "subtitlesEnabled") }
-    }
 
     private init() {
         self.preferredAudioLanguage = UserDefaults.standard.string(forKey: "preferredAudioLanguage") ?? "en"
-        self.preferredSubtitleLanguage = UserDefaults.standard.string(forKey: "preferredSubtitleLanguage")
-        self.subtitlesEnabled = UserDefaults.standard.bool(forKey: "subtitlesEnabled")
     }
 
     func showError(_ message: String) {
