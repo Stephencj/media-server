@@ -13,6 +13,7 @@
 		A10000000000000000000095 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000095 /* SettingsView.swift */; };
 		A10000000000000000000096 /* QRLoginScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000096 /* QRLoginScannerView.swift */; };
 		A10000000000000000000094 /* AudioSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000094 /* AudioSessionManager.swift */; };
+		A100000000000000000000AA /* SubtitleChoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = A200000000000000000000AA /* SubtitleChoice.swift */; };
 		A10000000000000000000005 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* AuthService.swift */; };
 		A10000000000000000000000E5 /* ServerLocator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000000E5 /* ServerLocator.swift */; };
 		A10000000000000000000007 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* User.swift */; };
@@ -58,6 +59,7 @@
 		A20000000000000000000095 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A20000000000000000000096 /* QRLoginScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRLoginScannerView.swift; sourceTree = "<group>"; };
 		A20000000000000000000094 /* AudioSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSessionManager.swift; sourceTree = "<group>"; };
+		A200000000000000000000AA /* SubtitleChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleChoice.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		A20000000000000000000000E5 /* ServerLocator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerLocator.swift; sourceTree = "<group>"; };
 		A20000000000000000000007 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
@@ -172,6 +174,7 @@
 				A20000000000000000000000E5 /* ServerLocator.swift */,
 				A20000000000000000000020 /* APIClient.swift */,
 				A20000000000000000000094 /* AudioSessionManager.swift */,
+				A200000000000000000000AA /* SubtitleChoice.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -290,6 +293,7 @@
 				A10000000000000000000095 /* SettingsView.swift in Sources */,
 				A10000000000000000000096 /* QRLoginScannerView.swift in Sources */,
 				A10000000000000000000094 /* AudioSessionManager.swift in Sources */,
+				A100000000000000000000AA /* SubtitleChoice.swift in Sources */,
 				A10000000000000000000005 /* AuthService.swift in Sources */,
 				A10000000000000000000000E5 /* ServerLocator.swift in Sources */,
 				A10000000000000000000007 /* User.swift in Sources */,
