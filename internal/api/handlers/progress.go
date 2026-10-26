@@ -123,7 +123,7 @@ func (h *ProgressHandler) GetContinueWatching(c *gin.Context) {
 	}
 
 	// Fetch media details for each progress item
-	var items []ContinueWatchingItem
+	items := []ContinueWatchingItem{}
 	for _, p := range progressItems {
 		media, err := h.db.GetMediaByID(p.MediaID)
 		if err != nil {
