@@ -68,3 +68,7 @@ tools/deploy-app/dist/
 tools/deploy-app/release/
 tools/deploy-app/*.dmg
 tools/deploy-app/*.zip
+
+# Python bytecode (regenerated on every run)
+__pycache__/
+*.pyc

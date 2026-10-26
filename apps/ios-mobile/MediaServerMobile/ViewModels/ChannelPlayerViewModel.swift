@@ -17,6 +17,7 @@ class ChannelPlayerViewModel: ObservableObject {
     private let api = APIClient.shared
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
+    private var subtitles: AnyCancellable?
     private var refreshTask: Task<Void, Never>?
     private var currentMediaId: Int64?
     private var currentScheduleItemId: Int64?
@@ -122,6 +123,9 @@ class ChannelPlayerViewModel: ObservableObject {
 
         let playerItem = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: playerItem)
+        // Each programme is a new item: keep the viewer's subtitle choice on it,
+        // in Picture in Picture too, where there is no menu to turn them back on.
+        subtitles = SubtitleChoice.follow(playerItem)
 
         setupObservers()
 
