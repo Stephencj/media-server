@@ -18,6 +18,7 @@ class PlayerViewModel: ObservableObject {
 
     private var timeObserver: Any?
     private var cancellables = Set<AnyCancellable>()
+    private var subtitles: AnyCancellable?
     private var lastSavedPosition: Int = 0
     private let saveInterval: Int = 10 // Save every 10 seconds of playback
 
@@ -140,19 +141,8 @@ class PlayerViewModel: ObservableObject {
             }
         }
 
-        // Apply subtitle preference
-        if AppState.shared.subtitlesEnabled,
-           let preferredSubtitleLanguage = AppState.shared.preferredSubtitleLanguage,
-           let subtitleGroup = try? await playerItem.asset.loadMediaSelectionGroup(for: .legible) {
-            if let option = subtitleGroup.options.first(where: {
-                $0.locale?.languageCode == preferredSubtitleLanguage
-            }) {
-                playerItem.select(option, in: subtitleGroup)
-            }
-        } else if let subtitleGroup = try? await playerItem.asset.loadMediaSelectionGroup(for: .legible) {
-            // Disable subtitles if not enabled in preferences
-            playerItem.select(nil, in: subtitleGroup)
-        }
+        // Subtitles: the last choice made in the player's menu (SubtitleChoice).
+        subtitles = SubtitleChoice.follow(playerItem)
     }
 
     private func updateTime(_ time: CMTime) {
@@ -199,15 +189,7 @@ class PlayerViewModel: ObservableObject {
 
         Task {
             if let group = try? await playerItem.asset.loadMediaSelectionGroup(for: .legible) {
-                if let language = language {
-                    if let option = group.options.first(where: {
-                        $0.locale?.languageCode == language
-                    }) {
-                        playerItem.select(option, in: group)
-                    }
-                } else {
-                    playerItem.select(nil, in: group)
-                }
+                SubtitleChoice.apply(language ?? "", to: playerItem, in: group)
             }
         }
     }
